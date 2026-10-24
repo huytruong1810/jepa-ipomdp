@@ -185,6 +185,27 @@
 #      enabled), so a resume reads it from the checkpoint like every other stream. The construction reseeds
 #      torch's global generator, which is deterministic and checkpointed (torch_rng), so resume is bit-exact.
 #    - retrain_every = 0 (the default, canonical Tiger) builds, draws and logs nothing new.
+#    - cfg.retrain_weight_decay = lambda (2026-10-24; default None = the trainer's weight_decay): AdamW's
+#      decoupled weight decay during the retrain's updates only, written onto the optimizer's param groups
+#      before them and reset to cfg.trainer.weight_decay after them, so the online training between retrains
+#      and every checkpoint (written between collections) keep the online decay. Motivation: objective_ab.py
+#      2m (the strong-weight-decay screen): at lambda = 1 a whole-buffer retrain can run 25600 updates without
+#      the overfitting that 2b saw past ~6400 at lambda <= 0.1 (held-out NLL 0.232 vs 0.269), repairs the
+#      declined-state observation model (glitter 0.41 -> 0.55 of exact) and plays +35.5 +- 25.6 on seed 0.
+#      Theory: weight-norm control of generalisation (Omnigrok, Liu et al. 2023; Power et al. 2022). Only the
+#      retrain gets it, because in-agent overfitting under repeated replay was the original problem and the
+#      online decay is a separate question.
+#    - Pre-registered in-agent screen (HANDOFF 6.2e Step G2; written 2026-10-24 before any G2 run, launched only
+#      if the objective_ab.py 2m 3-seed extension (G1) passes): the retrain recipe (runs/sweeps/wumpus_retrain/
+#      sweep.json overrides) with training.retrain_updates=25600 training.retrain_weight_decay=1.0, retrain_every
+#      kept at 50 (both retrains get the new setting: one rule, and the first one shapes the data of collections
+#      51-100 as in the recipe), sweep wumpus_retrain_wd1, development seeds 0, 1, 2, each paired per game against
+#      runs/sweeps/wumpus_retrain/seed<s>/analysis/games.npz (512 games, analysis seed 12345;
+#      reports/2026-10-22_option_a/paired_readout.py). Cost ~8 h per seed (two retrains of ~2.5 h each).
+#      * PASS: paired mean > 0 on 3 of 3 seeds, mean of the three >= +30, and deaths <= retrain + 2 points on
+#        each seed -> seeds 3, 4; it becomes the Wumpus recipe, then the stacking screens (HANDOFF 6.2e G3).
+#      * FAIL: the offline gain does not survive in-agent (the first retrain changes the later data, best.pt
+#        selection differs); compare with the offline u25600 numbers before any further run.
 #    - Pre-registered test (2026-10-16, before launch; runs/wumpus/retrain_chain.sh): the current recipe +
 #      value_estimator=double + retrain_every=50, retrain_updates=6400 (retrains after collections 50 and 100;
 #      the second is the retrain_play.py condition, the first also changes the data of collections 51-100),
@@ -345,6 +366,7 @@ class RunConfig:
     value_estimator: ValueEstimator   # max (default) | double | clipped_double value targets (section 13)
     retrain_every: int                # whole-buffer retrain every N collections (section 14); 0 = off
     retrain_updates: int              # uniform updates on the whole buffer after each retrain
+    retrain_weight_decay: float | None  # AdamW weight decay during the retrain's updates; None = the trainer's
     value_equivalent_weight: float    # value-equivalent observation term (section 15); 0 = off
     risk_margin: float                # fixed planning-time risk margin k (section 16); 1 = off
     trial_prob: float                 # own turn-then-step trials in collection (section 17); 0 = off
@@ -364,6 +386,8 @@ class TrainingRun:
             raise ValueError("a double or clipped-double value is not combined with time_aware_value or value_nstep (section 13).")
         if (cfg.retrain_every > 0) != (cfg.retrain_updates > 0):
             raise ValueError("retrain_every and retrain_updates must both be positive or both 0 (section 14).")
+        if cfg.retrain_weight_decay is not None and (cfg.retrain_every == 0 or cfg.retrain_weight_decay <= 0.0):
+            raise ValueError("retrain_weight_decay needs retrain_every > 0 and a positive value (section 14).")
         if cfg.self_predictive_weight > 0.0 and cfg.representation is not Representation.DECODER:
             raise ValueError("self_predictive_weight is for the decoder representation; JEPA has the term already (section 18).")
         if (cfg.risk_margin != 1.0 or cfg.trial_prob > 0.0) and setup.risk is None:
@@ -466,9 +490,15 @@ class TrainingRun:
         self.trainer.optimizer.load_state_dict(fresh.trainer.optimizer.state_dict())     # empty Adam moments
         del fresh
         metrics: dict[str, float] = {}
+        groups = self.trainer.optimizer.param_groups
+        if self.cfg.retrain_weight_decay is not None:                    # the retrain's own decay (section 14)
+            for group in groups:
+                group["weight_decay"] = self.cfg.retrain_weight_decay
         for _ in range(self.cfg.retrain_updates):
             metrics = self.trainer.train_step(self.buffer.sample(self.cfg.batch_size))
             self._update_acting()
+        for group in groups:                                             # the online training's decay again
+            group["weight_decay"] = self.cfg.trainer.weight_decay
         return metrics
 
     def _store(self, episodes: EpisodeBatch, greedy: bool) -> None:

@@ -27,7 +27,7 @@ def _config(**overrides) -> RunConfig:
         temperature_min=0.1, temperature_decay=0.5, epsilon=0.0, epsilon_min=0.0, store_eval_episodes=False,
         time_aware_value=False, value_nstep=0, value_nstep_mix=0.5,
         detached_planning_head=False, privileged_belief_loss=False, value_estimator=ValueEstimator.MAX,
-        retrain_every=0, retrain_updates=0, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0)
+        retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0)
     values.update(overrides)
     return RunConfig(**values)
 
@@ -268,8 +268,29 @@ class TestWholeBufferRetrain:
         trained = [(a - f).abs().max() for a, f in zip(plain.belief_filter.parameters(), fresh.belief_filter.parameters())]
         assert sum(moved) < sum(trained)
 
+    def test_retrain_weight_decay_applies_to_the_retrain_only(self):
+        for options in (dict(retrain_weight_decay=1.0), dict(retrain_every=2, retrain_updates=3, retrain_weight_decay=0.0)):
+            with pytest.raises(ValueError):
+                self._run(**options)
+        run = self._run(retrain_every=2, retrain_updates=3, retrain_weight_decay=1.0)
+        seen: list[float] = []
+        step = run.trainer.train_step
+        def recording_step(batch):
+            seen.append(run.trainer.optimizer.param_groups[0]["weight_decay"])
+            return step(batch)
+        run.trainer.train_step = recording_step
+        run.collect_and_train(); run.collect_and_train()
+        online = run.cfg.trainer.weight_decay
+        assert seen == [online] * 4 + [1.0] * 3                # 2 + 2 online updates, then the 3 retrain updates
+        assert all(group["weight_decay"] == online for group in run.trainer.optimizer.param_groups)
+        # With the online decay as the retrain decay the run is identical to the option left off.
+        same, off = (self._run(retrain_every=2, retrain_updates=3, retrain_weight_decay=online),
+                     self._run(retrain_every=2, retrain_updates=3))
+        assert [same.collect_and_train() for _ in range(3)] == [off.collect_and_train() for _ in range(3)]
+        assert all(torch.equal(a, b) for a, b in zip(_parameters(same), _parameters(off)))
+
     def test_resume_continues_bit_for_bit(self, tmp_path: Path):
-        options = dict(retrain_every=2, retrain_updates=3)
+        options = dict(retrain_every=2, retrain_updates=3, retrain_weight_decay=1.0)
         reference = self._run(**options)
         expected = [reference.collect_and_train() for _ in range(4)] + [reference.evaluate()]
         first = self._run(**options)
