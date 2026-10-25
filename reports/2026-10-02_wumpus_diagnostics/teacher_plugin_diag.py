@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-12; user choice "plug-in test", HANDOFF sections 5.9 and 6.2 C):
+# 1. Question (2026-10-12; chosen "plug-in test"):
 #    - With a near-exact latent (the oracle-latent arm, model.privileged_belief_loss) the agent still
 #      idles, and its own value is MORE over-optimistic on idle states (V_hat - realised return ~950).
 #      On those latents a value fitted to the exact-belief heuristic's returns ranks FORWARD first at the

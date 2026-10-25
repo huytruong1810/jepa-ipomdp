@@ -4,14 +4,14 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-09, HANDOFF section 6 step 1; user choice "screen offline, then train"):
+# 1. Question (2026-10-09; chosen "screen offline, then train"):
 #    - value_chain_diag.py (M4): on the current agent's FROZEN latents, a fresh value fitted to the
 #      exact-belief heuristic's Monte Carlo returns prefers FORWARD at the safe unvisited cells the
 #      agent declines (66-73%), while the learned value prefers the no-op. Two in-training remedies
 #      (time-aware value, n-step returns of the agent's own greedy games) failed at ~9 GPU-hours each.
 #    - Before training another remedy, screen candidate targets the AGENT ITSELF could use, on the
 #      same frozen latents and with the same M4 test. Only a target that passes is worth a training run.
-#    - Caveat on the optimistic target (corrects HANDOFF section 6): a single realised return G is NOT
+#    - Caveat on the optimistic target (a correction of the earlier plan): a single realised return G is NOT
 #      <= V*(b); only its expectation over the hidden layout is. max(V, G) is therefore biased upward
 #      by lucky layouts, the known weakness of self-imitation learning in stochastic environments.
 #      This screen measures that bias (V_fit - realised return on the greedy games).

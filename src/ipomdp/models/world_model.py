@@ -64,7 +64,7 @@
 #      z' = BeliefFilter.step(z, a, o'). Imagined latents are therefore exactly the latents
 #      the filter would produce after that history, on the manifold the heads were trained
 #      on, and branching mirrors the exact belief tree of the benchmark solver.
-# 7. Whole-Sequence Unroll Hoists the Input Network (2026-10-04, user-approved speed-up):
+# 7. Whole-Sequence Unroll Hoists the Input Network (2026-10-04 speed-up):
 #    - input_net reads only (a_t, o_{t+1}), never the latent, so unroll() applies it to the whole
 #      sequence in one call and loops only the GRU cell. step() (used by the planner, one
 #      transition at a time) is the same function: z_{t+1} = cell(input_net([a_t, o_{t+1}]), z_t).
@@ -72,7 +72,7 @@
 #      bit-identical under bf16 autocast, but gradients accumulate input_net's weight gradient in
 #      one GEMM instead of T, so training differs at floating-point-summation level: runs before
 #      this change (including the cited Tiger sweeps) reproduce bit-for-bit only at their own
-#      commits. Statistical equivalence on Tiger is checked separately (HANDOFF.md).
+#      commits. Statistical equivalence on Tiger is checked separately.
 # ==============================================================================
 
 import torch

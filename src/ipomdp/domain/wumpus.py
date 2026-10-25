@@ -4,9 +4,9 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. The World (Russell & Norvig's Wumpus World, the variant chosen by the user, 2026-10-01):
+# 1. The World (Russell & Norvig's Wumpus World, the variant chosen, 2026-10-01):
 #    - A 4x4 grid. Cell index c = x + 4 y with x, y in 0..3; R&N's square [1,1] is c = 0,
-#      [2,1] is c = 1, [1,2] is c = 4. The hunter starts at c = 0 facing North (user decision,
+#      [2,1] is c = 1, [1,2] is c = 4. The hunter starts at c = 0 facing North (design decision,
 #      2026-10-02; R&N's own agent starts facing East).
 #    - Exactly 2 pits, 1 wumpus and 1 gold, on pairwise distinct cells, none at the start.
 #      Every such layout is equally likely: 105 pit pairs x 13 wumpus cells x 12 gold cells =
@@ -18,18 +18,18 @@
 #    - The arrow flies straight ahead from the hunter's cell to the wall; it kills the wumpus
 #      if the wumpus is anywhere on that line. A shot without the arrow costs -1 and does
 #      nothing. The dead wumpus's cell is safe to enter.
-#    - Discount gamma = 0.99 (user decision; DISCOUNT). R&N's performance measure is undiscounted;
-#      the discount keeps values finite. The window is 50 steps (user decision, 2026-10-02;
+#    - Discount gamma = 0.99 (design decision; DISCOUNT). R&N's performance measure is undiscounted;
+#      the discount keeps values finite. The window is 50 steps (design decision, 2026-10-02;
 #      conf/env/wumpus.yaml), shorter than the effective horizon 1/(1 - gamma) = 100 but ample
 #      for a 4x4 game: with the layout known, every winnable layout is won within 50 steps.
 #    - gamma is the one rule that configuration may change (env.discount, conf/env/wumpus.yaml;
-#      user decision 2026-10-09). The learned value overestimates idle states by ~650, and a
-#      wasted step costs only about 1 + (1 - gamma) V under the Bellman backup (HANDOFF section
-#      5.6), so a lower gamma is the experiment. It also changes value_bound and with it the
+#      design decision 2026-10-09). The learned value overestimates idle states by ~650, and a
+#      wasted step costs only about 1 + (1 - gamma) V under the Bellman backup,
+#      so a lower gamma is the experiment. It also changes value_bound and with it the
 #      two-hot support. Returns at different gammas are not comparable; win, death and
 #      unfinished rates are.
 #
-# 2. Percepts (the 5 R&N bits, user decision; position and heading are NOT observed):
+# 2. Percepts (the 5 R&N bits, design decision; position and heading are NOT observed):
 #      STENCH   the wumpus (alive or dead) is in the hunter's cell or a 4-neighbour
 #      BREEZE   a pit is in a 4-neighbour
 #      GLITTER  the gold is in the hunter's cell
@@ -38,11 +38,11 @@
 #    - Observation index = STENCH + 2 BREEZE + 4 GLITTER + 8 BUMP + 16 SCREAM (0..31), plus
 #      GAME_OVER = 32. The hunter must dead-reckon its position from its own actions and the
 #      bumps, as in R&N; position and heading are a deterministic function of the history.
-#    - Initial observation (user decision): the hunter perceives its start cell before acting,
+#    - Initial observation (design decision): the hunter perceives its start cell before acting,
 #      as in R&N. reset() therefore returns o_0 (the percepts at c = 0; never BUMP or SCREAM),
 #      unlike canonical Tiger, whose reset() emits nothing (env.py, section 2).
 #
-# 3. End of the Game Is an Absorbing State (user decision):
+# 3. End of the Game Is an Absorbing State (design decision):
 #    - After a win or a death the row stays in an absorbing state: observation GAME_OVER and
 #      reward 0 on every remaining step of the fixed 50-step window. The window holds exactly
 #      one game, the training objective is the standard episodic discounted return, and the
@@ -58,7 +58,7 @@
 #      one hypothetical copy per layout, and keeps the layouts whose predicted observation
 #      equals the real one. The filter therefore cannot disagree with the simulator.
 #    - The tensors T[a, s, s'] of a FinitePOMDP would need ~6M states; they are not built.
-#      There is no exact solver for this domain (user decision): learned agents are evaluated
+#      There is no exact solver for this domain (design decision): learned agents are evaluated
 #      by return, win and death rates, and their latents against the exact filter below.
 #
 # 5. Exact Belief by Enumeration (ground truth for probes and latent figures):

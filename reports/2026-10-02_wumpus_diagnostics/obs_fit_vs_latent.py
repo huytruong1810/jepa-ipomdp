@@ -4,12 +4,12 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-18, HANDOFF 6.2 Step A; pre-authorised):
+# 1. Question (2026-10-18):
 #    - q_localise_diag.py read MODEL on 5 of 5 seeds (C9): at the planner's declined distance-2 near-turn
 #      states, the learned observation head's P(o' | turned latent, FORWARD) is far from the exact one (TV
 #      0.40-0.51) and predicts glitter 2.3-4.5x too rarely, so the backup misses the value of information of
 #      entering a new cell.
-#    - Two causes predict different methods (HANDOFF 6.2 Step C):
+#    - Two causes predict different methods:
 #        FIT/OBJECTIVE -> the latent holds the information, the head's training does not put accuracy where
 #                         decisions need it: a value-equivalent observation loss (Grimm et al. 2020/2021) or
 #                         decision-aware weighting of the cross-entropy (VaGraM, Voelcker et al. 2022).
@@ -48,8 +48,8 @@
 #      on >= 4 of 5 seeds. Sub-reading: (iii) close and (ii) far -> label noise / sample efficiency of the hard
 #      CE; (ii) close and (i) far -> the joint training / schedule.
 #    - LATENT: (iv) far on >= 4 of 5 seeds.
-#    - Otherwise MIXED: report the per-seed numbers and decide with the user.
-#    - Caveat (R1a, HANDOFF 7): a fresh head that looks better offline can play worse (the planner selects its
+#    - Otherwise MIXED: report the per-seed numbers and decide before further runs.
+#    - Caveat (R1a): a fresh head that looks better offline can play worse (the planner selects its
 #      errors). This screen only localises the error; it does not pick a head for play.
 #
 # 4. Result 2026-10-18 (runs/sweeps/wumpus_retrain seeds 0-4, best.pt; replays = report.json, states =
@@ -71,7 +71,7 @@
 #      Even so, (iv) recovers well under half of the EP - M gap (EP 42-62%). About half of the glitter
 #      under-prediction is fit/schedule (joint vs fresh), and the remainder (ratio ~0.5, TV ~0.3) is not
 #      decodable from the frozen latent by this head.
-#    - Implication for Step C (HANDOFF 6.2): an observation-head-only objective (value-equivalent loss, VaGraM
+#    - Implication for Step C: an observation-head-only objective (value-equivalent loss, VaGraM
 #      weighting) cannot close this on the current latent; the latent itself must carry "what the cell ahead can
 #      reveal" (a latent-side term: self-predictive / value-equivalent representation learning, candidate 3),
 #      possibly with a decision-aware head on top. Caveat: decodability is measured with the agent's head

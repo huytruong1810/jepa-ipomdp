@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (user decision 2026-10-05, after the combined-fix run failed):
+# 1. Question (design decision 2026-10-05, after the combined-fix run failed):
 #    - greedy_deaths.py showed that on the greedy planner's own histories the acting observation
 #      head predicts P(GAME_OVER | z, FORWARD) ~ 0.01 at FORWARD steps that kill 57-97% of the
 #      time, while it reads 0.5-0.9 at such dangers on random/reference histories. Which of these
@@ -54,7 +54,7 @@
 #      _seed0 (greedy games stored): 0.2% / 2.7% / 5.5% and 89% / 43%. The greedy planner is the
 #      worst case because it selects the confident "safe" errors.
 #
-# 4. R0 of the representation plan (HANDOFF 6.2; pre-registered 2026-10-15 BEFORE any result was read):
+# 4. R0 of the representation plan (pre-registered 2026-10-15 BEFORE any result was read):
 #    - Networks: latest.pt of the six double-value runs, u64_store_eval_eps_decoder_k5_double_seed{0,1,2}
 #      (current recipe) and u64_store_eval_eps_decoder_k5_privileged_double_seed{0,1,2} (oracle recipe),
 #      512 greedy games each (runs/wumpus/head_shift_double_chain.sh). No code change from item 3.
@@ -71,7 +71,7 @@
 #    - Decision (each recipe by majority of its 3 seeds):
 #      (A) current miscalibrated, oracle calibrated, buffer-only fresh head on current latents recovers:
 #          the danger is in the latent and the head overfits its games -> R1 screens head-side arms
-#          (ensemble/uncertainty heads; the NLL-early-stopped detached head already failed, HANDOFF 7).
+#          (ensemble/uncertainty heads; the NLL-early-stopped detached head already failed).
 #      (B) as (A) but only buffer + greedy recovers: outcome coverage of the data is missing -> R1
 #          screens head/data arms.
 #      (C) neither fresh head recovers on current latents: the latent lacks the danger -> R1 screens
@@ -134,7 +134,7 @@
 #      latents (buffer only) 0.354 / 0.826 (died 0.64 / 1.00). The danger is in the latent; the jointly trained
 #      head does not report it. Caveat: the fresh heads train on latest.pt's buffer, which includes the
 #      collections after best.pt.
-#      -> R1 on the head side: the planning model's death estimate in the moderate range (HANDOFF 6.2).
+#      -> R1 on the head side: the planning model's death estimate in the moderate range.
 # ==============================================================================
 
 import sys

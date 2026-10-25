@@ -4,10 +4,10 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Scratch diagnostic of 2026-10-02, kept so the HANDOFF numbers are reproducible:
+# 1. Scratch diagnostic of 2026-10-02, kept so the reported numbers are reproducible:
 #    - Usage: uv run python <this> <run dir> <games> [greedy]. Compares the reward head's GRAB
 #      prediction with the exact 1000 P(gold at own cell) - 1 from the enumeration filter.
-#    - Source of 'the reward head is accurate' in HANDOFF.md, section 4c.
+#    - Source of the finding 'the reward head is accurate'.
 # ==============================================================================
 
 import sys

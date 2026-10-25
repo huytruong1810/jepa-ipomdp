@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Scratch diagnostic of 2026-10-02, kept so the HANDOFF numbers are reproducible:
+# 1. Scratch diagnostic of 2026-10-02, kept so the reported numbers are reproducible:
 #    - Value iteration over the hunter's 256 states for each of the 16,380 layouts with the
 #      domain's own step_rules; the mean over layouts of each known layout's value bounds V*(b0)
 #      from above. Also reports the fraction of layouts winnable within 50 / 100 steps.

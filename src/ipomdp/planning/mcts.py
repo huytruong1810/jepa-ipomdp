@@ -56,7 +56,7 @@
 #      follow PUCT's exploration and give a smoothed, exploratory policy.
 #    - Root visit counts and Q values are recorded for telemetry and tests.
 #
-# 6. Pruning Negligible Observations (Wumpus World, user decision 2026-10-01):
+# 6. Pruning Negligible Observations (Wumpus World, design decision 2026-10-01):
 #    - Wumpus World has 33 observations, so exact branching would create 5 x 33 = 165 Python
 #      child nodes per expansion although, in any given belief, most percept combinations are
 #      impossible. With observation_prune = eps > 0 an edge keeps only the observations with

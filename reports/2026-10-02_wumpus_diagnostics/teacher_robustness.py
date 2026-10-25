@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-09; user choice "check B's robustness first"):
+# 1. Question (2026-10-09; chosen "check B's robustness first"):
 #    - value_chain_diag.py M4: a value fitted on frozen latents to the exact-belief heuristic's Monte
 #      Carlo returns (256 games, 3000 full-batch Adam steps, no early stopping) prefers FORWARD at the
 #      agent's declined safe-cell steps on 66-73% of them.

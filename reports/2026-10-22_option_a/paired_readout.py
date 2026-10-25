@@ -1,6 +1,6 @@
 # ABSOLUTE PATH: reports/2026-10-22_option_a/paired_readout.py
 # ==============================================================================
-# PAIRED READOUT OF THE OPTION (a) IN-AGENT SCREEN (HANDOFF 6.2d, STEP 1)
+# PAIRED READOUT OF THE OPTION (a) IN-AGENT SCREEN (STEP 1)
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:

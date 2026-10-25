@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Why a Reference Agent (user decision, 2026-10-02):
+# 1. Why a Reference Agent (design decision, 2026-10-02):
 #    - Wumpus World has no exact solver (domain/wumpus.py, section 4), so a learned agent's
 #      return has no optimum to be compared with. This agent supplies the missing yardstick
 #      from below: any policy's return is a lower bound on V*(b0). The full-information bound
@@ -26,7 +26,7 @@
 #    d. Gamble: otherwise step into the frontier cell (unvisited, next to a reachable safe
 #       cell) with the lowest death probability P(pit) + P(wumpus alive there), if that
 #       probability is at most `risk_threshold`.
-#    e. Idle: otherwise TURN_LEFT. There is no Climb (user decision), so waiting out the window
+#    e. Idle: otherwise TURN_LEFT. There is no Climb (design decision), so waiting out the window
 #       at -1 per step is the remaining choice.
 #    - risk_threshold = 0 never gambles, so the agent can never die (tested); larger values
 #      trade deaths for wins. The analysis reports a small grid of thresholds.

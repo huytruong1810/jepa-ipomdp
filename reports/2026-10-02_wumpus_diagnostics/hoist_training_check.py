@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Diagnostic of 2026-10-04/05, kept so the HANDOFF numbers are reproducible:
+# 1. Diagnostic of 2026-10-04/05, kept so the reported numbers are reproducible:
 #    - Two collections on Tiger and Wumpus with each unroll variant (monkeypatched); compares
 #      metrics and parameter sums. Result (2026-10-04): not bit-identical (parameter sums differ by
 #      0.004 on Tiger and 0.025 on Wumpus after 16 updates; gradient summation order).

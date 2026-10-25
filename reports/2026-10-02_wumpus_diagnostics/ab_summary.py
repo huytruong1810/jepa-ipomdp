@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Statistics (user guidance, 2026-10-03: A/B with good statistics):
+# 1. Statistics (design rule, 2026-10-03: A/B with good statistics):
 #    - One log per (arch, seed); seeds differ only in initialisation and minibatch order, and
 #      the data pools are identical, so the arms are compared per seed (paired difference
 #      B - A with its own interval) as well as by arm means.

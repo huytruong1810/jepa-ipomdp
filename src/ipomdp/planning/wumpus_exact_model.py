@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Why a Planning Reference (HANDOFF section 1c, gap 3; 2026-10-19):
+# 1. Why a Planning Reference (gap 3; 2026-10-19):
 #    - The only Wumpus yardstick so far is a hand-written heuristic on the exact belief
 #      (agents/wumpus_reference.py, 573 per game), whose risk threshold was tuned on the same
 #      evaluation games. A reviewer expects a standard online POMDP planner with the TRUE model
@@ -37,7 +37,7 @@
 #      its steps left k (root: max_steps - t). A node with k = 0 pays 0 for every action and
 #      its children are worth 0: the search cannot collect reward after the window, and it is
 #      not misled by a stationary value bootstrapping through the truncation (the problem
-#      HANDOFF section 5.6 diagnosed in the learned value).
+#      diagnosed in the learned value).
 #    - Finished games are absorbing in the rules themselves (reward 0, GAME_OVER), so a
 #      game-over child is worth exactly 0. With an exact model that is correct (the
 #      co-adaptation caveat of exact_model_play.py, header 3a, concerns learned values only).

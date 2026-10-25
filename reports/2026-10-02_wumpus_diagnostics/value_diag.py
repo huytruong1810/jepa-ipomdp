@@ -4,11 +4,11 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Scratch diagnostic of 2026-10-02, kept so the HANDOFF numbers are reproducible:
+# 1. Scratch diagnostic of 2026-10-02, kept so the reported numbers are reproducible:
 #    - Usage: uv run python <this> <run dir> <games> [randomonly]. Compares V_hat(z_t) of the acting
 #      value head with realised discounted return-to-go, on random (and greedy) games, plus the
 #      one-step Bellman backup through the learned model and the mean Q per action.
-#    - Source of the 'flat value' finding in HANDOFF.md, section 4c (full_seed0, old setup).
+#    - Source of the 'flat value' finding (full_seed0, old setup).
 # ==============================================================================
 
 import sys

@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (HANDOFF section 6, step 1; agreed with the user on 2026-10-11):
+# 1. Question (2026-10-11):
 #    - unfinished_diag.py found that the greedy planner, facing a provably safe unvisited cell, steps in
 #      only 29-42% of the time, and that its one-step learned preference for the no-op is about -15.
 #      One idle step costs only about 1 + (1 - gamma) * V_hat ~ 7 under the self-consistent backup, less
@@ -34,7 +34,7 @@
 #      the noise floor G_A2 - G_A, the outcome of each branch, the new cells each branch reaches, and in
 #      F the steps until the planner declines a safe step again. Intervals are percentile bootstraps
 #      that resample games (steps of one game are correlated).
-#    - Pre-registered readout (HANDOFF section 6):
+#    - Pre-registered readout:
 #      (i)  median Delta_true > +15 and > 0 on most steps while the model's estimate is negative: the
 #           hypothesis holds; the fix belongs at the action-gap level (advantage learning, deeper search
 #           along FORWARD).

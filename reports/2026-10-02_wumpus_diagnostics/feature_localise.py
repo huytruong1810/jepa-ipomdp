@@ -4,14 +4,14 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-19, HANDOFF 6.2 Step D; pre-authorised, algorithm-design phase):
+# 1. Question (2026-10-19):
 #    - Step A (obs_fit_vs_latent.py) read LATENT: at the planner's declined distance-2 near-turn states no head on
 #      the frozen acting latent recovers the exact P(o' | turned latent, FORWARD) (glitter ratio ~0.5, TV ~0.3).
 #      Step B (exact_model_play.py) priced the learned one-step model at ~+208 per game.
 #    - P(o' | b, FORWARD) factorises over the cell ahead in the hunter's heading: whether it is a wall, whether it
 #      is unvisited, and the posterior P(gold), P(pit), P(live wumpus) there; glitter after FORWARD is exactly
 #      (1 - wall) * P(gold ahead) + wall * P(gold here) (asserted). Which factor the latent lacks, and where,
-#      picks the method branch (HANDOFF 1b candidates):
+#      picks the method branch:
 #        D1 SHIFT        -> the factors decode on ordinary buffer states but not at the turned latents: imagined /
 #                           counterfactual latents are off the filter's training support. Remedy: coverage of
 #                           decision-relevant counterfactuals, or training the model on its own branches (cand. 4).
@@ -66,7 +66,7 @@
 #      leaves the support.
 #    - D2 COMPOSITION/OBJECTIVE: every glitter-driving factor decodable on (a) and (c), the composed glitter
 #      ratio at (c) in [0.67, 1.5], and Step A's arm (iv) glitter ratio < 0.67, on >= 4 of 5 seeds.
-#    - Otherwise MIXED: report the per-seed table and decide with the user.
+#    - Otherwise MIXED: report the per-seed table and decide before further runs.
 #    - Pre-launch correction (2026-10-19, after the 8-game smoke, before any full run): at (b) and (c) the binary
 #      targets are near-constant by the selection (the cell ahead after the turn is never a wall), so the training
 #      majority is trivially right there and the "+5 points over majority" margin could never pass. The margin is
@@ -96,8 +96,7 @@
 #    - Reading: mostly a support SHIFT specific to the declined turn (the latent after "turn towards the unvisited
 #      safe cell" at states where the agent itself declines is rare in its data), plus a weaker, marginal
 #      representation deficit in "visited" tracking on the three weaker seeds. Consistent with the feedback-loop
-#      conjecture of HANDOFF 1b (idle -> no such data -> the model under-rates new cells -> idle). Decided with the
-#      user per section 3.
+#      feedback-loop conjecture (idle -> no such data -> the model under-rates new cells -> idle). Decided per section 3.
 # ==============================================================================
 
 import copy

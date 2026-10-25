@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-13; HANDOFF section 5.9, after q_head_screen.py):
+# 1. Question (2026-10-13, after q_head_screen.py):
 #    - After the last new cell, 50-90% of the greedy agent's actions are GRAB without gold or SHOOT
 #      without the arrow (unfinished_diag.py, all 8 current and oracle-latent runs). Both are exact
 #      no-ops: the world, the exact belief and (nearly) the latent stay put; value_chain_diag.py

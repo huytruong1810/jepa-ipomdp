@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (user decision 2026-10-11, HANDOFF section 6):
+# 1. Question (design decision 2026-10-11):
 #    - On Wumpus World the greedy planner idles in front of provably safe cells. Exact-belief
 #      overrides (reports/2026-10-02_wumpus_diagnostics/override_diag.py) price the idling at +300 per
 #      game, most of it from turning towards an adjacent safe cell and stepping in. The agent's latent

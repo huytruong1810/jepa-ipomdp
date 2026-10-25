@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-19 night, coverage_games.py readout, user away; my call under research autonomy):
+# 1. Question (2026-10-19 night, coverage_games.py readout):
 #    - On seed 0 the cover-arm networks repair the turned-latent model (glitter ratio 0.45 -> 0.77, decision share
 #      M 26 -> 58%) but die in 28% of games (control 4.5%; return -190 paired vs control).
 #    - The forced steps themselves are safe (forward_risk check on games_cover_seed1.pt: +1791 after-turn

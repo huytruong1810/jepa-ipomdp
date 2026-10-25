@@ -4,9 +4,9 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Scratch diagnostic of 2026-10-02, kept so the HANDOFF numbers are reproducible:
+# 1. Scratch diagnostic of 2026-10-02, kept so the reported numbers are reproducible:
 #    - Usage: uv run python <this> <run dir> <games> <simulations>. Same analysis simulator
-#      stream as analyze.py. Source of 'search depth is not the bottleneck' (HANDOFF.md, 4c).
+#      stream as analyze.py. Source of 'search depth is not the bottleneck'.
 # ==============================================================================
 
 import sys, json

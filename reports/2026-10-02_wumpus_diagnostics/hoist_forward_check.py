@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Diagnostic of 2026-10-04/05, kept so the HANDOFF numbers are reproducible:
+# 1. Diagnostic of 2026-10-04/05, kept so the reported numbers are reproducible:
 #    - Compares BeliefFilter.unroll's per-step loop with input_net hoisted out of the loop, on
 #      Tiger and Wumpus sizes, with and without bf16 autocast. Written before the hoist was
 #      committed: today's unroll() IS the hoisted version, so rerun it at commit 62deb68 to

@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (user decision, 2026-10-03):
+# 1. Question (design decision, 2026-10-03):
 #    - The same GRU filter learns cell, heading and the danger ahead almost perfectly from
 #      privileged supervision (supervised_filter.py), but not from the agent's objectives. Which
 #      objective closes the gap? Arms: representation (jepa | decoder) x observation_horizon
@@ -25,7 +25,7 @@
 #    - Output: "RESULT name value" lines after training (parsed by ab_summary.py), plus
 #      "RESULT@<updates> name value" lines at the --score-at update counts (learning curves).
 #
-# 2b. Overfitting A/B (user decision, 2026-10-06; head_shift.py found the jointly trained filter and
+# 2b. Overfitting A/B (design decision, 2026-10-06; head_shift.py found the jointly trained filter and
 #    observation head calibrated in-sample but overconfident on fresh games):
 #    - Arms: --weight-decay (AdamW, every trained network) and --train-games (the first n games of
 #      each half of the training pool, so 2n games), plus the --score-at learning curve as the
@@ -35,21 +35,21 @@
 #      mean exact danger at held-out states where the head predicts P(death | FORWARD) < 0.02 (the
 #      confident "safe" errors the greedy planner exploits; 0 for a perfect head).
 #
-# 2c. Horizon A/B and saved networks (user decision, 2026-10-09: latent work after every value-side
+# 2c. Horizon A/B and saved networks (design decision, 2026-10-09: latent work after every value-side
 #    remedy for the unfinished games failed):
 #    - Arms: --horizon 5 (the current agent's recipe) against 10 and 20, decoder, 3 seeds each, with
 #      the current agent's config (--config runs/wumpus/u64_store_eval_eps_decoder_k5_seed0/...).
 #      Over longer action sequences the future BUMPs and percepts depend on position and heading, so
 #      the multi-step term is the natural non-privileged pressure towards them.
 #    - --save writes every network's state (run.networks, online and acting copies) after training,
-#      so later diagnostics need no retraining (HANDOFF section 7).
+#      so later diagnostics need no retraining.
 #    - Result 2026-10-10 (runs/wumpus/horizon_ab/, summary.txt): LONGER HORIZONS DO NOT HELP, k = 20 HURTS.
 #      Held-out MLP probes, cell / heading per seed 1-3: k5 77/63, 81/69, 81/84%; k10 77/60, 80/70, 78/62%;
 #      k20 76/60, 76/56, 76/60%. k20 - k5: cell -3.8 +- 5.2 points (lower on 3/3 seeds), heading -13 +- 24
 #      (lower on 3/3); wumpus error +0.0008 +- 0.0004; head held-out NLL +0.014 +- 0.019. Heading is still
 #      rising at 6400 updates for k5 (seed 3: 55 -> 58 -> 69 -> 84% at 1600/3200/4800/6400).
 #
-# 2d. Decoupled planning head (user decision, 2026-10-10, after 2c: the latent's heading keeps
+# 2d. Decoupled planning head (design decision, 2026-10-10, after 2c: the latent's heading keeps
 #    improving with more updates, but the jointly trained observation head overfits, section 2b):
 #    - --planning-head: at every scoring point, a FRESH ObservationHead (the agent's architecture) is
 #      fitted on the frozen acting latents of the training games, i.e. a head on detached latents,
@@ -72,7 +72,7 @@
 #        (paired +0.025 +- 0.062). Even on the same 6400 latent the fresh head misses more
 #        (0.021/0.065/0.050): NLL early stopping does not make the head conservative where it matters.
 #
-# 2e. Data vs objective for dead reckoning (user decision, 2026-10-15 night, R1 of HANDOFF 6.2):
+# 2e. Data vs objective for dead reckoning (design decision, 2026-10-15 night, R1 of the representation plan):
 #    - The agent's best.pt filters decode cell / heading 59-61% / 58-66% on the held-out random pool, whereas
 #      this script's offline decoder k5 at the same 6400 updates reaches 77-81% / 63-84% (2c). Is the agent's
 #      own data (idle-heavy greedy and exploring games) what limits dead reckoning, or its in-agent training?
@@ -159,15 +159,15 @@
 #      only to the extent the final network is trained long and uniformly on the full buffer, i.e. it
 #      approaches the buffer arm itself. A reset schedule is NOT added to the agent; next is 2h.
 #
-# 2i. Value-equivalent observation term, retrain screen (2026-10-18, HANDOFF 6.2 Step C; user: "go with your
-#     recommendation" = the latent-side decision-aware objective):
+# 2i. Value-equivalent observation term, retrain screen (2026-10-18; the latent-side
+#     decision-aware objective):
 #    - Question: does model.value_equivalent_weight (trainer.py 2f: the observation head's predicted next value
 #      must match the realised one, gradients into the filter) make the retrain recipe's networks play better,
 #      on the same games, than the same retrain without it? Theory: value equivalence (Grimm et al. 2020/2021),
 #      decision-aware model learning (VaGraM, Voelcker et al. 2022). Motivation: exact_model_play.py (the exact
 #      one-step model is worth +208 per game) and obs_fit_vs_latent.py (the missing information is not
 #      decodable from the latent).
-#    - Why a retrain screen first (section 1b of HANDOFF, "screen the whole fix on frozen data"): the recipe's
+#    - Why a retrain screen first ("screen the whole fix on frozen data"): the recipe's
 #      final networks ARE a whole-buffer retrain (training.retrain_every), so retraining offline on a run's
 #      final buffer is the in-agent condition minus its later data; 2h predicted the in-agent result.
 #    - --set (OmegaConf dotlist) applies config overrides to the run's own config before build_training_run.
@@ -183,7 +183,7 @@
 #        -> train the retrain + double recipe with that weight in the agent, 3 seeds paired with
 #        runs/sweeps/wumpus_retrain (pre-registered there), then 5 seeds.
 #      * FAIL: neither passes -> report per seed (with the probe accuracies, to see whether the term hurt the
-#        latent) and take the next variant (multi-step value equivalence, a reward term) to the user.
+#        latent) and take the next variant (multi-step value equivalence, a reward term) before further runs.
 #    - Result 2026-10-18 (runs/wumpus/ve_screen/, chain ve_screen_chain.sh at 712dbe3; ~77 min per retrain, 3 in
 #      parallel; every best.pt replay = report.json). **FAIL: no arm reaches +50 over control on any seed.**
 #                 control (vs best.pt)    VE25 vs control   VE100 vs control   deaths c / 25 / 100     unfinished c / 25 / 100
@@ -205,16 +205,16 @@
 #      death/danger calibration for value matching (danger error up with w). A Q-equivalent variant would need
 #      observation-conditioned rewards, sum_o P(o)[r(o) + gamma V-bar(tau)] against the realised r + gamma V-bar.
 #    - Also learned: n = 3 retrain screens have retrain-to-retrain noise of ~+-50 per seed (control vs best.pt),
-#      so a +50 bar on 2 of 3 is underpowered for effects below ~+50 (HANDOFF 1c, gap 2). Per the readout: report
-#      and take the next variant to the user.
+#      so a +50 bar on 2 of 3 is underpowered for effects below ~+50 (gap 2). Per the readout: report
+#      and choose the next variant before further runs.
 #
-# 2j. Coverage screen (2026-10-19, coverage_games.py; HANDOFF 6.2 after Step D): --extra-games <file> appends the
+# 2j. Coverage screen (2026-10-19, coverage_games.py): --extra-games <file> appends the
 #    games saved by coverage_games.py (an EpisodeBatch-shaped dict) to the --train-buffer data, so the uniform
 #    retrain sees the run's whole buffer plus the arm's extra games. Question, arms, pre-registered readout and
-#    result: coverage_games.py. Several files may be given (2026-10-21, HANDOFF 6.2b E0): the union arm appends the
+#    result: coverage_games.py. Several files may be given (2026-10-21): the union arm appends the
 #    cover AND own games of a seed (4096 extra games), the data upper bound of the two coverage deficits together.
 #
-# 2k. Bootstrapped whole-model retrains (2026-10-21, HANDOFF 6.2c C1; question, readout and result in
+# 2k. Bootstrapped whole-model retrains (2026-10-21; question, readout and result in
 #    ensemble_disagreement.py): --bootstrap <j> resamples the uniform retrain's games (buffer plus --extra-games)
 #    with replacement, as many as there are, from a generator seeded with j that is separate from the update
 #    sampler's. K such retrains with different --seed and --bootstrap form a bootstrapped ensemble of whole models,
@@ -222,8 +222,7 @@
 #    candidate epistemic-uncertainty signal. Without the flag nothing changes (the resample draws from its own
 #    generator only when given).
 #
-# 2l. Self-predictive latent, retrain screen (2026-10-22, HANDOFF 6.2d Step 2; my "taste in research" call while the
-#    user is away, recorded in HANDOFF section 0):
+# 2l. Self-predictive latent, retrain screen (2026-10-22):
 #    - Question: does adding latent self-prediction (the ZP condition, Ni et al. 2024; trainer.py 2g) make the
 #      retrain recipe's networks play better on the same games than the same retrain without it? And does JEPA (ZP
 #      with the one-step observation term detached; contribution 1) on the retrain recipe match or beat the decoder?
@@ -250,12 +249,12 @@
 #        exploitation again) -> stack with option (a)'s margin offline (pessimism_play.py on the saved sets).
 #      * FAIL without MECHANISM: self-prediction does not put the declined-state information into the latent at this
 #        data -> the latent objective is not the lever; next is the grokking screen (long fixed-buffer retrains with
-#        weight decay; HANDOFF 6.2d) and decision-aware weighting (1b candidate 2).
+#        weight decay) and decision-aware weighting (1b candidate 2).
 #    - Power caveat stated in advance: retrain-to-retrain noise is ~+-50 per seed (2i), so the bar detects only large
 #      effects; probes and the mechanism readout carry the reading of a null.
 #
-# 2m. Grokking screen: long fixed-buffer retrain with strong weight decay (2026-10-22, HANDOFF 6.2d; the user asked
-#    about grokking, I queued it after Step 2 and started it when a GPU slot freed; written before the run):
+# 2m. Grokking screen: long fixed-buffer retrain with strong weight decay (2026-10-22; queued after
+#    Step 2, written before the run):
 #    - Question: trained far past the overfitting point (~6400 updates, 2b) on the FIXED whole buffer with strong
 #      decoupled weight decay, does the model generalise late (grokking: Power et al. 2022; Omnigrok, Liu et al. 2023:
 #      weight decay drives the weight norm to the generalising solution on non-algorithmic data too; Nanda et al.
@@ -472,7 +471,7 @@ def main() -> None:
     parser.add_argument("--save", type=Path, default=None, help="Write run.networks' states here after training.")
     parser.add_argument("--extra-games", type=Path, nargs="+", default=None,
                         help="With --train-buffer: append these coverage_games.py game files to the buffer (2j; "
-                             "several files = the union arm of HANDOFF 6.2b E0).")
+                             "several files = the union arm E0).")
     parser.add_argument("--bootstrap", type=int, default=None,
                         help="With a uniform --train-buffer: resample its games with replacement, seed j (2k).")
     parser.add_argument("--set", nargs="*", default=[], metavar="KEY=VALUE",

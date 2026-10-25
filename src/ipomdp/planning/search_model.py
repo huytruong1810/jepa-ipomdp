@@ -36,7 +36,7 @@
 #      in float32 without autocast: planning evaluates few, small batches, and bfloat16 logits
 #      would perturb the two-hot means the search compares.
 #
-# 5. Optional Finite Horizon (LearnedSearchModel(horizon=H); model.time_aware_value, user decision 2026-10-07):
+# 5. Optional Finite Horizon (LearnedSearchModel(horizon=H); model.time_aware_value, design decision 2026-10-07):
 #    - The state becomes [z, k]: the latent with the number of steps left in the agent's
 #      H-step window appended as one more column (exact small integers in float32). The agent's
 #      own step counter is not privileged. initial_states sets k = H, update and every imagined

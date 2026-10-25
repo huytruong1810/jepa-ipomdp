@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-17, user: "go ahead" after macro_reach_diag.py read VOID):
+# 1. Question (2026-10-17, after macro_reach_diag.py read VOID):
 #    - macro_reach_diag.py showed that at the planner's declined near-turn states (the exact-belief heuristic
 #      turns towards a provably safe unvisited cell, or known gold, 2 actions away) the search already holds
 #      TURN -> FORWARD and values it 29-45 below the chosen action. The learned Q has three learned parts:
@@ -12,7 +12,7 @@
 #    - Wumpus has an exact Bayes filter (layout enumeration), so the exact one-step model (R(b, a), P(o' | b, a),
 #      successor beliefs, terminal outcomes) is available at the same states. Swapping exact parts in, one
 #      at a time, while keeping the learned value at the filter's latents, localises the ranking error. The
-#      branch picks the theory for the next method (HANDOFF 6.2):
+#      branch picks the theory for the next method:
 #        MODEL  -> decision-aware / value-equivalent model learning (Grimm et al. 2020): the observation head
 #                  is wrong exactly where it changes decisions (e.g. the value of information of a new cell).
 #        VALUE  -> the value of the stepped-into latent is too low even under the exact model: a value-learning
@@ -41,7 +41,7 @@
 #    Q_mac > Q2(chosen)):
 #    - MODEL: EPR - M >= +30 points on >= 3 of 5 seeds. (EP - M carrying most of it -> the observation head.)
 #    - VALUE: EPR - M < +10 points on >= 4 of 5 seeds and EPR < 25% on >= 4 of 5 seeds.
-#    - Otherwise MIXED: report the per-seed shares and gaps and decide with the user.
+#    - Otherwise MIXED: report the per-seed shares and gaps and decide before further runs.
 #    - Sanity (asserted): exact P sums to 1; exact P(GAME_OVER | turn, FORWARD) = 0 when the target is a
 #      provably safe cell (the selection guarantees it); the replay and the macro_reach.npz cross-checks.
 #

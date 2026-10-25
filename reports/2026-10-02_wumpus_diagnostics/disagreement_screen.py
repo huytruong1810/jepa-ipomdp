@@ -1,10 +1,10 @@
 # ABSOLUTE PATH: reports/2026-10-02_wumpus_diagnostics/disagreement_screen.py
 # ==============================================================================
-# IS THERE A NON-PRIVILEGED SIGNAL OF WHERE THE ONE-STEP MODEL IS WRONG? (HANDOFF 6.2b, E1)
+# IS THERE A NON-PRIVILEGED SIGNAL OF WHERE THE ONE-STEP MODEL IS WRONG? (E1)
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-21, HANDOFF 6.2b, user-approved): the proposed method (E2) uses epistemic uncertainty over
+# 1. Question (2026-10-21): the proposed method (E2) uses epistemic uncertainty over
 #    the one-step model twice: optimism in collection (direct trials to transitions whose outcome the model is
 #    unsure about; Pathak et al. 2019, Sekar et al. 2020) and pessimism in acting (a margin scaled by the same
 #    uncertainty; MOPO, Yu et al. 2020). Both need a signal that is (V) high at the declined turned latents, where
@@ -12,7 +12,7 @@
 #    coverage_games.py), and (R) large where the death-risk prediction is wrong (risk_localise.py). This screen asks
 #    whether the cheapest such signal, the disagreement of a bootstrapped ensemble of observation heads on the frozen
 #    latent (Osband et al. 2016; Lakshminarayanan et al. 2017), has both properties.
-#    - Caveat stated in advance (R1a, HANDOFF 7): head ensembles on one latent failed as PREDICTORS (the planner
+#    - Caveat stated in advance (R1a): head ensembles on one latent failed as PREDICTORS (the planner
 #      exploited them). Here they are only a signal. A shared latent error makes all members agree; then the next
 #      signal is whole-model ensembles (filter included), which are costlier.
 #

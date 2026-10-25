@@ -4,9 +4,9 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (user decision, 2026-10-02):
+# 1. Question (design decision, 2026-10-02):
 #    - The baseline planner (runs/wumpus/north50_seed0) has a good latent but wanders instead
-#      of exploring new safe cells (HANDOFF.md, section 4c). Is the bottleneck the DATA its own
+#      of exploring new safe cells. Is the bottleneck the DATA its own
 #      exploration produces, or the LEARNING (value through the learned model)?
 #    - Train the unchanged stack on data that already contains directed exploration: if the
 #      greedy planner then approaches the reference agent, the data/exploration is the

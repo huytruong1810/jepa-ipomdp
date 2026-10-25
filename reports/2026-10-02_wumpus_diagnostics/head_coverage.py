@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (user decision, 2026-10-05):
+# 1. Question (design decision, 2026-10-05):
 #    - With longer training the latent nearly reaches the supervised bound, but the observation
 #      head's P(GAME_OVER | z, FORWARD) stays badly calibrated (objective_ab_long). Hypothesis:
 #      the head learns it only from SAMPLED outcomes, and dangerous FORWARD steps are rare in

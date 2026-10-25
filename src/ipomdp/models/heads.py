@@ -20,7 +20,7 @@
 #      (models/distributions.py); the decoded mean is unbiased. The final projection is
 #      zero-initialised so the initial prediction is uniform, whose mean is exactly 0.
 #
-# 2b. Horizon Value Head (optional, model.time_aware_value; user decision 2026-10-07):
+# 2b. Horizon Value Head (optional, model.time_aware_value; design decision 2026-10-07):
 #    - V(z_t, k_t) where k_t = H - t is the number of steps left in the agent's fixed window of H
 #      steps. k is the agent's own step counter, not privileged information. It enters as k / H
 #      concatenated to the latent.
@@ -60,7 +60,7 @@
 #      cross-entropy flows INTO the belief filter (training/trainer.py, section 2c).
 #    - Why: on Wumpus World neither JEPA nor one-step observation prediction makes the latent
 #      track the hunter's cell, heading and the danger ahead, although the same filter learns
-#      them almost perfectly from privileged supervision (HANDOFF.md, section 4c, 2026-10-03).
+#      them almost perfectly from privileged supervision (2026-10-03).
 #      Predicting future percepts under arbitrary future actions requires exactly that
 #      information. It is a self-supervised, non-privileged signal: actions and observations only.
 #    - It is not a planning model: the planner never reads it. With k = 0 it is not built at all.

@@ -4,12 +4,12 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-16, after objective_ab.py 2e-2g; representation direction, HANDOFF 6.2):
+# 1. Question (2026-10-16, after objective_ab.py 2e-2g; representation direction):
 #    - Trained uniformly offline on the agent's own final buffer, the agent's objective gives cell / heading
 #      85 / 87% (2e buffer arm) where the agent's growing-buffer training gives 76 / 68% (2f: primacy). Resets
 #      with a budget-matched catch-up do not close the gap (2g FAIL): the final network has to be trained long
 #      and uniformly on the full buffer, i.e. be the buffer arm itself.
-#    - The representation direction (user, 2026-10-15) says: a better own latent, then the double value. C6
+#    - The representation direction (2026-10-15) says: a better own latent, then the double value. C6
 #      says the double value fails on the current latent because the planner exploits the model's errors. So
 #      the question that decides whether to build a "retrain on the whole buffer" step into the agent is:
 #      do networks retrained from scratch on the final buffer, WITH model.value_estimator=double, play better
@@ -34,8 +34,7 @@
 #      "retrain the world model from scratch on the whole buffer" step in the agent (Tiger fingerprint), then
 #      3 seeds with model.value_estimator=double paired with the double runs.
 #    - FAIL: otherwise. A latent 9-19 points better on cell/heading does not make the double-value planner
-#      safe; the representation gap is not the lever at these accuracies, and the decision goes to the user
-#      (HANDOFF 6.2 options 2 and 3).
+#      safe; the representation gap is not the lever at these accuracies; the next direction is chosen before further runs.
 #    - Caveat stated in advance: the retrained value has never been trained on the agent's own later play,
 #      and best.pt is a max over evaluations (biased upward relative to a single network), which favours the
 #      baseline; a PASS is therefore conservative.

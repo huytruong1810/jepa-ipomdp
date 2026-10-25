@@ -66,11 +66,11 @@
 #      training loop reads exact model tensors, so domains without an exact model (and
 #      without a solver) train identically.
 #
-# 7. Epsilon-Uniform Exploration (user decision, 2026-10-05; agents/planning_agent.py, section 3):
+# 7. Epsilon-Uniform Exploration (design decision, 2026-10-05; agents/planning_agent.py, section 3):
 #    - After warm-up, each collected action is replaced with probability epsilon by a uniformly
 #      random one. epsilon starts at cfg.epsilon and decays with the temperature
 #      (temperature_decay per collection) to cfg.epsilon_min.
-#    - Motivation (Wumpus diagnosis, HANDOFF section 5.4, item 14): the observation head's
+#    - Motivation (Wumpus diagnosis, item 14): the observation head's
 #      death prediction is miscalibrated because dangerous FORWARD outcomes are rare in the
 #      agent's data; one extra forced FORWARD step from every live reference state halved the
 #      head's danger error. Uniform actions in the states the agent actually reaches are the
@@ -79,7 +79,7 @@
 #      so off-policy actions do not bias them; greedy evaluation never uses epsilon.
 #    - cfg.epsilon = 0 (the default, canonical Tiger) draws no extra random numbers.
 #
-# 8. Greedy Evaluation Games as Training Data (user decision, 2026-10-05):
+# 8. Greedy Evaluation Games as Training Data (design decision, 2026-10-05):
 #    - cfg.store_eval_episodes adds every greedy evaluation's episodes to the replay buffer.
 #    - Motivation (reports/2026-10-02_wumpus_diagnostics/head_shift.py): on Wumpus the observation
 #      head is calibrated on its training data (buffer FORWARD steps: predicted death 0.071,
@@ -92,7 +92,7 @@
 #      layouts, so storing the games does not leak evaluation layouts into later evaluations.
 #    - Off by default (canonical Tiger): the buffer and every random stream are then untouched.
 #
-# 9. Time-Aware (Finite-Horizon) Value (user decision, 2026-10-07):
+# 9. Time-Aware (Finite-Horizon) Value (design decision, 2026-10-07):
 #    - cfg.time_aware_value replaces the value head by HorizonValueHead V(z, k) over the steps
 #      left in the episode_length window. The trainer's targets and the planner's search model
 #      count k down to a terminal 0 (models/heads.py, 2b; trainer.py, 3b; search_model.py, 5).
@@ -105,7 +105,7 @@
 #      against 186 / 166 / 215; still ~69% unfinished (the agent idles with GRAB instead of SHOOT).
 #      The truncation was not the cause. Kept as an option, not used.
 #
-# 10. n-Step Greedy-Return Value Grounding (user decision, 2026-10-08; trainer.py, section 3c):
+# 10. n-Step Greedy-Return Value Grounding (design decision, 2026-10-08; trainer.py, section 3c):
 #    - cfg.value_nstep = n > 0 mixes n-step returns of the stored greedy evaluation games into the
 #      value targets with weight cfg.value_nstep_mix. It requires store_eval_episodes (section 8),
 #      the only source of greedy games; the buffer records each game's source (episode_buffer.py, 4).
@@ -118,7 +118,7 @@
 #      policy's own returns are uniformly poor and do not separate exploring from idling.
 #      Kept as an option, not used.
 #
-# 11. Detached Planning Head (user decision, 2026-10-10; trainer.py, section 3d):
+# 11. Detached Planning Head (design decision, 2026-10-10; trainer.py, section 3d):
 #    - cfg.detached_planning_head builds a second ObservationHead trained on detached latents. The
 #      planners and the value targets use it (through its Polyak copy for acting); the joint
 #      observation head only shapes the decoder's filter. Decoder representation only.
@@ -134,7 +134,7 @@
 #      The latent did NOT improve online either: MLP probes on random histories cell 52 / 53%,
 #      heading 50 / 49% (current agent 56 / 59%). Failed; kept as an option, not used.
 #
-# 12. Privileged Exact-Belief Term (user decision, 2026-10-11; training/privileged.py, trainer.py 2e):
+# 12. Privileged Exact-Belief Term (design decision, 2026-10-11; training/privileged.py, trainer.py 2e):
 #    - cfg.privileged_belief_loss trains the filter, through a readout, on the exact Bayes filter's
 #      targets that the domain provides (DomainSetup.privileged; Wumpus only, raises elsewhere).
 #    - The "oracle-latent" diagnostic arm: if the Wumpus agent stops idling with a latent that knows the
@@ -195,7 +195,7 @@
 #      Theory: weight-norm control of generalisation (Omnigrok, Liu et al. 2023; Power et al. 2022). Only the
 #      retrain gets it, because in-agent overfitting under repeated replay was the original problem and the
 #      online decay is a separate question.
-#    - Pre-registered in-agent screen (HANDOFF 6.2e Step G2; written 2026-10-24 before any G2 run, launched only
+#    - Pre-registered in-agent screen (Step G2; written 2026-10-24 before any G2 run, launched only
 #      if the objective_ab.py 2m 3-seed extension (G1) passes): the retrain recipe (runs/sweeps/wumpus_retrain/
 #      sweep.json overrides) with training.retrain_updates=25600 training.retrain_weight_decay=1.0, retrain_every
 #      kept at 50 (both retrains get the new setting: one rule, and the first one shapes the data of collections
@@ -203,7 +203,7 @@
 #      runs/sweeps/wumpus_retrain/seed<s>/analysis/games.npz (512 games, analysis seed 12345;
 #      reports/2026-10-22_option_a/paired_readout.py). Cost ~8 h per seed (two retrains of ~2.5 h each).
 #      * PASS: paired mean > 0 on 3 of 3 seeds, mean of the three >= +30, and deaths <= retrain + 2 points on
-#        each seed -> seeds 3, 4; it becomes the Wumpus recipe, then the stacking screens (HANDOFF 6.2e G3).
+#        each seed -> seeds 3, 4; it becomes the Wumpus recipe, then the stacking screens.
 #      * FAIL: the offline gain does not survive in-agent (the first retrain changes the later data, best.pt
 #        selection differs); compare with the offline u25600 numbers before any further run.
 #    - Pre-registered test (2026-10-16, before launch; runs/wumpus/retrain_chain.sh): the current recipe +
@@ -211,7 +211,7 @@
 #      the second is the retrain_play.py condition, the first also changes the data of collections 51-100),
 #      seeds 0-2, analysed on the same 512 games as the double runs (163.8 / 81.7 / 168.0).
 #      * PASS: >= +50 on 2+ of 3 seeds with the death rate not up on those seeds -> 5 seeds (sweep.py) and
-#        this becomes the Wumpus recipe; then the unfinished games (HANDOFF 6.3, macro actions).
+#        this becomes the Wumpus recipe; then the unfinished games (macro actions).
 #      * FAIL: otherwise -> compare with the offline retrain (230.3 / 81.1 / 256.0): if the in-agent retrain
 #        is clearly worse, the agent's own later data or best.pt selection differs; report before more runs.
 #    - Result 2026-10-16 (runs/wumpus/u64_store_eval_eps_decoder_k5_double_retrain50_seed{0,1,2}; same 512 games):
@@ -236,14 +236,14 @@
 #      missing information is not decodable from the frozen latent (obs_fit_vs_latent.py: LATENT).
 #    - w = 0 (the default, canonical Tiger) computes nothing new.
 #
-# 16. Fixed Planning-Time Risk Margin (2026-10-22; planning/search_model.py, section 6; HANDOFF 6.2d option (a)):
+# 16. Fixed Planning-Time Risk Margin (2026-10-22; planning/search_model.py, section 6):
 #    - cfg.risk_margin = k > 1 wraps the acting LearnedSearchModel in RiskMarginModel(k) for the collection and
 #      evaluation planners (and so for analysis, which plans with eval_agent.model). The trainer's value
 #      targets keep the unwrapped model. The domain describes its fatal outcome in DomainSetup.risk (a
 #      RiskSpec); a domain without one (Tiger) raises.
 #    - k = 1 (the default, canonical Tiger) wraps nothing.
 #
-# 17. Own Turn-then-Step Trials (2026-10-22; agents/planning_agent.py, section 4; HANDOFF 6.2d option (a)):
+# 17. Own Turn-then-Step Trials (2026-10-22; agents/planning_agent.py, section 4):
 #    - cfg.trial_prob = p > 0 gives the COLLECTION agent the trial rule (constant p, as offline); evaluation
 #      never trials. The step and turn actions come from DomainSetup.risk. Logged: collect_trials_per_game.
 #    - p = 0 (the default, canonical Tiger) draws and logs nothing new.
@@ -258,9 +258,9 @@
 #        games are expected to stay near 67%, which is reported, not part of the bar).
 #      * FAIL: the offline gain does not survive in-agent training (dose and timing differ: trials enter the
 #        growing buffer from the start); report, keep the options (default off), go to the representation
-#        branch (HANDOFF 6.2d, Step 2) on the plain retrain recipe.
+#        branch (Step 2) on the plain retrain recipe.
 #
-# 18. Self-Predictive Term in the Decoder Representation (2026-10-22; trainer.py 2g; HANDOFF 6.2d Step 2):
+# 18. Self-Predictive Term in the Decoder Representation (2026-10-22; trainer.py 2g):
 #    - cfg.self_predictive_weight = w > 0 (decoder only) builds the JEPA predictor and EMA target filter around the
 #      filter (RecurrentJEPA; networks key "world_model" instead of "belief_filter") and adds w x the JEPA term to
 #      the decoder's loss. The planner, heads and acting copies are unchanged.

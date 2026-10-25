@@ -5,7 +5,7 @@
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
 # 1. Ground Truth Without a Solver:
-#    - Wumpus World has no exact solver here (user decision), but its exact posterior over the
+#    - Wumpus World has no exact solver here (design decision), but its exact posterior over the
 #      16,380 layouts is computable by enumeration (domain/wumpus.py, section 5). The learned
 #      latent is probed against that posterior's marginals -- P(pit at c), P(wumpus at c),
 #      P(gold at c) for the 16 cells -- and against the hunter's own state (cell, heading,

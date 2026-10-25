@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. What Can Be Measured Without an Exact Solver (user decision: no solver for Wumpus):
+# 1. What Can Be Measured Without an Exact Solver (design decision: no solver for Wumpus):
 #    - Performance: discounted return, win, death and unfinished rates of the greedy learned
 #      planner on fresh simulator seeds (runs.py, section 3: the training-time best.pt score
 #      is a biased maximum). A uniformly random hunter on the SAME layouts (same seed) is the

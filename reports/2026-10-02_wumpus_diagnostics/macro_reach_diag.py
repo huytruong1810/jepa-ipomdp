@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-17, HANDOFF 6.2.1, user's choice "macro actions"):
+# 1. Question (2026-10-17, chosen "macro actions"):
 #    - On the retrain + double recipe (runs/sweeps/wumpus_retrain, 200 +- 44) about 67% of games end
 #      unfinished. The exact-belief `near` override (override_diag.py) is worth +224 of the +300
 #      navigation prize: turn towards an adjacent provably safe cell and step in. The candidate remedy is a
@@ -40,7 +40,7 @@
 # 3. Pre-registered readout (written 2026-10-17, before any run; 5 seeds of runs/sweeps/wumpus_retrain):
 #    - VOID: q_mac > q_chosen at < 10% of declined distance-2 near-turn states on >= 4 of 5 seeds. The
 #      macro cannot reach the decision, so it is not built; the blocker is the model's value of the turned-
-#      and-stepped latent, not search coverage. Return to the user for the next direction.
+#      and-stepped latent, not search coverage. The next direction is chosen before further runs.
 #    - REACHES: q_mac > q_chosen at >= 25% on >= 3 seeds -> the macro play screen (512 paired games per
 #      seed; pass >= +50 on 3 of 5 with unfinished down and deaths up by at most 2 points).
 #    - In between: the macro play screen on seeds 0-1 only, as a smoke.

@@ -7,7 +7,7 @@ computed from the FinitePOMDP and must plan optimally.
 Protocol (fixed seeds, GPU, ~40 min):
     - 6000 updates, each on 64 fresh random-policy episodes of 100 steps (no MCTS in training).
       100-step episodes: conf/env/tiger.yaml, section 3. 6000 updates: the fitted value
-      iteration of the value head is still converging at 3000 (user decision, 2026-10-05).
+      iteration of the value head is still converging at 3000 (design decision, 2026-10-05).
       Mean |V - V*| by network-init seed (reports/2026-10-02_wumpus_diagnostics/
       tiger_acceptance_seed.py; logs in runs/tiger_acceptance_seeds/):
           seed                     0     1     2     3     4     5     6     7     8

@@ -1,10 +1,10 @@
 # ABSOLUTE PATH: reports/2026-10-02_wumpus_diagnostics/pessimism_play.py
 # ==============================================================================
-# DOES A PLANNING-TIME RISK MARGIN TURN THE COVERAGE NETWORKS' IDLING CURE INTO RETURN? (HANDOFF 6.2b, E0')
+# DOES A PLANNING-TIME RISK MARGIN TURN THE COVERAGE NETWORKS' IDLING CURE INTO RETURN? (E0')
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-21, HANDOFF 6.2b, user-approved): the coverage screens left two separable data deficits and a
+# 1. Question (2026-10-21): the coverage screens left two separable data deficits and a
 #    planner that exploits whatever model error remains (C10). The privileged cover networks cure most idling
 #    (unfinished -31 points) but die in 27-43% of games, and risk_localise.py found the deaths are under-rated risks
 #    the argmax picks out (83-100% of fatal FORWARDs rated below half the exact danger): the optimizer's curse
@@ -59,16 +59,16 @@
 #      +33 [-1, +66] (k = 2) and +41 [-5, +86] (k = 4) over seeds, deaths -> 0.2-4.1%, unfinished about unchanged.
 #      On networks without coverage data the under-rating is milder and a fixed margin removes most deaths.
 #
-# 5. Follow-up (2026-10-21 evening, my call under research autonomy; exploratory, pre-registered here before launch):
+# 5. Follow-up (2026-10-21 evening; exploratory, pre-registered here before launch):
 #    own-arm networks (coverage_games.py section 5: non-privileged, unfiltered trials; +66 [+16, +116] over best.pt,
 #    from safety) with the same margin, k in {2, 4}. Question: do the two non-privileged pieces that each helped
 #    (own trials in collection, a fixed risk margin in acting) add up? Read against control at k = 1
 #    (control_seed<s>.returns.npy, paired per game) and against control at the same k.
 #    - PROMISING: own at some k - control at k = 1 >= +50 mean with the t95 interval over seeds above 0, and deaths
-#      at most control's + 2 points on >= 4 of 5 -> propose to the user an in-agent recipe (default-off options:
+#      at most control's + 2 points on >= 4 of 5 -> propose an in-agent recipe (default-off options:
 #      own-trial collection rule, fixed risk margin at planning), 3 then 5 development seeds.
 #    - Otherwise: the fixed margin is a small, separate gain (section 4 secondary) and the method question returns
-#      to the user with the representation branch and a whole-model uncertainty signal as the options.
+#      to a choice between the representation branch and a whole-model uncertainty signal as the options.
 #    - Result 2026-10-21 (pess_own_k*_seed*.log, own_pess_chain.log; ~50 min). **Readout: not PROMISING by the rule
 #      (interval includes 0); deaths criterion met on 5 of 5.**
 #      | Seed | own k2 - ctl k1 | own k4 - ctl k1 | own k2 return | deaths k2 / k4 | unfinished k2 |
@@ -80,7 +80,7 @@
 #      - k = 2: +74 [-19, +168]; k = 4: +63 [-24, +150] over seeds (4 of 5 positive). Mean return 275 (k = 2), the best
 #        non-privileged Wumpus result so far; exploratory against best.pt: +75 [+34, +117], positive on 5 of 5.
 #      - The gain is safety (deaths 0-2.3%), not idling: unfinished stays 60-72%, as in every arm without targeted
-#        value-of-information data. Per the rule the method question returns to the user; this pair (own trials +
+#        value-of-information data. Per the rule the method question is reopened; this pair (own trials +
 #        a fixed margin) is the cheapest candidate to train in-agent if they want a safety-only improvement.
 # ==============================================================================
 

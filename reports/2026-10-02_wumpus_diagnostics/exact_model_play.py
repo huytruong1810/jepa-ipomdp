@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-18, HANDOFF 6.2 Step B; the user approved the plan that includes it):
+# 1. Question (2026-10-18):
 #    - q_localise_diag.py (C9) showed OFFLINE that swapping the exact observation probabilities and rewards
 #      into a depth-2 expectimax flips the declined turn-then-step decision at 48-81% of states (learned:
 #      8-14%). Offline rankings have failed in play before (C3: teacher values, Q/A heads). Before building a
@@ -41,7 +41,7 @@
 #    - Per arm: return, win / death / unfinished, live action mix, cells visited per game; per-game discounted
 #      returns saved to <run>/analysis/exact_play_<arm>.npz; the paired gain over learned when that file exists.
 #
-# 3. Pre-registered readout (from HANDOFF 6.2, written 2026-10-18 before any run; 5 seeds):
+# 3. Pre-registered readout (written 2026-10-18 before any run; 5 seeds):
 #    - PASS: EPR >= +100 paired (per game, 512 games) on >= 3 of 5 seeds, with the unfinished rate down and the
 #      death rate up by at most 2 points on those seeds.
 #    - EP vs EPR splits the observation head from the reward head (descriptive).

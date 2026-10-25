@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Statistics (user guidance: several seeds, paired comparisons, 95% intervals):
+# 1. Statistics (design rule: several seeds, paired comparisons, 95% intervals):
 #    - Logs are named obj_<arm>_seed<n>.log and hold "RESULT@<updates> name value" lines at the
 #      --score-at counts plus final "RESULT name value" lines (scored at --updates).
 #    - Per arm and update count: mean over seeds with a Student-t 95% half-width. Every arm is also

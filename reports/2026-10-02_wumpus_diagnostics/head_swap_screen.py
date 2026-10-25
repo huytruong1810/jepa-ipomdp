@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-15, representation plan R1, HANDOFF 6.2; after head_shift.py item 5 = branch (M)):
+# 1. Question (2026-10-15, representation plan R1; after head_shift.py item 5 = branch (M)):
 #    - With model.value_estimator=double the current recipe loses to the oracle recipe (138 vs 223 on seeds
 #      0-2), largely by deaths. On best.pt's fresh greedy games those deaths sit in the head's MODERATE bins
 #      (predicted 0.04-0.06, realised 0.13-0.35 on seeds 1-2), and at exact-danger >= 0.4 FORWARDs a fresh head
@@ -44,7 +44,7 @@
 #      the same training comparison.
 #    - none passes -> swapping the head on frozen networks is not enough (the value was trained with the joint
 #      head's model, so a head swap alone may not be read as "the head is not the lever"): report per seed and
-#      take the decision to the user.
+#      choose the next direction before further runs.
 #
 # 4. Result 2026-10-15 (128-game smoke plays, logs runs/wumpus/<run>.head_swap_smoke.log for seeds 0 and 2;
 #    seed 1 printed to the console): NONE PASSES; stopped before the 512-game plays because no arm can reach
@@ -64,7 +64,7 @@
 #      the value/model consistency. The swap is not a clean test of "a better head", but every arm moved
 #      the decisions (action mix and FORWARD bins change), so the intervention did reach them.
 #    - Reading: the joint head is not the weak part that a non-joint head can replace; any learned head's
-#      errors are selected by the greedy double-value planner. Per 3: the decision goes to the user.
+#      errors are selected by the greedy double-value planner. Per 3: the next direction is chosen before further runs.
 # ==============================================================================
 
 import json

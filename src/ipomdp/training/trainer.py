@@ -52,7 +52,7 @@
 #                   gradients INTO the filter (models/heads.py, section 4)
 #    - Added because on Wumpus World neither JEPA nor one-step observation prediction makes the
 #      latent track the hunter's position, heading and the danger ahead, while the same filter
-#      learns them from privileged supervision (HANDOFF.md, section 4c). Each horizon j is
+#      learns them from privileged supervision. Each horizon j is
 #      averaged over its valid starts, then the k horizons are averaged, so the term has the
 #      scale of one cross-entropy whatever k is.
 #    - k = 0 (the default, and canonical Tiger) builds nothing and leaves training unchanged.
@@ -73,7 +73,7 @@
 #      always-listen return, at every evaluation).
 #    - gamma is the domain's discount (0.95 for canonical Tiger), passed in by TrainingRun.
 #
-# 3b. Optional Finite-Horizon Value (horizon = H; model.time_aware_value, user decision 2026-10-07):
+# 3b. Optional Finite-Horizon Value (horizon = H; model.time_aware_value, design decision 2026-10-07):
 #      V_target(z_t, k_t) = max_a [ R(z_t, a) + gamma * sum_o P(o | z_t, a) * V-bar(tau(z_t, a, o), k_t - 1) ],
 #      k_t = H - t,   V(., 0) = 0
 #    - The value head becomes V(z, k) (models/heads.py, section 2b), and the backup counts the
@@ -86,7 +86,7 @@
 #      makes a wasted step cost only about 1 + (1 - gamma) * V, so the greedy planner idled).
 #    - horizon=None (the default and canonical Tiger) leaves the computation unchanged.
 #
-# 3c. Optional n-Step Greedy-Return Grounding (nstep = n > 0; model.value_nstep, user decision 2026-10-08):
+# 3c. Optional n-Step Greedy-Return Grounding (nstep = n > 0; model.value_nstep, design decision 2026-10-08):
 #      G_t = sum_{i<m} gamma^i r_{t+i} + gamma^m V-bar(z_{t+m}),   m = min(n, T - t)
 #      V_target(z_t) = (1 - mix) * Bellman(z_t) + mix * G_t   on rows t < T of GREEDY episodes only
 #    - Why (reports/2026-10-02_wumpus_diagnostics/value_chain_diag.py): on Wumpus the bootstrapped value
@@ -103,7 +103,7 @@
 #    - nstep = 0 (the default and canonical Tiger) leaves the computation unchanged.
 #
 # 3d. Optional Detached Planning Head (planning_observation_head; model.detached_planning_head,
-#    user decision 2026-10-10):
+#    design decision 2026-10-10):
 #    - In the decoder baseline the observation head is the representation term: its cross-entropy
 #      shapes the filter (section 2b). On Wumpus that joint pair overfits with more updates (held-out
 #      NLL rises, the head turns confidently "safe" where it is wrong), while the latent itself keeps
@@ -161,7 +161,7 @@
 #    - Decoder only, single horizon-free value, no planning head (raises otherwise). w = 0 (the default and
 #      canonical Tiger) computes nothing new and leaves training unchanged.
 #
-# 2e. Optional Privileged Exact-Belief Term (privileged; model.privileged_belief_loss, user decision 2026-10-11):
+# 2e. Optional Privileged Exact-Belief Term (privileged; model.privileged_belief_loss, design decision 2026-10-11):
 #      Privileged   CE(cell) + CE(heading) + BCE(hazards, danger ahead) of a readout of z_0..z_T,
 #                   live steps only; gradients INTO the filter (training/privileged.py)
 #    - The "oracle-latent" diagnostic arm: does the Wumpus agent still idle when its latent knows
@@ -169,7 +169,7 @@
 #    - None (the default and canonical Tiger) builds nothing and leaves the parameter order unchanged.
 #
 # 2g. Optional Self-Predictive Term in the Decoder Representation (self_predictive_weight = w > 0;
-#     model.self_predictive_weight, 2026-10-22; HANDOFF 6.2d Step 2):
+#     model.self_predictive_weight, 2026-10-22):
 #      SelfPred     w * MSE( g(z_t, a_t), sg(z-bar_{t+1}) )      the JEPA term of section 2, gradients INTO the filter
 #    - The decoder representation keeps its observation likelihood INTO the filter (section 2b) and adds JEPA's
 #      latent self-prediction against the EMA target filter (jepa holds the predictor and the target; the

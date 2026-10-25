@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Diagnostic of 2026-10-04/05, kept so the HANDOFF numbers are reproducible:
+# 1. Diagnostic of 2026-10-04/05, kept so the reported numbers are reproducible:
 #    - Times WorldModelTrainer.train_step (decoder, k = 5, Wumpus) and the value-target part.
 #      Result (2026-10-04, GPU shared by six runs): ~950 ms per update, value targets 12%.
 # ==============================================================================

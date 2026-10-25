@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-15, representation plan R0/R1, HANDOFF 6.2): the exact belief is unchanged by a GRAB
+# 1. Question (2026-10-15, representation plan R0/R1): the exact belief is unchanged by a GRAB
 #    without GLITTER or a SHOOT without the arrow (both decidable from the history alone). Does the acting
 #    filter's latent stay put there, and does it differ between the current and the oracle recipe?
 # 2. Method (usage: uv run python <this> <run dir>; CPU, ~7 s): the 128 greedy games of best.pt stored in the

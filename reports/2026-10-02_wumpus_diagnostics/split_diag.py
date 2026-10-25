@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Scratch diagnostic of 2026-10-02, kept so the HANDOFF numbers are reproducible:
+# 1. Scratch diagnostic of 2026-10-02, kept so the reported numbers are reproducible:
 #    - Usage: uv run python <this> <run dir> <games>. A quiet start (o_0 = 0) makes the first step
 #      provably safe; the split separates idling under real danger from failing to explore.
 # ==============================================================================

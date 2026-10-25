@@ -1,10 +1,10 @@
 # ABSOLUTE PATH: reports/2026-10-02_wumpus_diagnostics/ensemble_disagreement.py
 # ==============================================================================
-# DOES WHOLE-MODEL DISAGREEMENT (FILTER INCLUDED) TRACK WHERE THE ONE-STEP MODEL IS WRONG? (HANDOFF 6.2c, C0 / C1)
+# DOES WHOLE-MODEL DISAGREEMENT (FILTER INCLUDED) TRACK WHERE THE ONE-STEP MODEL IS WRONG? (C0 / C1)
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-21 evening, user decision: option (c)):
+# 1. Question (2026-10-21 evening, option (c)):
 #    - Every idling cure so far (cover / union data, coverage_games.py) brings the deaths back. At the risky
 #      FORWARDs the planner chooses, the predicted death risk is 2-5% of the exact one, although the AVERAGE risk
 #      calibration is fine (union 0.83-0.94): the optimizer's curse (Smith & Winkler 2006) at the argmax. A uniform
@@ -58,12 +58,12 @@
 #        coverage half (reported, pooled over seeds).
 #      - (V) per seed: rho_v >= 0.3 (acting = union and control both reported; union decides).
 #      - PASS = (R) and (V) each on >= 4 of 5 seeds with acting = union (an interim on seeds 0-2 needs 3 of 3 and is
-#        labelled interim) -> propose C2 to the user (a K-model search wrapper with an uncertainty-scaled margin,
+#        labelled interim) -> propose C2 (a K-model search wrapper with an uncertainty-scaled margin,
 #        screened offline on union vs control; optimism in collection with the same signal).
 #      - (R) passes, (V) fails -> C2 as pessimism only (the margin); collection needs another signal.
-#      - (V) passes, (R) fails -> the signal can direct collection but not the acting margin; report to the user.
-#      - Both fail -> whole-model disagreement does not find the latent's blind spots either; back to the user with
-#        option (a) (own trials + fixed margin) and the representation branch (HANDOFF 1b candidate 1).
+#      - (V) passes, (R) fails -> the signal can direct collection but not the acting margin; report it.
+#      - Both fail -> whole-model disagreement does not find the latent's blind spots either; the options are then
+#        option (a) (own trials + fixed margin) and the representation branch.
 #    - AMENDMENT (2026-10-21 17:05, after C0, BEFORE any C1 measurement; the C1 retrains were still on seed 0):
 #      C0 shows that the margin mean + beta x sd covers union's fatal FORWARDs mostly through the MEAN (the other
 #      members rate the risk higher than union does), not through the spread: p_act + beta x sd covers only 11-41%.
@@ -96,7 +96,7 @@
 #      sign that disagreement finds the value-of-information blind spot.
 #
 # 5. C1 result (2026-10-21; runs/wumpus/coverage/c1_{control,union}_seed0.log, train_boot*_seed0.log; members =
-#    boot0-4_seed0.pt). **STOPPED after seed 0 by user decision (19:55): seed 0 fails both halves clearly, and C0's
+#    boot0-4_seed0.pt). **STOPPED after seed 0 (19:55): seed 0 fails both halves clearly, and C0's
 #    apparent signal was the data-difference confound. Not a full registered readout (1 of 5 seeds), but no seed
 #    came near a bar.** boot0_seed1.pt is also saved; boot1-3 of seed 1 were killed mid-training.
 #    | Seed | act     | fatal | rho_sd | rho(p_act, err) | cover b1 / phantom b1 | cover b2 / phantom b2 | p_act + sd cover b1 | rho_v |

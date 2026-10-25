@@ -4,10 +4,10 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-19, user's choice after feature_localise.py, HANDOFF 6.2 Step D read MIXED / mostly SHIFT):
+# 1. Question (2026-10-19, after feature_localise.py read MIXED / mostly SHIFT):
 #    - On 5 of 5 seeds P(gold ahead) and "cell ahead unvisited" decode on ordinary buffer states but not at the
 #      turned latents of the declined states (gold under-rated ~2x), and the composition is not the failure.
-#      Conjecture (HANDOFF 1b, the feedback loop): the agent declines "turn towards the unvisited safe cell, then
+#      Conjecture (the feedback loop): the agent declines "turn towards the unvisited safe cell, then
 #      step in", so its data rarely holds that transition from those states, the filter/model never learn what
 #      it reveals, and the backup misses the value of information. This is the objective-mismatch / compounding-
 #      error view of model learning (Lambert et al. 2020; Ross & Bagnell 2012 for model-based DAgger: a model is
@@ -48,7 +48,7 @@
 #      novelty for unvisited cells, or exploration over turn-then-step pairs) and screen it the same way.
 #      MECHANISM pass, PLAY fail -> the repaired model does not reach the decisions; report and localise again
 #      (q_localise on the cover networks). MECHANISM fail -> coverage at the maximal dose does not repair the
-#      shift; the representation branch (D3, HANDOFF 1b candidate 1) next.
+#      shift; the representation branch (D3) next.
 #    - Also reported: control vs best.pt (the retrain noise floor, -39 to +58 in objective_ab.py 2i) and the
 #      cover arm's probe accuracies on the base buffer (does coverage hurt the latent elsewhere?).
 #
@@ -72,7 +72,7 @@
 #      Coverage that comes from a privileged, safety-filtered teacher is not a usable lever as it stands; section 5
 #      tests coverage from the agent's own, unfiltered choices.
 #
-# 5. Arm "own" (2026-10-19 night; my call under research autonomy, user away): coverage from the agent's OWN
+# 5. Arm "own" (2026-10-19 night): coverage from the agent's OWN
 #    choices, no privilege.
 #    - Why: on seeds 0-1 the cover arm cures most idling (unfinished 59 -> 34% and 81 -> 26%; wins up 2 and 25
 #      points) but deaths explode (4.5 -> 28%, 3.1 -> 33%). Every forced step was provably safe, so the cover data
@@ -116,8 +116,8 @@
 #        rise, and its fatal steps are mostly not under-rated (37%); those risks were taken knowingly.
 #      - Registered branch: MECHANISM fail with a small declined-state dose -> "targeting needs a novelty signal the
 #        latent does not carry: the representation branch". Its premise is contradicted: "cell ahead unvisited" decodes
-#        at 0.97-0.98 on buffer states under the own networks. The direction is re-argued in HANDOFF section 6.2 (2026-10-21).
-# 6. Arm "union" (2026-10-21, HANDOFF 6.2b E0, user-approved): the DATA UPPER BOUND of both coverage deficits.
+#        at 0.97-0.98 on buffer states under the own networks.
+# 6. Arm "union" (2026-10-21): the DATA UPPER BOUND of both coverage deficits.
 #    - Why: cover repairs the value-of-information deficit (V) but its safety-filtered data deepen the risk deficit
 #      (R); own keeps the risk calibrated but is too diluted to repair (V) (C10). Is the union of both data enough
 #      to get both at once? If not even the union helps, no collection rule that only reshapes these data will.
@@ -129,9 +129,9 @@
 #        PASS: union - control mean >= +50 with the t95 interval over seeds above 0, unfinished below control's on
 #              >= 4 of 5 seeds, deaths at most control's + 2 points on >= 4 of 5 seeds.
 #      PASS -> both deficits together are sufficient at this latent: build E2 (uncertainty-directed collection
-#      plus pessimistic planning, HANDOFF 6.2b). FAIL with deaths up -> even mixed data leave an exploitable risk
+#      plus pessimistic planning). FAIL with deaths up -> even mixed data leave an exploitable risk
 #      error: pessimism (E0', pessimism_play.py) is required on top. FAIL with the idling kept -> data alone cannot
-#      fix it at this latent: the representation branch (HANDOFF 1b, candidate 1).
+#      fix it at this latent: the representation branch (candidate 1).
 #      Also reported: glitter ratio and decision share M (MECHANISM as in section 3) and the risk calibration ratio
 #      (RISK as in section 5), so the two deficits are read separately.
 #    - Result 2026-10-21 (runs/wumpus/coverage: play_union_seed*.log, compare_union.log, risk_union_seed*.log; e0_chain.log;

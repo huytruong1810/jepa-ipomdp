@@ -4,13 +4,13 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Diagnostic of 2026-10-04/05, kept so the HANDOFF numbers are reproducible:
+# 1. Diagnostic of 2026-10-04/05, kept so the reported numbers are reproducible:
 #    - Usage (from the repo root, or a git worktree with PYTHONPATH=<worktree>/src):
 #      python reports/2026-10-02_wumpus_diagnostics/tiger_acceptance_seed.py <seed> [updates]. Runs
 #      tests/test_world_model_acceptance.train_and_measure with its torch.manual_seed(0) replaced
 #      by <seed> (data seeds unchanged) and prints the value error, planning return and probe KL.
 #    - The optional [updates] replaces the test's UPDATES (3000) to check whether the value head's
-#      fitted value iteration converges with more updates (2026-10-05, user decision).
+#      fitted value iteration converges with more updates (2026-10-05, design decision).
 #    - About 1.8 GB RAM and 40 min per run; run at most 2-3 at a time while ipomcp is busy.
 #    - Logs of 2026-10-05: runs/tiger_acceptance_seeds/ (pre = commit 62deb68, post = with the hoist).
 # ==============================================================================

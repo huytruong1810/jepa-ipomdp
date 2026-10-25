@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (user decision, 2026-10-03):
+# 1. Question (design decision, 2026-10-03):
 #    - Neither JEPA nor the decoder makes the danger ahead decodable from the latent
 #      (danger_probe.py). Is that the TRAINING OBJECTIVE or the ARCHITECTURE / CAPACITY?
 #    - Train the very same BeliefFilter (the trained runs' latent_dim, hidden_dim, num_blocks)
@@ -27,7 +27,7 @@
 #      analysis probes: hazard error vs the constant, cell / heading accuracy, and the binned
 #      calibration of the danger ahead, so the numbers sit next to the learned latents'.
 #
-# 4. Architecture A/B (user guidance, 2026-10-03: the architecture must never be the bottleneck):
+# 4. Architecture A/B (design rule, 2026-10-03: the architecture must never be the bottleneck):
 #    - --arch gru: the agent's BeliefFilter (GRU cell after an input network).
 #    - --arch transformer: a causal Transformer over the history as tokens. Token t embeds the
 #      same input the GRU step receives, (a_{t-1}, o_t), with (no action, o_0) at t = 0, plus a

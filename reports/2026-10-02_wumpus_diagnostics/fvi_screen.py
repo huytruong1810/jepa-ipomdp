@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-14; HANDOFF sections 1b C2 and 6.2 B):
+# 1. Question (2026-10-14):
 #    - The agent's value is ~950 above the realised return on idle states, nearly flat, with a Bellman
 #      residual of ~5: self-consistent, not under-trained. A flat V is self-consistent under
 #      V = max_a [R + gamma E V(child)] only if the max over 5 actions x observation branches of noisy
@@ -57,7 +57,7 @@
 #      with unfinished down. Then: a default-off double/clipped value option in the trainer (Tiger
 #      fingerprint), small check, 3 seeds paired, in the population(s) where it passed.
 #    - "Not the mechanism": (ii) and (iii) gain < +30 on 2+ of 3 seeds in both populations. Then choose
-#      among HANDOFF 6.3 by which part of the target is flat (the measures above).
+#      among the remaining candidates by which part of the target is flat (the measures above).
 #    - Otherwise partial: report per seed, with the 1-simulation plays (closest to one-step greedy) as the
 #      tie-breaker.
 #    - Added before any run (2026-10-14, after phantom_reward_diag.py): the oracle-latent networks hold
@@ -68,8 +68,8 @@
 #      sanity gate FAILS, because only then is its play read above (at 1 simulation it is always played);
 #      (b) all arms are fitted, measured and played at 1 simulation before any arm's 50-simulation play, so the
 #      gate, the V > 999 shares and the 1-simulation gains are in the log hours before the long plays;
-#      (c) the fitted nets are saved to <run dir>.fvi_nets.pt, for a later clipped-leaf search test (HANDOFF
-#      6.2 C) without refitting; (d) the latents are frozen, so their children are too: they are expanded once
+#      (c) the fitted nets are saved to <run dir>.fvi_nets.pt, for a later clipped-leaf search test
+#      without refitting; (d) the latents are frozen, so their children are too: they are expanded once
 #      (FrozenChildren) instead of at every refresh, which took 8.5 of a refresh's ~10 s (64 GPU-bound expands of
 #      2048 latents). Children with P(o) < PROB_FLOOR = 1e-6 are not kept (the planner's own pruning idea): about 4-5
 #      of 33 per (state, action) remain, the dropped mass is <= 1.1e-5 on both populations (measured on oracle
@@ -114,9 +114,9 @@
 #      (ii) itself diverges on seed 0 (mean target ~1,640, V > 999 everywhere).
 #    - The pair values drive the planner into deaths (3-4% -> 5-16%) while unfinished barely moves: the
 #      converged backup exploits the current agent's model errors (its overconfident "safe" observation
-#      head, HANDOFF 5.5; and the filter's drift on no-ops, C4), which the training-time value had not.
+#      head; and the filter's drift on no-ops, C4), which the training-time value had not.
 #    - Readout (2b): the current population does NOT pass, and is not "not the mechanism" either (the oracle
-#      population passed): HANDOFF 6.2 (A) with "the oracle networks passed and the current ones did not".
+#      population passed): option (A) with "the oracle networks passed and the current ones did not".
 # ==============================================================================
 
 import copy

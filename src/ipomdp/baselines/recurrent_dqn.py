@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Why This Baseline (HANDOFF 1c, item 3; reports/2026-10-19_eval_protocol/PROTOCOL.md, C-c):
+# 1. Why This Baseline (item 3; reports/2026-10-19_eval_protocol/PROTOCOL.md, C-c):
 #    - The paper's agent is "learned model + belief-tree search over a recurrent latent". The
 #      question a reviewer asks first is what the model and the search buy over a recurrent
 #      value learner trained on the same data. R2D2 (Kapturowski et al. 2019) is the standard

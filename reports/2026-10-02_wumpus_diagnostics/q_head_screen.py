@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-12; HANDOFF sections 5.9 and 6.2 C):
+# 1. Question (2026-10-12):
 #    - teacher_plugin_diag.py: a state value V fitted to the exact-belief heuristic's returns on the
 #      oracle latents (model.privileged_belief_loss runs) does not stop the idling, at 1, 10 or 50
 #      simulations. Under the heuristic an idle step costs about 1 + (1 - gamma) * V ~ 7, while the
@@ -42,7 +42,7 @@
 #    networks (<run>_final), median over the 3 initialisations, per seed:
 #    - "Action-level values resolve the gap": the A head plays >= +150 above V (paired) and leaves
 #      <= 60% unfinished on all 3 seeds. Then: design a non-privileged action-level value for the agent
-#      (a change of method; ask the user).
+#      (a change of method; decided before further runs).
 #    - "The gap is not resolvable from this latent and data": the A head gains < +50 on 2+ seeds. Then:
 #      read the offline metric (does it rank well on teacher states but drift in play?) before more.
 #    - Otherwise: partial; report the per-seed numbers and the Q head beside A.

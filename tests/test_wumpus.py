@@ -3,7 +3,7 @@
 Small-scale checks for the Wumpus World domain (src/ipomdp/domain/wumpus.py).
 
 What is verified, and why it matters downstream:
-    1. The layout table is the uniform distribution over the user's placement rule.
+    1. The layout table is the uniform distribution over the placement rule.
     2. Hand-built scenarios reproduce every R&N rule: percepts, bumps, death, the arrow, the
        scream, winning and the absorbing end of the game (rewards to the unit).
     3. The simulator is seeded, checkpointable, and returns the start-cell percept from reset().

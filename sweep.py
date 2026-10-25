@@ -14,8 +14,7 @@
 #    (ipomdp/experiments/aggregate.py explains why the seed is the unit of replication).
 #
 # 2. Sequential, One Process per Training Run:
-#    - The single GPU is the bottleneck (search is Python-bound, section "Known open issues" of
-#      HANDOFF.md), so seeds run one after another. Each training run is its own main.py
+#    - The single GPU is the bottleneck (search is Python-bound), so seeds run one after another. Each training run is its own main.py
 #      process, so it is launched exactly as a hand-started run would be (same Hydra config
 #      composition, same run-directory contents) and its GPU memory is released before the
 #      next seed.
