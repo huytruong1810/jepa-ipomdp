@@ -11,3 +11,8 @@ __pycache__/
 # Every run (main.py) and sweep (sweep.py) writes under runs/.
 runs/
 *.tmp
+
+# Claude Code working documents (local only, never committed).
+CLAUDE.md
+HANDOFF.md
+.claude/
