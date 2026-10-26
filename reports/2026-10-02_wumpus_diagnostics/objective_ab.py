@@ -252,6 +252,18 @@
 #        weight decay) and decision-aware weighting (1b candidate 2).
 #    - Power caveat stated in advance: retrain-to-retrain noise is ~+-50 per seed (2i), so the bar detects only large
 #      effects; probes and the mechanism readout carry the reading of a null.
+#    - Result (2026-10-25, seeds 0-2; runs/wumpus/sp_screen/play_seed<s>.log, fl_<arm>_seed<s>.log): FAIL for both
+#      arms, without MECHANISM.
+#        seed  ctl return (deaths)   zp vs ctl (deaths, unfinished)       jepa vs ctl (deaths)    glitter ctl / zp / jepa
+#        0     270.0 (1.0%)          -61.1 +- 31.1 (3.7%, 65.8%)           -20.9 +- 27.8 (1.2%)    0.41 / 0.50 / 0.25
+#        1     214.7 (1.8%)           +0.5 +- 36.5 (11.5%, 50.2%)          -24.3 +- 38.6 (10.2%)   0.25 / 0.30 / 0.23
+#        2     194.3 (7.2%)          +78.9 +- 35.6 (0.0%, 66.0%)           +69.6 +- 34.5 (0.6%)    0.33 / 0.50 / 0.27
+#      zp clears +50 on 1 of 3 seeds and the glitter bar (+0.10) on 1 of 3 (+0.09 / +0.05 / +0.17); jepa clears +50
+#      on 1 of 3 and lowers the glitter ratio on every seed. Seed 2's gains are measured against a control that plays
+#      38.8 per game below that seed's best.pt (vs best.pt: zp +40.1, jepa +30.8). Where zp cures idling (seed 1,
+#      unfinished 69 -> 50%) the freed steps die (deaths 1.8 -> 11.5%). Reading, per the registered branch: latent
+#      self-prediction does not reliably put the declined-state information into the latent at this data; JEPA on
+#      the retrain recipe is worse than the decoder on latent, mechanism and play. Next: the grokking screen (2m).
 #
 # 2m. Grokking screen: long fixed-buffer retrain with strong weight decay (2026-10-22; queued after
 #    Step 2, written before the run):
