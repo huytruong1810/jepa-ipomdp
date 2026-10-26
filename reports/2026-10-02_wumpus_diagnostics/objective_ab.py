@@ -358,6 +358,21 @@
 #      -> PASS-A only: the in-agent screen tests model.absorbing_value=true on the plain recipe.
 #      -> MECHANISM fails: the anchor does not reach the value's offset; diagnose before any in-agent run.
 #      -> otherwise: report; the anchor stays a default-off option.
+#    - Result (2026-10-26; runs/wumpus/absorbing_train/{train,play,phantom}_*): PASS-W PASS, PASS-A FAIL, MECHANISM
+#      FAIL as registered. Anchored plays (planner anchored), 512 games, paired per game:
+#        seed  ctl (unanch.)    ctlA: vs ctl, deaths     wdA_u12800: vs ctlA     wdA_u25600: vs ctlA, vs ctl, deaths
+#        0     270.0, 1.0%      225.5: -44.5, 5.5%       298.9: +73.4            271.1: +45.6 +- 32.9, +1.1, 1.4%
+#        1     214.7, 1.8%      226.2: +11.6, 1.0%       268.1: +41.9            300.7: +74.5 +- 32.0, +86.1, 0.0%
+#        2     194.3, 7.2%      200.0: +5.7, 8.2%        255.3: +55.3            264.1: +64.1 +- 29.8, +69.8, 0.0%
+#      PASS-W: u25600 > ctlA on 3 of 3, mean +61.4, deaths below ctlA on every seed. u25600 averages 278.6 against
+#      the plain retrain recipe's best.pt 208.9 on these seeds (not paired) and 226.3 for the unanchored ctl.
+#      PASS-A: ctlA - ctl mean -9.1 (seed 0 -44.5, deaths +4.5 points): the anchor alone does not help the recipe.
+#      MECHANISM (phantom_reward_diag.py --networks, unanchored readout of the learned values): V_hat > 999 on
+#      <= 0.3% of live steps on the wdA sets (0 / 2.2 / 1.1% on ctlA); GRAB the one-step argmax at GLITTER on 100%
+#      except ctlA seed 2 (0%); but the learned V_hat of the imagined GAME_OVER child reads +28 / +36, +233 / +18,
+#      +57 / +29 on the wdA sets (ctlA +0.1 / +0.1 / +0.2), outside the +-10 clause. The anchored planner never reads
+#      that value; whether the stored post-game latents fit their anchored targets is go_value_diag.py's question,
+#      which the registered branch ("diagnose before any in-agent run") requires before the in-agent screen.
 #
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \
