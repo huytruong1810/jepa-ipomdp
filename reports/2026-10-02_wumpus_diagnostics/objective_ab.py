@@ -373,6 +373,11 @@
 #      +57 / +29 on the wdA sets (ctlA +0.1 / +0.1 / +0.2), outside the +-10 clause. The anchored planner never reads
 #      that value; whether the stored post-game latents fit their anchored targets is go_value_diag.py's question,
 #      which the registered branch ("diagnose before any in-agent run") requires before the in-agent screen.
+#    - Follow-up (go_value_diag.py header 4, 2026-10-26): on the stored games the wdA sets fit V = 0 on the later
+#      GAME_OVER latents and the live targets, but not on the first GAME_OVER latent of a game (+11 to +152; ctlA
+#      <= 0.13), the stored counterpart of the imagined child above. No target or decision of the anchored recipe
+#      reads that value, so the clause's failure is real but off the decision path; it is a deviation from the
+#      registered MECHANISM reading, stated here rather than re-registered.
 #
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \
