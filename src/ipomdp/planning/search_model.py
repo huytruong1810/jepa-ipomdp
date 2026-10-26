@@ -68,6 +68,19 @@
 #      networks gained +33 on 5 of 5 seeds, deaths 0.2-4.1%.
 #    - Used by the PLANNER only (collection and evaluation). The trainer's Bellman value targets keep the
 #      unwrapped model: the value must stay an unbiased backup of the learned model.
+#
+# 7. Anchored Absorbing Value (AbsorbingValueModel, 2026-10-25; reports/2026-10-02_wumpus_diagnostics/retrain_play.py, 6):
+#    - A domain whose games end in an absorbing state that the agent PERCEIVES (Wumpus: the GAME_OVER percept, emitted
+#      on every step after a win or a death, reward 0 forever after) has V = 0 at every latent reached through that
+#      percept. AbsorbingValueModel(inner, o_abs) wraps any SearchModel and sets next_values[:, :, o_abs] = 0 at every
+#      expansion; rewards, probabilities and successor states are unchanged. It is the latent counterpart of the
+#      done mask of episodic RL: it uses only an observed percept, nothing privileged.
+#    - Why: the learned value pins the absorbing latent only through its own Bellman residual,
+#      V(go) - gamma V(go) = (1 - gamma) V(go), a pull 100x weaker than an ordinary target at gamma = 0.99, so a long,
+#      strongly regularised retrain can leave V(go) anywhere (-50 / +184 / +70 on three networks of one seed,
+#      objective_ab.py 2m). Q(GRAB at the gold) = r + gamma V(go) then decides whether the agent ends the game: at
+#      V(go) = -50 the agent stood on the gold and did not grab it (GRAB the argmax on 3.9% of GLITTER steps).
+#    - A domain without an absorbing percept (Tiger) is never wrapped.
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -292,3 +305,26 @@ class RiskMarginModel:
         p_r = ((rewards[:, a] - self.spec.step_cost) / self.spec.fatal_reward).clamp(0.0, 1.0)
         rewards[:, a] = rewards[:, a] + self.spec.fatal_reward * ((k * p_r).clamp(max=1.0) - p_r)
         return Expansion(rewards, probs, e.next_states, e.next_values)
+
+
+class AbsorbingValueModel:
+    """A SearchModel whose successors through the absorbing percept are worth exactly 0 (section 7)."""
+
+    def __init__(self, inner: SearchModel, absorbing_observation: int):
+        if not 0 <= absorbing_observation < inner.num_observations:
+            raise ValueError(f"absorbing observation {absorbing_observation} is not in 0..{inner.num_observations - 1}.")
+        self.inner, self.absorbing_observation = inner, absorbing_observation
+        self.num_actions, self.num_observations, self.discount = inner.num_actions, inner.num_observations, inner.discount
+
+    def initial_states(self, batch_size: int, initial_observations: Tensor | None) -> Tensor:
+        return self.inner.initial_states(batch_size, initial_observations)
+
+    def update(self, states: Tensor, actions: Tensor, observations: Tensor) -> Tensor:
+        return self.inner.update(states, actions, observations)
+
+    @torch.no_grad()
+    def expand(self, states: Tensor) -> Expansion:
+        e = self.inner.expand(states)
+        values = e.next_values.clone()
+        values[:, :, self.absorbing_observation] = 0.0
+        return Expansion(e.rewards, e.observation_probs, e.next_states, values)

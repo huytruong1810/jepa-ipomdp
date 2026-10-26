@@ -57,6 +57,34 @@
 # 5. Several saved network sets (2026-10-18, objective_ab.py 2i; usage: <run dir> <saved .pt> [<saved .pt> ...]
 #    [<games>]): each is played on the same games and reported against best.pt and, paired per game, against
 #    the FIRST saved set (the screen's control arm). Per-game returns go to <saved>.returns.npy.
+#
+# 6. Anchored absorbing value at planning time (2026-10-25; --absorbing-value; planning/search_model.py, section 7):
+#    - Question: objective_ab.py 2m's seed-2 u25600 set collapsed (-41 per game, 99.4% unfinished) because the value
+#      of the absorbing GAME_OVER latent was left at about -50, so GRAB at the gold lost to the other actions. Does
+#      planning with V = 0 behind the GAME_OVER percept (AbsorbingValueModel) remove the collapse, leave the other
+#      networks unharmed, and so show what the strong-weight-decay retrain is worth once the absorbing value is
+#      pinned? Planning only: the networks are unchanged (no retraining).
+#    - With --absorbing-value every play (best.pt included) wraps the evaluation model in AbsorbingValueModel; the
+#      best.pt replay check against report.json is skipped (the play differs by design), and per-game returns go to
+#      <saved>.absorbing.returns.npy (best.pt's to <run>/analysis/best.absorbing.returns.npy), so the unanchored
+#      <saved>.returns.npy and analysis/learned_planner_games.npz stay untouched for the pairing.
+#    - Sets (seeds 0-2 of runs/sweeps/wumpus_retrain): best.pt, ctl (runs/wumpus/ve_screen/control_seed<s>.pt),
+#      u12800 and u25600 (runs/wumpus/grok_screen/wd1_seed<s>_u<k>.pt); 512 analysis games each, the same games as
+#      the unanchored plays. Logs runs/wumpus/absorbing/play_seed<s>.log.
+#    - Pre-registered readout (written 2026-10-25, before any anchored play):
+#      * RESCUE: the seed-2 u25600 set anchored >= its seed's ctl unanchored (194.3) - 25, i.e. the collapse is the
+#        absorbing value and nothing else.
+#      * NO HARM: on each of the other 11 sets (3 best.pt, 3 ctl, 3 u12800, 2 u25600) anchoring changes the return
+#        by >= -20 paired (95% interval not wholly below -20) and deaths by <= +2 points.
+#      * VALUE OF THE RETRAIN once anchored (both sides anchored, paired per game), with the 2m extension criterion:
+#        u_k - ctl > 0 on 3 of 3 seeds, mean >= +30, deaths <= ctl + 2 points on each seed (glitter already 3 of 3
+#        for u25600).
+#      -> RESCUE and NO HARM pass: anchoring becomes a default-off agent option (planner AND value targets, which
+#         keep the one-step backup the planner performs), and the in-agent screen G2 takes the strong-weight-decay
+#         retrain at the length k that passes VALUE (25600 if both pass, as registered in 2m), with anchoring on.
+#         If neither length passes VALUE, the in-agent screen tests anchoring on the plain retrain recipe alone.
+#      -> RESCUE fails: the collapse has a second cause; diagnose before any in-agent run.
+#      -> NO HARM fails: report which sets lose and why before deciding.
 # ==============================================================================
 
 import json
@@ -72,17 +100,20 @@ from ipomdp.domain import WumpusSimulator, game_outcomes
 from ipomdp.domain.wumpus import WumpusAction
 from ipomdp.experiments.runs import load_trained_run
 from ipomdp.experiments.wumpus import WumpusAnalysisSettings
-from ipomdp.planning import BeliefTreeSearch
+from ipomdp.planning import AbsorbingValueModel, BeliefTreeSearch
 from ipomdp.training import discounted_returns, play_episodes, stream_seed
 
 sys.path.insert(0, str(Path(__file__).parent))
 from saved_networks import in_layout  # noqa: E402  (same diagnostics directory)
 
-run_dir = Path(sys.argv[1])
-saved_sets = [Path(a) for a in sys.argv[2:] if a.endswith(".pt")]
-rest = [a for a in sys.argv[2:] if not a.endswith(".pt")]
+args = sys.argv[1:]
+absorbing = "--absorbing-value" in args                          # header 6
+args = [a for a in args if a != "--absorbing-value"]
+run_dir = Path(args[0])
+saved_sets = [Path(a) for a in args[1:] if a.endswith(".pt")]
+rest = [a for a in args[1:] if not a.endswith(".pt")]
 if not saved_sets or len(rest) > 1:
-    raise ValueError("usage: <run dir> <saved .pt> [<saved .pt> ...] [<games>]")
+    raise ValueError("usage: <run dir> <saved .pt> [<saved .pt> ...] [<games>] [--absorbing-value]")
 dev = torch.device("cuda")
 # No per-process memory cap: a 512-game search needs > 4.8 GB (the 0.3 cap of head_swap_screen.py OOMed);
 # the plays run one at a time (runs/wumpus/retrain_play_plays.sh).
@@ -93,6 +124,10 @@ world, run, cfg = trained.setup.domain, trained.run, trained.cfg
 if cfg.model.value_estimator != "double":
     raise ValueError(f"{run_dir} has value_estimator={cfg.model.value_estimator}; this screen is for double runs.")
 model = run.eval_agent.model
+if absorbing:                                                    # header 6
+    if trained.setup.absorbing_observation is None:
+        raise ValueError(f"{run_dir}'s domain has no absorbing percept.")
+    model = AbsorbingValueModel(model, trained.setup.absorbing_observation)
 GAMMA, NAMES = world.discount, [a.name for a in WumpusAction]
 
 
@@ -147,10 +182,12 @@ def report(name: str, episodes, base: torch.Tensor | None, control: torch.Tensor
 
 
 print(f"== {run_dir.name} best.pt (collection {trained.checkpoint_collection}) vs {[str(p) for p in saved_sets]}, "
-      f"{n} games", flush=True)
+      f"{n} games{', anchored absorbing value (header 6)' if absorbing else ''}", flush=True)
 episodes = play()
 base = report("best.pt", episodes, None)
-if n == settings.episodes:
+if absorbing:                                                    # header 6
+    np.save(run_dir / "analysis" / "best.absorbing.returns.npy", base.cpu().numpy())
+if n == settings.episodes and not absorbing:
     reported = json.loads((run_dir / "analysis" / "report.json").read_text())["returns"]["learned_planner"]
     out = game_outcomes(episodes.rewards)
     for key in ("win_rate", "death_rate", "unfinished_rate"):
@@ -164,6 +201,6 @@ for saved in saved_sets:
     for name, net in run.networks.items():
         net.load_state_dict(states[name])
     returns = report(saved.stem, play(), base, control)
-    np.save(saved.with_suffix(".returns.npy"), returns.cpu().numpy())
+    np.save(saved.with_suffix(".absorbing.returns.npy" if absorbing else ".returns.npy"), returns.cpu().numpy())
     control = returns if control is None else control
 print("DONE", flush=True)

@@ -19,7 +19,7 @@ from ipomdp.agents import PlanningAgent
 from ipomdp.domain import (BatchedPOMDPEnv, TigerAction, belief_update, build_tiger_pomdp, observation_distribution,
                            solve_finite_horizon, solve_infinite_horizon)
 from ipomdp.models import BeliefFilter, HorizonValueHead, ObservationHead, RewardHead, TwoHotSymlog, ValueHead
-from ipomdp.planning import (BeliefTreeSearch, ExactSearchModel, Expansion, LearnedSearchModel, MinMaxStats, RiskMarginModel,
+from ipomdp.planning import (AbsorbingValueModel, BeliefTreeSearch, ExactSearchModel, Expansion, LearnedSearchModel, MinMaxStats, RiskMarginModel,
                              RiskSpec, SearchStatistics)
 
 CPU = torch.device("cpu")
@@ -314,6 +314,23 @@ class TestRiskMarginModel:
     def test_rejects_a_margin_that_is_not_above_one(self, margin):
         with pytest.raises(ValueError):
             RiskMarginModel(_FixedModel(self._expansion()), _RISK, margin)
+
+
+class TestAbsorbingValueModel:
+    """planning/search_model.py, section 7."""
+
+    def test_zeroes_only_the_absorbing_successors_values(self):
+        e = TestRiskMarginModel._expansion()
+        out = AbsorbingValueModel(_FixedModel(e), 2).expand(torch.zeros(2, 1))
+        assert torch.equal(out.next_values[:, :, 2], torch.zeros(2, 5))
+        assert torch.equal(out.next_values[:, :, :2], e.next_values[:, :, :2])
+        assert out.rewards is e.rewards and out.observation_probs is e.observation_probs and out.next_states is e.next_states
+        assert not torch.equal(e.next_values[:, :, 2], torch.zeros(2, 5))     # the inner expansion is not modified
+
+    @pytest.mark.parametrize("observation", [-1, 3])
+    def test_rejects_an_observation_outside_the_model(self, observation):
+        with pytest.raises(ValueError):
+            AbsorbingValueModel(_FixedModel(TestRiskMarginModel._expansion()), observation)
 
 
 class _FixedPlanner:

@@ -317,6 +317,8 @@ class DomainSetup:
         episode_metrics: Domain-specific summary of played episodes (e.g. win rate); may be empty.
         privileged: Exact-belief targets for the privileged term (section 12), or None if the domain has none.
         risk: The domain's fatal outcome, for the risk margin and the trials (sections 16, 17), or None.
+        absorbing_observation: The percept that marks the absorbing end of a game, worth V = 0
+            (planning/search_model.py, section 7), or None if the domain has none (Tiger).
     """
 
     domain: Domain
@@ -324,6 +326,7 @@ class DomainSetup:
     episode_metrics: Callable[[EpisodeBatch], dict[str, float]]
     privileged: PrivilegedSpec | None = None
     risk: RiskSpec | None = None
+    absorbing_observation: int | None = None
 
 
 @dataclass(frozen=True)

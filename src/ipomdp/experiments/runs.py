@@ -78,7 +78,8 @@ def wumpus_setup(device: torch.device, discount: float) -> DomainSetup:
                        lambda episodes: game_outcomes(episodes.rewards),
                        PrivilegedSpec((NUM_CELLS, 4), 3 * NUM_CELLS + 1, privileged_targets),
                        RiskSpec(int(WumpusAction.FORWARD), (int(WumpusAction.TURN_LEFT), int(WumpusAction.TURN_RIGHT)),
-                                GAME_OVER, DEATH_REWARD, STEP_COST))
+                                GAME_OVER, DEATH_REWARD, STEP_COST),
+                       GAME_OVER)
 
 
 # Domains selectable through conf/env/<name>.yaml (section 2).
