@@ -27,7 +27,7 @@ def _config(**overrides) -> RunConfig:
         temperature_min=0.1, temperature_decay=0.5, epsilon=0.0, epsilon_min=0.0, store_eval_episodes=False,
         time_aware_value=False, value_nstep=0, value_nstep_mix=0.5,
         detached_planning_head=False, privileged_belief_loss=False, value_estimator=ValueEstimator.MAX,
-        retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0)
+        retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0, absorbing_value=False)
     values.update(overrides)
     return RunConfig(**values)
 
@@ -315,7 +315,7 @@ class TestPrivilegedBeliefTerm:
 class TestRiskOptions:
     """training/run.py, sections 16 and 17: Tiger has no fatal outcome, so both options raise; off wraps nothing."""
 
-    @pytest.mark.parametrize("overrides", [dict(risk_margin=2.0), dict(trial_prob=0.2)])
+    @pytest.mark.parametrize("overrides", [dict(risk_margin=2.0), dict(trial_prob=0.2), dict(absorbing_value=True)])
     def test_tiger_raises(self, overrides):
         with pytest.raises(ValueError):
             TrainingRun(tiger_setup(CPU), _config(**overrides), CPU)

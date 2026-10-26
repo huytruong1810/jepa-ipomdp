@@ -330,6 +330,35 @@
 #      the fixed point by themselves). Whether the agent grabs the gold rests on that unanchored value, which also
 #      adds seed-to-seed noise to every retrain comparison.
 #
+# 2n. Anchored absorbing value in training, retrain screen (2026-10-25; model.absorbing_value, trainer.py 3f, run.py 19;
+#    written before any run):
+#    - Question: anchoring only the planner on networks trained without it fails (retrain_play.py 6: seed 0 best.pt
+#      -169, u12800 -320, u25600 -349 per game; ctl -2), because the learned value carries a common offset that
+#      the anchor removes from the GRAB side only. Does anchoring the TARGETS (V = 0 behind GAME_OVER) remove the
+#      offset itself, and does the strong-weight-decay retrain then pay, with the planner anchored too?
+#    - Arms (runs/sweeps/wumpus_retrain seeds 0-2, each run's own .hydra config, --representation decoder --horizon 5
+#      --seed <s> --train-buffer <run> --set model.absorbing_value=true, --save into runs/wumpus/absorbing_train/):
+#        ctlA  6400 updates at the config's weight decay (1e-4): the 2i control plus the anchor
+#        wdA   --weight-decay 1.0 --updates 25600 --score-at 12800 25600: the 2m arm plus the anchor
+#      Played with retrain_play.py <run> ctlA wdA_u12800 wdA_u25600 --absorbing-value (planner anchored as in the
+#      agent option; 512 analysis games, the games of every earlier play), paired per game with the unanchored 2i
+#      control's stored returns (runs/wumpus/ve_screen/control_seed<s>.returns.npy) and with ctlA.
+#      phantom_reward_diag.py --networks on each set (unanchored readout of the learned values: V_hat(GAME_OVER
+#      child) = (Q(GRAB) - r_hat(GRAB)) / gamma at the GLITTER steps, GRAB's argmax share there, V_hat > 999 share).
+#    - Pre-registered readout:
+#      * MECHANISM: on every anchored set, the learned V_hat behind GAME_OVER at the GLITTER steps is within +-10 of 0,
+#        and GRAB is the one-step argmax on >= 95% of the GLITTER steps.
+#      * PASS-A (the anchor on the plain recipe): ctlA - ctl >= 0 on the mean of the 3 seeds, no seed below -25, and
+#        deaths <= ctl + 2 points on each seed.
+#      * PASS-W (the strong-weight-decay retrain once anchored, both sides anchored): wdA_u25600 - ctlA > 0 on 3 of 3
+#        seeds, mean >= +30, deaths <= ctlA + 2 points on each seed (u12800 reported, not decided on).
+#      -> PASS-W (with MECHANISM): G2 in-agent, the recipe with training.retrain_updates=25600
+#         training.retrain_weight_decay=1.0 model.absorbing_value=true (run.py 14 pre-registration with the anchor
+#         added), seeds 0-2 paired with runs/sweeps/wumpus_retrain.
+#      -> PASS-A only: the in-agent screen tests model.absorbing_value=true on the plain recipe.
+#      -> MECHANISM fails: the anchor does not reach the value's offset; diagnose before any in-agent run.
+#      -> otherwise: report; the anchor stays a default-off option.
+#
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \
 #        --horizon 5 --seed 1 --pool-cache runs/wumpus/supervised_filter/pools.pt

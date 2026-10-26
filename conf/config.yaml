@@ -112,6 +112,7 @@ model:
   value_estimator: max        # max | double | clipped_double value targets (run.py, section 13; trainer.py, 3e)
   value_equivalent_weight: 0.0  # w > 0: value-equivalent observation term into the filter, decoder only (run.py, 15; trainer.py, 2f)
   self_predictive_weight: 0.0   # w > 0: JEPA latent self-prediction added to the decoder representation (run.py, 18; trainer.py, 2g)
+  absorbing_value: false        # true: V = 0 behind the absorbing percept in the value targets and the planner (run.py, 19)
 
 mcts:
   num_simulations: 50         # Search simulations per decision (per parallel episode)

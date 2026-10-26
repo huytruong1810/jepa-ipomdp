@@ -186,6 +186,18 @@
 #      factorial on the same data. Decoder only (with JEPA the term is already present, weight 1); w = 0 (the
 #      default and canonical Tiger) builds nothing.
 #
+# 3f. Optional Anchored Absorbing Value (absorbing_observation = o_abs; model.absorbing_value, 2026-10-25):
+#    - Every Bellman target values the successors through the absorbing percept at exactly 0: the expansion is
+#      wrapped in AbsorbingValueModel (planning/search_model.py, section 7), and the double / clipped-double
+#      targets zero both heads' child values there too. The latents after the end of a game (stored GAME_OVER
+#      steps) then regress to max_a r_hat(z, a) ~ 0 directly instead of to their own discounted value.
+#    - Why: without it the absorbing latent's value is pinned only by its own residual (1 - gamma) V(go), and the
+#      whole learned value can carry a common offset (V(go) +70 to +184, values next to the gold above 999,
+#      objective_ab.py 2m). Anchoring only the planner on networks trained without it removes the offset on the
+#      GRAB side of the comparison and not on the others (retrain_play.py, section 6: -169 to -349 per game on
+#      seed 0), so the anchor must reach the targets, which the planner then shares.
+#    - None (the default and canonical Tiger) computes nothing new.
+#
 # 4. No Imagination Losses:
 #    - An earlier version also trained V on latents imagined by a stochastic latent
 #      transition ("consistency"). Planning now imagines through the real filter
@@ -214,7 +226,7 @@ from ..models.ema import ema_update, frozen_copy
 from ..models.heads import (HorizonValueHead, MultiStepObservationPredictor, ObservationHead, RewardHead, ValueEstimator, ValueHead,
                             ValuePair)
 from ..models.world_model import BeliefFilter, RecurrentJEPA
-from ..planning.search_model import LearnedSearchModel
+from ..planning.search_model import AbsorbingValueModel, LearnedSearchModel
 from .episode_buffer import EpisodeBatch
 from .privileged import PrivilegedBeliefLoss
 
@@ -261,6 +273,7 @@ class WorldModelTrainer:
         value_equivalent_weight: float = 0.0,
         value_equivalent_scale: float = 1.0,
         self_predictive_weight: float = 0.0,
+        absorbing_observation: int | None = None,
     ):
         """
         Args:
@@ -275,6 +288,8 @@ class WorldModelTrainer:
             value_head: A ValuePair selects the double or clipped-double targets (section 3e).
             value_equivalent_weight, value_equivalent_scale: w and max|R| of the value-equivalent term (section 2f).
             self_predictive_weight: w of the self-predictive term in the decoder representation (section 2g); needs jepa.
+            absorbing_observation: The absorbing percept whose successors the targets value at exactly 0 (section 3f),
+                or None.
         """
         if nstep < 0 or not 0.0 <= nstep_mix <= 1.0 or (nstep > 0 and nstep_mix == 0.0):
             raise ValueError(f"need nstep >= 0 and nstep_mix in (0, 1] when nstep > 0; got {nstep}, {nstep_mix}.")
@@ -286,6 +301,9 @@ class WorldModelTrainer:
             raise ValueError("the self-predictive term needs the JEPA predictor and target filter (section 2g).")
         if jepa is not None and planning_observation_head is not None:
             raise ValueError("a detached planning head needs the decoder representation (section 3d).")
+        if absorbing_observation is not None and (horizon is not None or nstep > 0):
+            raise ValueError("the anchored absorbing value is not combined with the time-aware value or n-step grounding "
+                             "(section 3f).")
         if isinstance(value_head, ValuePair) and (horizon is not None or nstep > 0):
             raise ValueError("a value pair is not combined with the time-aware value or n-step grounding (section 3e).")
         if value_equivalent_weight < 0.0 or value_equivalent_scale <= 0.0:
@@ -335,6 +353,9 @@ class WorldModelTrainer:
         self.target_model = LearnedSearchModel(belief_filter, reward_head, planner_observation,
                                                self.target_value_head, codec, num_actions, num_observations, discount,
                                                horizon)
+        self.absorbing_observation = absorbing_observation
+        self.target_search = (self.target_model if absorbing_observation is None
+                              else AbsorbingValueModel(self.target_model, absorbing_observation))      # section 3f
 
     @torch.no_grad()
     def value_targets(self, latents: Tensor) -> Tensor:
@@ -353,7 +374,7 @@ class WorldModelTrainer:
     def _value_targets_and_children(self, latents: Tensor) -> tuple[Tensor, Tensor]:
         """value_targets plus the expansion's child values V-bar(tau(z, a, o)), (N, A, O) (section 2f reads them)."""
         with torch.autocast(self.device.type, enabled=False):
-            expansion = self.target_model.expand(latents.float())
+            expansion = self.target_search.expand(latents.float())
             q = expansion.rewards + self.discount * (expansion.observation_probs * expansion.next_values).sum(-1)
         return q.max(dim=-1).values, expansion.next_values
 
@@ -374,13 +395,17 @@ class WorldModelTrainer:
     def _pair_value_targets_and_children(self, latents: Tensor) -> tuple[Tensor, Tensor, Tensor]:
         """pair_value_targets plus the expansion's child values (the pair's combined value), (N, A, O)."""
         with torch.autocast(self.device.type, enabled=False):
-            expansion = self.target_model.expand(latents.float())
+            expansion = self.target_search.expand(latents.float())
             backup = lambda v: expansion.rewards + self.discount * (expansion.observation_probs * v).sum(-1)  # noqa: E731
             if self.value_head.estimator is ValueEstimator.CLIPPED_DOUBLE:
                 target = backup(expansion.next_values).max(dim=-1).values          # next_values = min(A, B)
                 return target, target, expansion.next_values
             children = expansion.next_states.flatten(0, 2)
             va, vb = (v.view_as(expansion.next_values) for v in self.target_value_head.head_values(children, self.twohot))
+            if self.absorbing_observation is not None:                                       # section 3f
+                va, vb = va.clone(), vb.clone()
+                va[:, :, self.absorbing_observation] = 0.0
+                vb[:, :, self.absorbing_observation] = 0.0
             qa, qb = backup(va), backup(vb)
         return (qb.gather(1, qa.argmax(-1, keepdim=True)).squeeze(1),
                 qa.gather(1, qb.argmax(-1, keepdim=True)).squeeze(1), expansion.next_values)

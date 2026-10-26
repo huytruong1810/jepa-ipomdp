@@ -265,6 +265,12 @@
 #      filter (RecurrentJEPA; networks key "world_model" instead of "belief_filter") and adds w x the JEPA term to
 #      the decoder's loss. The planner, heads and acting copies are unchanged.
 #    - w = 0 (the default, canonical Tiger) builds nothing new.
+#
+# 19. Anchored Absorbing Value (2026-10-25; trainer.py 3f, planning/search_model.py 7):
+#    - cfg.absorbing_value = True: the trainer's Bellman targets and the acting planners (collection, evaluation)
+#      value every successor through the domain's absorbing percept (DomainSetup.absorbing_observation; Wumpus:
+#      GAME_OVER) at exactly 0. A domain without one (Tiger) raises.
+#    - False (the default, canonical Tiger) wraps and computes nothing new.
 # ==============================================================================
 
 from collections.abc import Callable
@@ -277,7 +283,7 @@ import torch
 from ..agents import PlanningAgent, UniformRandomAgent
 from ..models import (BeliefFilter, HorizonValueHead, LatentPredictor, MultiStepObservationPredictor, ObservationHead, RecurrentJEPA, RewardHead, TwoHotSymlog, ValueEstimator, ValueHead, ValuePair,
                       ema_update, frozen_copy)
-from ..planning import BeliefTreeSearch, LearnedSearchModel, RiskMarginModel, RiskSpec
+from ..planning import AbsorbingValueModel, BeliefTreeSearch, LearnedSearchModel, RiskMarginModel, RiskSpec
 from .episode_buffer import EpisodeBatch, EpisodeBuffer
 from .privileged import PrivilegedBeliefLoss, PrivilegedSpec
 from .rollout import Simulator, discounted_returns, play_episodes
@@ -374,6 +380,7 @@ class RunConfig:
     risk_margin: float                # fixed planning-time risk margin k (section 16); 1 = off
     trial_prob: float                 # own turn-then-step trials in collection (section 17); 0 = off
     self_predictive_weight: float     # self-predictive term in the decoder representation (section 18); 0 = off
+    absorbing_value: bool             # V = 0 behind the absorbing percept, targets and planner (section 19)
 
 
 class TrainingRun:
@@ -393,6 +400,8 @@ class TrainingRun:
             raise ValueError("retrain_weight_decay needs retrain_every > 0 and a positive value (section 14).")
         if cfg.self_predictive_weight > 0.0 and cfg.representation is not Representation.DECODER:
             raise ValueError("self_predictive_weight is for the decoder representation; JEPA has the term already (section 18).")
+        if cfg.absorbing_value and setup.absorbing_observation is None:
+            raise ValueError("absorbing_value needs a domain with an absorbing percept (DomainSetup.absorbing_observation; section 19).")
         if (cfg.risk_margin != 1.0 or cfg.trial_prob > 0.0) and setup.risk is None:
             raise ValueError("risk_margin and trial_prob need a domain with a fatal outcome (DomainSetup.risk; sections 16, 17).")
         domain = self.domain = setup.domain
@@ -427,7 +436,8 @@ class TrainingRun:
                                          self.codec, num_a, num_o, domain.discount, cfg.trainer, device,
                                          self.multistep_predictor, horizon, cfg.value_nstep, cfg.value_nstep_mix,
                                          self.planning_observation_head, self.privileged, cfg.value_equivalent_weight,
-                                         domain.value_bound * (1.0 - domain.discount), cfg.self_predictive_weight)
+                                         domain.value_bound * (1.0 - domain.discount), cfg.self_predictive_weight,
+                                         setup.absorbing_observation if cfg.absorbing_value else None)      # section 19
 
         # Polyak-averaged copies the agent acts with (section 4).
         self.acting_filter = frozen_copy(self.belief_filter)
@@ -440,6 +450,8 @@ class TrainingRun:
                                else self.acting_planning_observation_head)
         model = LearnedSearchModel(self.acting_filter, self.acting_reward_head, planner_observation,
                                    self.acting_value_head, self.codec, num_a, num_o, domain.discount, horizon)
+        if cfg.absorbing_value:                                                                           # section 19
+            model = AbsorbingValueModel(model, setup.absorbing_observation)
         if cfg.risk_margin != 1.0:                                                                        # section 16
             model = RiskMarginModel(model, setup.risk, cfg.risk_margin)
         self.train_agent = PlanningAgent(

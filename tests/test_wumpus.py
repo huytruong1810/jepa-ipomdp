@@ -213,7 +213,7 @@ class TestLearningStack:
             temperature=1.0, temperature_min=0.1, temperature_decay=0.5, epsilon=0.0, epsilon_min=0.0, store_eval_episodes=False,
             time_aware_value=False, value_nstep=0, value_nstep_mix=0.5,
             detached_planning_head=False, privileged_belief_loss=False, value_estimator=ValueEstimator.MAX,
-            retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0)
+            retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0, absorbing_value=False)
         values.update(overrides)
         return RunConfig(**values)
 
@@ -255,6 +255,36 @@ class TestLearningStack:
         resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
         continued = [resumed.collect_and_train() for _ in range(2)] + [resumed.evaluate()]
         assert repr(continued) == repr(expected[1:])
+
+    @pytest.mark.parametrize("estimator", ["max", "double"])
+    def test_absorbing_value_anchors_targets_and_planner(self, estimator):
+        # training/run.py, section 19; trainer.py, section 3f: the planners and the Bellman targets value every
+        # successor through GAME_OVER at exactly 0; without the option the targets differ.
+        from ipomdp.domain.wumpus import GAME_OVER
+        from ipomdp.experiments import wumpus_setup
+        from ipomdp.models import ValueEstimator
+        from ipomdp.planning import AbsorbingValueModel
+        from ipomdp.training import Representation, TrainingRun
+        setup = wumpus_setup(CPU, DISCOUNT)
+        options = dict(representation=Representation.DECODER, value_estimator=ValueEstimator(estimator))
+        on, off = (TrainingRun(setup, self._config(absorbing_value=flag, **options), CPU) for flag in (True, False))
+        assert isinstance(on.eval_agent.model, AbsorbingValueModel) and on.eval_agent.model is on.train_agent.model
+        assert not isinstance(off.eval_agent.model, AbsorbingValueModel)
+        torch.manual_seed(0)
+        for p in on.value_head.parameters():                            # zero-initialised projections: move them
+            p.data.add_(0.1 * torch.randn_like(p))
+        on.trainer.target_value_head.load_state_dict(on.value_head.state_dict())
+        for name, net in off.networks.items():                          # identical networks, only the option differs
+            net.load_state_dict(on.networks[name].state_dict())
+        off.trainer.target_value_head.load_state_dict(on.trainer.target_value_head.state_dict())
+        z = torch.randn(6, 16)
+        assert torch.equal(on.eval_agent.model.expand(z).next_values[:, :, GAME_OVER], torch.zeros(6, setup.domain.num_actions))
+        targets = (lambda run: run.trainer.pair_value_targets(z)[0]) if estimator == "double" else (lambda run: run.trainer.value_targets(z))
+        e = on.trainer.target_model.expand(z)
+        backup = e.rewards + DISCOUNT * (e.observation_probs * e.next_values.index_fill(2, torch.tensor([GAME_OVER]), 0.0)).sum(-1)
+        if estimator == "max":
+            assert torch.allclose(targets(on), backup.max(-1).values)
+        assert not torch.allclose(targets(on), targets(off))
 
     def test_time_aware_value_trains_and_resumes(self, tmp_path):
         # training/run.py, section 9: the agent's state carries the steps left; resume stays bit-exact.
