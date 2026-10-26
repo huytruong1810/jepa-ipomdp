@@ -35,6 +35,11 @@
 #        the share of the idle state's V_hat that a phantom-free loop would remove:
 #              V_hat - max over the no-op actions of [r_exact + gamma V_hat(loop child)].
 #
+# 2a. --networks <saved .pt> (2026-10-25; objective_ab.py --save sets, loaded with saved_networks.py as in
+#    feature_localise.py): the states stay best.pt's own stored greedy games, and every number below is read from
+#    the saved networks instead (latents recomputed from the histories). Used on the strong-weight-decay retrains
+#    (objective_ab.py 2m), whose seed-2 u25600 set collapsed in play (-41 per game, 99% unfinished).
+#
 # 2b. Pre-registered readout (recorded 2026-10-14 before any run), per network (oracle-latent final
 #    networks seeds 0-2; current agent seeds 0-2):
 #    - "Phantom reward": on idle steps, mean r_hat(GRAB | no GLITTER) >= +2 (a loop lift >= +300 over the
@@ -82,10 +87,23 @@ from ipomdp.domain.wumpus import GAME_OVER, Percept, WumpusAction
 from ipomdp.experiments.runs import load_trained_run
 from ipomdp.training.checkpointing import load_checkpoint
 
-run_dir = Path(sys.argv[1])
-dev = torch.device(sys.argv[2] if len(sys.argv) > 2 else "cpu")
+sys.path.insert(0, str(Path(__file__).parent))
+from saved_networks import in_layout  # noqa: E402  (same diagnostics directory)
+
+args = sys.argv[1:]
+networks_path = None
+if "--networks" in args:                                     # header 2a
+    i = args.index("--networks")
+    networks_path = Path(args[i + 1])
+    del args[i:i + 2]
+run_dir = Path(args[0])
+dev = torch.device(args[1] if len(args) > 1 else "cpu")
 trained = load_trained_run(run_dir, dev)
 world, run, cfg = trained.setup.domain, trained.run, trained.cfg
+if networks_path is not None:
+    states = in_layout(torch.load(networks_path, map_location=dev), run.networks)   # saved_networks.py
+    for name, net in run.networks.items():
+        net.load_state_dict(states[name])
 model = run.eval_agent.model
 if model.horizon is not None:
     raise ValueError("Time-aware runs carry steps-left in the state; this diagnostic reads plain latents only.")
@@ -157,7 +175,7 @@ with torch.no_grad():
         kid = model.update(z, torch.full((len(z),), a, device=dev), same)
         loop_v[a] = model.values(kid).double().cpu()
 
-print(f"== {run_dir.name} best.pt (collection {c}); its {n} stored greedy games {start}..{start + n}: "
+print(f"== {run_dir.name} {networks_path or 'best.pt'} on best.pt's (collection {c}) {n} stored greedy games {start}..{start + n}: "
       f"{ {k: round(float(v), 4) for k, v in game_outcomes(rewards).items()} }; live steps {len(items)}, idle {int(idle.sum())}")
 
 

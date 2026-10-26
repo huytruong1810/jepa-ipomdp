@@ -307,6 +307,28 @@
 #        retrain uses weight decay 1 and 25600 updates (training.retrain_updates plus a retrain weight-decay key),
 #        3 seeds paired with runs/sweeps/wumpus_retrain.
 #      * FAIL: otherwise; seed 0 reported as a single-seed positive.
+#    - Result of the extension (2026-10-25; runs/wumpus/grok_screen/{train_wd1,fl,play}_seed<s>*.log): FAIL. The
+#      mechanism holds on every seed; play fails on seed 2 by a collapse of the u25600 set.
+#        seed  set     held-out NLL  cell / heading  glitter (c)  TV (c)  return   vs ctl (95%)       deaths  unfinished
+#        1     ctl     0.299         87 / 91         0.25         0.317   214.7    -                  1.8%    69.1%
+#        1     u12800  0.241         93 / 93         0.50         0.210   260.0    +45.4 +- 31.7      0.2%    68.4%
+#        1     u25600  0.237         94 / 94         0.45         0.214   231.2    +16.5 +- 34.4      0.0%    70.5%
+#        2     ctl     0.342         82 / 86         0.33         0.570   194.3    -                  7.2%    60.2%
+#        2     u12800  0.243         91 / 92         0.49         0.444   262.5    +68.2 +- 35.0      0.0%    68.0%
+#        2     u25600  0.236         93 / 92         0.56         0.403   -41.0    -235.2 +- 45.6     0.0%    99.4%
+#      u25600 > ctl on 2 of 3 seeds (+35.5 / +16.5 / -235.2); glitter >= ctl + 0.1 on 3 of 3 (+0.14 / +0.20 / +0.23).
+#      Seed 0 stands as a single-seed positive. u12800 beats ctl on 3 of 3 (+5.9 / +45.4 / +68.2, mean +39.8), but
+#      that checkpoint was not the registered one and is read here only as a lead for a new pre-registration.
+#    - Diagnosis of the seed-2 collapse (phantom_reward_diag.py --networks, best.pt's 128 stored greedy games): the
+#      heads are exact (r_hat(GRAB | GLITTER) 998.4, no-op rewards -1.0), but on the 51 GLITTER steps the one-step
+#      Q(GRAB) = r_hat + gamma V_hat(GAME_OVER child) is 948.4 against 1048.0 for the best other action, so GRAB is
+#      the argmax on 3.9% of them (best.pt 100%, u12800 100%). V_hat of the absorbing GAME_OVER latent, whose true
+#      value is 0, reads about -50 (u25600), +184 (u12800) and +70 (best.pt), while the other actions at the gold
+#      exceed the 999 that any game can pay. The absorbing state's value is fixed only by its own Bellman residual,
+#      V(go) - gamma V(go) = (1 - gamma) V(go), a gradient 100x weaker than an ordinary target at gamma = 0.99, so a
+#      long, strongly regularised retrain can leave it anywhere (wumpus.py section 3 expected the targets to reach
+#      the fixed point by themselves). Whether the agent grabs the gold rests on that unanchored value, which also
+#      adds seed-to-seed noise to every retrain comparison.
 #
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \
