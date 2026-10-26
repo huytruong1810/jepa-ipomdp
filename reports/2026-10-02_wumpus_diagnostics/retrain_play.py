@@ -85,6 +85,17 @@
 #         If neither length passes VALUE, the in-agent screen tests anchoring on the plain retrain recipe alone.
 #      -> RESCUE fails: the collapse has a second cause; diagnose before any in-agent run.
 #      -> NO HARM fails: report which sets lose and why before deciding.
+#    - Result (2026-10-25; runs/wumpus/absorbing/play_seed<s>.log): RESCUE FAIL, NO HARM FAIL. Anchored (unanchored):
+#        seed  best.pt          ctl              u12800           u25600
+#        0     67.3 (236.7)     267.6 (270.0)    -44.4 (275.9)    -43.6 (305.4)
+#        1     -78.7 (156.8)    -55.9 (214.7)    -42.9 (260.0)    10.0 (231.2)
+#        2     64.2 (233.1)     -44.1 (194.3)    -41.2 (262.5)    10.0 (-41.0)
+#      Only seed 0's ctl survives (-2.4); every other set loses 100-350 per game, almost always by unfinished games
+#      (82-100%, wins 0-15%). The collapsed seed-2 u25600 set rises only to 10.0 (bar 169.3). Reading: the learned
+#      value carries a common offset over the live states (gold-adjacent values above 999, V(GAME_OVER) +70 to +184
+#      on the healthy sets), and GRAB at the gold works only while the absorbing latent shares that offset; pinning
+#      it to 0 at planning time removes the offset from the GRAB side alone. The anchor has to shape the value in
+#      training (objective_ab.py 2n), not be imposed on networks trained without it.
 # ==============================================================================
 
 import json
