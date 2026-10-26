@@ -199,7 +199,14 @@
 #      if the objective_ab.py 2m 3-seed extension (G1) passes): the retrain recipe (runs/sweeps/wumpus_retrain/
 #      sweep.json overrides) with training.retrain_updates=25600 training.retrain_weight_decay=1.0, retrain_every
 #      kept at 50 (both retrains get the new setting: one rule, and the first one shapes the data of collections
-#      51-100 as in the recipe), sweep wumpus_retrain_wd1, development seeds 0, 1, 2, each paired per game against
+#      51-100 as in the recipe), and model.absorbing_value=true (amended 2026-10-26, before any G2 run: without
+#      the anchor the strong-weight-decay retrain collapsed on seed 2 of objective_ab.py 2m; with it, 2n PASS-W
+#      +45.6 / +74.5 / +64.1 over the anchored control). In-agent the anchor shapes the online training between
+#      retrains as well as both retrains and the acting planners; offline only the retrain had it, and the anchor
+#      alone was neutral-to-negative on the plain recipe (2n PASS-A: -44.5 / +11.6 / +5.7), so this screen tests
+#      the combination. The length stays 25600 although u12800 did as well offline (2n). The anchored sets do
+#      not fit V = 0 on a game's first GAME_OVER latent (go_value_diag.py 4), a value no anchored target or
+#      planner reads. Sweep wumpus_retrain_wd1_abs, development seeds 0, 1, 2, each paired per game against
 #      runs/sweeps/wumpus_retrain/seed<s>/analysis/games.npz (512 games, analysis seed 12345;
 #      reports/2026-10-22_option_a/paired_readout.py). Cost ~8 h per seed (two retrains of ~2.5 h each).
 #      * PASS: paired mean > 0 on 3 of 3 seeds, mean of the three >= +30, and deaths <= retrain + 2 points on
