@@ -213,6 +213,21 @@
 #        each seed -> seeds 3, 4; it becomes the Wumpus recipe, then the stacking screens.
 #      * FAIL: the offline gain does not survive in-agent (the first retrain changes the later data, best.pt
 #        selection differs); compare with the offline u25600 numbers before any further run.
+#    - Result 2026-10-27 (runs/sweeps/wumpus_retrain_wd1_abs; 512 paired games per seed vs runs/sweeps/
+#      wumpus_retrain): FAIL (mean bar). best.pt at collections 60 / 70 / 80: 236.7 / 200.4 / 255.7 against
+#      236.7 / 156.8 / 233.1, paired +0.0 [-31.0, +31.0] / +43.6 [+7.1, +80.1] / +22.6 [-11.2, +56.3], mean
+#      +22.1 (bar +30); > 0 on 3 of 3 only because seed 0 is +0.02; deaths 0.2 / 2.9 / 1.8% against 0.8 / 4.7
+#      / 4.1% (clause met); unfinished 70.3 / 69.1 / 65.0% against 67.2 / 67.8 / 62.3% (not down). Aggregate
+#      230.9 [196.4, 264.5] (hierarchical bootstrap). Against the offline anchored u25600 sets on the same
+#      games (objective_ab.py 2n: 271.1 / 300.7 / 264.1) the in-agent best.pt is -34.4 / -100.3 / -8.3.
+#    - Registered follow-up (written before it ran): best.pt never selected the networks of the final retrain
+#      (collection 100), which is the offline condition. Play latest.pt's networks (collection 100, right after
+#      the second 25600-update retrain) with retrain_play.py --absorbing-value on the same 512 games, seeds 0-2.
+#      * SELECTION: the collection-100 networks beat the in-agent best.pt on the mean and come within the
+#        offline u25600 numbers' paired noise (~+-30 per seed) -> the in-agent loss is best.pt selection by
+#        128-game evaluations; the next screen changes selection (e.g. act with the final retrain), no retrain.
+#      * DATA: the collection-100 networks also fall short of offline -> the agent's own data under the anchor
+#        and weight decay differ from the recipe's buffer; report before any further run.
 #    - Pre-registered test (2026-10-16, before launch; runs/wumpus/retrain_chain.sh): the current recipe +
 #      value_estimator=double + retrain_every=50, retrain_updates=6400 (retrains after collections 50 and 100;
 #      the second is the retrain_play.py condition, the first also changes the data of collections 51-100),
