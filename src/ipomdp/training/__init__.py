@@ -1,6 +1,7 @@
 """Replay, world-model training, rollouts and the checkpointable training run."""
 
-from .checkpointing import load_checkpoint, save_checkpoint
+from .checkpointing import (CheckpointSelection, check_checkpoint_selection, load_checkpoint, save_checkpoint, selects_best,
+                            selects_best_eval)
 from .episode_buffer import EpisodeBatch, EpisodeBuffer
 from .privileged import PrivilegedBeliefLoss, PrivilegedSpec, PrivilegedTargets
 from .rollout import Agent, Simulator, discounted_returns, play_episodes
@@ -10,6 +11,7 @@ from .trainer import Representation, TrainerConfig, WorldModelTrainer
 
 __all__ = [
     "Agent",
+    "CheckpointSelection",
     "Domain",
     "DomainSetup",
     "Simulator",
@@ -24,9 +26,12 @@ __all__ = [
     "TrainerConfig",
     "TrainingRun",
     "WorldModelTrainer",
+    "check_checkpoint_selection",
     "discounted_returns",
     "load_checkpoint",
     "play_episodes",
     "save_checkpoint",
+    "selects_best",
+    "selects_best_eval",
     "stream_seed",
 ]

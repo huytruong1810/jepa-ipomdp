@@ -23,9 +23,11 @@
 #      experiments/wumpus.py.
 #
 # 3. Analysis Uses Fresh Seeds, Not the Training Evaluation:
-#    - best.pt is the checkpoint with the highest greedy evaluation during training. That score
-#      is the maximum of several noisy estimates and is therefore biased upwards (winner's
-#      curse). analyze_run re-estimates every return on simulator seeds that training never
+#    - best.pt is the checkpoint with the highest greedy evaluation during training (the default
+#      training.checkpoint_selection=best_eval). That score is the maximum of several noisy
+#      estimates and is therefore biased upwards (winner's curse). Under final_retrain best.pt
+#      holds the final retrain's networks and its score is a single, unselected evaluation
+#      (main.py, section 5). analyze_run re-estimates every return on simulator seeds that training never
 #      used (interpretability/analysis.py), so its numbers are unbiased for the chosen
 #      checkpoint. The training score is still recorded, labelled as the selection score.
 #
@@ -139,21 +141,25 @@ def latent_figure(domain: Domain, belief_filter: BeliefFilter, episodes: Episode
 
 @dataclass(frozen=True)
 class TrainedRun:
-    """A run directory reloaded with the networks of its best.pt (section 1)."""
+    """A run directory reloaded with the networks of one selected checkpoint, best.pt by default (section 1)."""
 
     run_dir: Path
     cfg: DictConfig
     setup: DomainSetup
     run: TrainingRun
     checkpoint_collection: int
-    checkpoint_eval_return: float     # training-time selection score (biased upwards, section 3)
+    checkpoint_eval_return: float     # training-time evaluation of best.pt (biased upwards under best_eval, section 3)
 
 
-def load_trained_run(run_dir: Path, device: torch.device) -> TrainedRun:
-    """Rebuilds the run from <run>/.hydra/config.yaml and loads <run>/checkpoints/best.pt."""
+def load_trained_run(run_dir: Path, device: torch.device, checkpoint: str = "best.pt") -> TrainedRun:
+    """
+    Rebuilds the run from <run>/.hydra/config.yaml and loads <run>/checkpoints/<checkpoint>, a
+    selected-networks file (collection, eval_return, networks): best.pt, or best_eval.pt of a
+    final_retrain run (main.py, section 5).
+    """
     cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
     setup, run = build_training_run(cfg, device)
-    best = load_checkpoint(run_dir / "checkpoints" / "best.pt")
+    best = load_checkpoint(run_dir / "checkpoints" / checkpoint)
     for name, net in run.networks.items():
         net.load_state_dict(best["networks"][name])
     run.belief_filter.eval()

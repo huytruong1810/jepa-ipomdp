@@ -27,6 +27,26 @@
 #      writes latest.pt (the guardrail itself writes emergency.pt) and exits with status 1.
 #      Only a run that completed every collection exits with 0, which is what sweep.py relies
 #      on before analysing a run.
+#
+# 5. Checkpoint Selection (training.checkpoint_selection; training/checkpointing.py, 2b):
+#    - best_eval (the default; canonical Tiger and every run before 2026-10-27): best.pt holds the
+#      networks of the highest greedy evaluation so far.
+#    - final_retrain (whole-buffer retrain recipes only): best.pt holds the networks of the final
+#      retrain (the evaluation of the last collection); best_eval.pt holds what best_eval would
+#      have selected, so both rules are read from one run. The evaluation and its logging are the
+#      same under both rules: the score informs, it no longer selects.
+#    - Evidence (Wumpus retrain recipe, runs/sweeps/wumpus_retrain, 5 development seeds, 512 paired
+#      games each; reports/2026-10-02_wumpus_diagnostics/retrain_play.py on each run's latest.pt;
+#      training/run.py section 14 has the registrations): the final-retrain networks beat best.pt
+#      by +0.0 / +115.0 / +27.9 / +63.6 / +95.6 per game (seeds 0-2 found after the fact, seeds
+#      3-4 a pre-registered confirmation that passed), mean +60.4 [+1.7, +119.1] (Student-t over
+#      seeds), 260.6 +- 30.4 against 200.2 per game, deaths down on every seed that died.
+#    - Mechanism: the maximum of noisy 128-game evaluations is a winner's curse (optimizer's curse,
+#      Smith & Winkler 2006). Between retrains the networks re-degrade (collections 55-95 had deaths
+#      up to 25% on one seed; training/run.py section 14), so the evaluations differ mostly by luck, and the argmax picks a lucky mid-run
+#      checkpoint over the final retrain, which trains longest and uniformly on the whole buffer. The
+#      same selection effect makes the planner pick the risks its model under-rates.
+#    - best_eval stays the default: Tiger has no retrain, and its gate (Phase 8) was read with it.
 # ==============================================================================
 
 import logging
@@ -50,7 +70,8 @@ from ipomdp.telemetry import (
     RewardTrajectoryVisualizer,
     SystemTelemetryMonitor,
 )
-from ipomdp.training import TrainingRun, load_checkpoint, play_episodes, save_checkpoint
+from ipomdp.training import (CheckpointSelection, TrainingRun, check_checkpoint_selection, load_checkpoint, play_episodes,
+                             save_checkpoint, selects_best, selects_best_eval)
 
 torch.set_float32_matmul_precision('high')
 
@@ -98,6 +119,8 @@ def main(cfg: DictConfig):
     t = cfg.training
     total_collections = t.total_episodes // t.env_batch_size
     transitions_per_collection = t.env_batch_size * cfg.env.max_steps
+    selection = CheckpointSelection(t.checkpoint_selection)                                     # section 5
+    check_checkpoint_selection(selection, total_collections, t.eval_every, t.retrain_every)
     pbar = tqdm(total=total_collections, initial=run.collection, desc="Collections")
     try:
         while run.collection < total_collections:
@@ -116,10 +139,13 @@ def main(cfg: DictConfig):
                 logger.info(f"collection {collection}: greedy eval discounted return "
                             f"{evaluation['eval_discounted_return']:.2f} +- {evaluation['eval_discounted_return_stderr']:.2f} "
                             f"(best {run.best_eval_return:.2f}){outcomes}")
-                if evaluation["eval_discounted_return"] >= run.best_eval_return:
-                    save_checkpoint(checkpoints / "best.pt", {
-                        "collection": collection, "eval_return": evaluation["eval_discounted_return"],
-                        "networks": {name: net.state_dict() for name, net in run.networks.items()}})
+                eval_return = evaluation["eval_discounted_return"]
+                selected = {"collection": collection, "eval_return": eval_return,
+                            "networks": {name: net.state_dict() for name, net in run.networks.items()}}
+                if selects_best(selection, collection, total_collections, eval_return, run.best_eval_return):
+                    save_checkpoint(checkpoints / "best.pt", selected)
+                if selection is CheckpointSelection.FINAL_RETRAIN and selects_best_eval(eval_return, run.best_eval_return):
+                    save_checkpoint(checkpoints / "best_eval.pt", selected)                     # section 5
                 pbar.set_postfix({"eval": f"{evaluation['eval_discounted_return']:.2f}",
                                   "best": f"{run.best_eval_return:.2f}", "loss": f"{metrics['loss_total']:.3f}"})
             if collection % t.viz_every == 0:

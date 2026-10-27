@@ -9,8 +9,8 @@ import torch.nn.functional as F
 
 from ipomdp.experiments import tiger_setup
 from ipomdp.models import ValueEstimator, ValueHead, ValuePair, ema_update
-from ipomdp.training import (Representation, RunConfig, RunStream, TrainerConfig, TrainingRun, load_checkpoint, save_checkpoint,
-                             stream_seed)
+from ipomdp.training import (CheckpointSelection, Representation, RunConfig, RunStream, TrainerConfig, TrainingRun,
+                             check_checkpoint_selection, load_checkpoint, save_checkpoint, selects_best, stream_seed)
 
 CPU = torch.device("cpu")
 
@@ -355,6 +355,27 @@ class TestCheckpointFiles:
     def test_missing_checkpoint_raises(self, tmp_path: Path):
         with pytest.raises(FileNotFoundError):
             load_checkpoint(tmp_path / "absent.pt")
+
+
+class TestCheckpointSelection:
+    """best_eval keeps the running maximum; final_retrain takes the last collection only (checkpointing.py, 2b)."""
+
+    def test_best_eval_selects_ties_and_new_maxima_only(self):
+        rule = CheckpointSelection.BEST_EVAL
+        assert selects_best(rule, 5, 100, 3.0, 3.0)              # evaluate() already folded it into the maximum
+        assert not selects_best(rule, 100, 100, 2.0, 3.0)
+
+    def test_final_retrain_selects_the_last_collection_whatever_its_score(self):
+        rule = CheckpointSelection.FINAL_RETRAIN
+        assert not selects_best(rule, 95, 100, 9.0, 9.0)
+        assert selects_best(rule, 100, 100, -5.0, 9.0)
+
+    def test_final_retrain_needs_an_evaluated_final_retrain(self):
+        check_checkpoint_selection(CheckpointSelection.FINAL_RETRAIN, 100, 5, 50)        # the Wumpus retrain recipe
+        check_checkpoint_selection(CheckpointSelection.BEST_EVAL, 40, 3, 0)              # nothing to check
+        for total, eval_every, retrain_every in ((100, 5, 0), (100, 5, 30), (100, 3, 50)):
+            with pytest.raises(ValueError):
+                check_checkpoint_selection(CheckpointSelection.FINAL_RETRAIN, total, eval_every, retrain_every)
 
 
 class TestSeedStreams:

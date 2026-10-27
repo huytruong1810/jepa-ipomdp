@@ -54,6 +54,12 @@ class TestRunConstruction:
             for key, value in net.state_dict().items():
                 assert torch.equal(trained.run.networks[name].state_dict()[key], value), f"{name}.{key}"
 
+        save_checkpoint(tmp_path / "checkpoints" / "best_eval.pt", {        # main.py section 5: a second selection
+            "collection": 0, "eval_return": 9.0, "networks": {name: net.state_dict() for name, net in run.networks.items()}})
+        assert load_trained_run(tmp_path, CPU, "best_eval.pt").checkpoint_eval_return == 9.0
+        with pytest.raises(FileNotFoundError):
+            load_trained_run(tmp_path, CPU, "latest_selected.pt")
+
 
 def _report(optimal: float, planner: float, decoded: float) -> dict:
     report: dict = {}

@@ -29,6 +29,10 @@
 #      directory. The default (seed 12345, analysis/) is the development set every screen up to
 #      2026-10-18 read; the held-out protocol writes analysis_heldout/ with a seed no screen has
 #      read, so re-analysing a development run never overwrites its development report.
+#    - settings.checkpoint (default best.pt) names the networks analysed (runs.load_trained_run).
+#      A run trained with training.checkpoint_selection=final_retrain holds both selections
+#      (best.pt the final retrain, best_eval.pt the best evaluation; main.py section 5), so the
+#      two are compared on the same games by analysing each into its own output directory.
 #    - The per-game rows (games.npz) are what the hierarchical bootstrap of aggregate.py
 #      (section 6) resamples: seeds, then games within a seed, paired across agents game by game.
 # ==============================================================================
@@ -58,6 +62,7 @@ class WumpusAnalysisSettings:
         mlp_probe_steps: Adam steps of each MLP probe fit.
         seed: Base seed of the analysis streams (training/seeding.py); never a training stream.
         output: Directory name under the run for every output (section 3).
+        checkpoint: File under <run>/checkpoints/ whose networks are analysed (section 3).
         reference_risk_thresholds: Risk thresholds of the reference agents (agents/wumpus_reference.py,
             section 2d): 0 never gambles, 1 always does.
     """
@@ -67,6 +72,7 @@ class WumpusAnalysisSettings:
     seed: int = 12345
     reference_risk_thresholds: tuple[float, ...] = (0.0, 0.4, 1.0)
     output: str = "analysis"
+    checkpoint: str = "best.pt"
 
 
 def _halves(episodes: EpisodeBatch) -> tuple[EpisodeBatch, EpisodeBatch]:
@@ -92,8 +98,8 @@ def _game_rows(name: str, episodes: EpisodeBatch, discount: float) -> dict[str, 
 
 
 def analyze_wumpus_run(run_dir: Path, settings: WumpusAnalysisSettings, device: torch.device) -> dict:
-    """Section 1 on a run's best.pt; writes <run>/<settings.output>/ (section 2) and returns the report."""
-    trained = load_trained_run(run_dir, device)
+    """Section 1 on a run's settings.checkpoint; writes <run>/<settings.output>/ (section 2) and returns the report."""
+    trained = load_trained_run(run_dir, device, settings.checkpoint)
     world, run, cfg = trained.setup.domain, trained.run, trained.cfg
     if not isinstance(world, WumpusWorld):
         raise TypeError(f"analyze_wumpus_run needs a Wumpus World run, got {cfg.env.name}.")
@@ -109,7 +115,7 @@ def analyze_wumpus_run(run_dir: Path, settings: WumpusAnalysisSettings, device: 
     agent_episodes, _ = play_episodes(simulator(), planner)
     random_episodes, _ = play_episodes(simulator(), UniformRandomAgent(world.num_actions, n,
                                                                        stream_seed(settings.seed, 4), device))
-    report: dict = {"checkpoint_collection": trained.checkpoint_collection,
+    report: dict = {"checkpoint": settings.checkpoint, "checkpoint_collection": trained.checkpoint_collection,
                     "checkpoint_eval_return": trained.checkpoint_eval_return,
                     "settings": asdict(settings),
                     "returns": {"learned_planner": _summary(agent_episodes, world.discount),

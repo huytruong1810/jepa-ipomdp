@@ -264,6 +264,9 @@
 #      retrain networks average 260.6 +- 30.4 per game against best.pt's 200.2. Reading: the maximum of noisy
 #      128-game evaluations picks checkpoints between retrains whose score is mostly luck (winner's curse); the
 #      final whole-buffer retrain is the better policy on 4 of 5 seeds and the same on the fifth.
+#    - Built as training.checkpoint_selection=final_retrain (default best_eval; main.py section 5,
+#      training/checkpointing.py 2b): best.pt holds the final retrain's networks and best_eval.pt the old
+#      selection, so one run gives both arms of a paired comparison.
 #    - Pre-registered test (2026-10-16, before launch; runs/wumpus/retrain_chain.sh): the current recipe +
 #      value_estimator=double + retrain_every=50, retrain_updates=6400 (retrains after collections 50 and 100;
 #      the second is the retrain_play.py condition, the first also changes the data of collections 51-100),

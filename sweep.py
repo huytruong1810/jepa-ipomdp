@@ -57,6 +57,10 @@
 #      must come from the sweep's analysis seed (checked) and be played on the same games
 #      (checked against the heuristic's per-game returns, experiments/aggregate.py section 6).
 #      It changes the aggregate only, so it is not part of the recorded condition.
+#    - --checkpoint (Wumpus; default best.pt) names the networks each seed's analysis reads
+#      (experiments/wumpus.py, section 3). It is part of the recorded analysis condition. With a
+#      final_retrain run (main.py, section 5), best.pt and best_eval.pt are compared by two sweeps
+#      over the same seed directories (symlinked, section 4), each with its own --analysis-output.
 #    - --baseline-runs (Wumpus) adds the model-free baseline (PROTOCOL.md C-c), trained per seed by
 #      reports/2026-10-19_eval_protocol/recurrent_dqn_baseline.py: seed k's games from
 #      <dir>/seed<k>/<analysis output>/games.npz, same checks, aggregate only.
@@ -128,6 +132,8 @@ def main() -> None:
     parser.add_argument("--analysis-seed", type=int, default=defaults.seed)
     parser.add_argument("--analysis-output", default=None,
                         help="Wumpus only: analysis directory under each seed (section 5; default analysis).")
+    parser.add_argument("--checkpoint", default=None,
+                        help="Wumpus only: checkpoint file analysed under each seed's checkpoints/ (section 5; default best.pt).")
     parser.add_argument("--exact-planner-games", type=Path, default=None,
                         help="Wumpus only: the exact planner's games.npz of the same analysis seed (section 6).")
     parser.add_argument("--baseline-runs", type=Path, default=None,
@@ -147,11 +153,14 @@ def main() -> None:
         settings = WumpusAnalysisSettings(args.episodes, args.mlp_probe_steps, args.analysis_seed)
         if args.analysis_output is not None:
             settings = replace(settings, output=args.analysis_output)
+        if args.checkpoint is not None:
+            settings = replace(settings, checkpoint=args.checkpoint)
         output = settings.output
         analyze = analyze_wumpus_run
     else:
-        if args.analysis_output is not None or args.exact_planner_games is not None or args.baseline_runs is not None:
-            raise ValueError("--analysis-output, --exact-planner-games and --baseline-runs apply to Wumpus World only.")
+        if (args.analysis_output is not None or args.checkpoint is not None or args.exact_planner_games is not None
+                or args.baseline_runs is not None):
+            raise ValueError("--analysis-output, --checkpoint, --exact-planner-games and --baseline-runs apply to Wumpus World only.")
         output = "analysis"
         tolerance = defaults.solver_tolerance if args.solver_tolerance is None else args.solver_tolerance
         settings = AnalysisSettings(args.episodes, tolerance, args.mlp_probe_steps, args.analysis_seed)
