@@ -257,6 +257,13 @@
 #        rule becomes the recipe's selection and its claim is registered in PROTOCOL.md before held-out seeds.
 #      * FAIL: the post-hoc gain on seeds 0-2 was seed noise; best.pt stays.
 #      The 5-seed mean gain (seeds 0-2 post hoc, 3-4 confirmatory) is reported, not decided on.
+#    - Result 2026-10-27 (runs/wumpus/absorbing_train/recipe_c100_play_seed{3,4}.log; best.pt replays reproduce
+#      report.json): PASS. Seed 3: 238.3 vs 174.7, +63.6 +- 34.4, deaths 0.4 vs 2.9%, unfinished 68.8 vs 71.5%;
+#      seed 4: 295.3 vs 199.7, +95.6 +- 33.5, deaths 1.0 vs 3.1%, unfinished 60.9 vs 67.2%. Five seeds (0-2 post
+#      hoc): +0.0 / +115.0 / +27.9 / +63.6 / +95.6, mean +60.4 [+1.7, +119.1] (Student-t over seeds); the final-
+#      retrain networks average 260.6 +- 30.4 per game against best.pt's 200.2. Reading: the maximum of noisy
+#      128-game evaluations picks checkpoints between retrains whose score is mostly luck (winner's curse); the
+#      final whole-buffer retrain is the better policy on 4 of 5 seeds and the same on the fifth.
 #    - Pre-registered test (2026-10-16, before launch; runs/wumpus/retrain_chain.sh): the current recipe +
 #      value_estimator=double + retrain_every=50, retrain_updates=6400 (retrains after collections 50 and 100;
 #      the second is the retrain_play.py condition, the first also changes the data of collections 51-100),
