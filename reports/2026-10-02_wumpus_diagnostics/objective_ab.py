@@ -379,6 +379,36 @@
 #      reads that value, so the clause's failure is real but off the decision path; it is a deviation from the
 #      registered MECHANISM reading, stated here rather than re-registered.
 #
+# 2o. Decision-aware weighting of the observation term, retrain screen (2026-10-27, written before any run;
+#     model.decision_aware_weight, trainer.py 2h, run.py 20):
+#    - Question: does weighting each transition's observation cross-entropy by the squared span of its branch values
+#      (a bound on the backup's squared value-equivalence error; VaGraM for discrete observations) make the retrain
+#      recipe's networks repair the value of information at the declined states and play better than the same
+#      retrain without it? Unlike 2i the loss stays a proper scoring rule per transition and reads the values of
+#      every CHILD branch, where the gold's value lives.
+#    - Smoke (seed 0, the 2i control networks on the run's buffer, 32,000 transitions; weights at beta = 1): 92.5%
+#      of transitions have zero span, the top 5% carry 97.7% of the weight (ESS 3.3%); mean ratio 7.2 on FORWARD,
+#      0.02 on the other actions, 5.9 on realised GLITTER. So beta is the share of the CE mass moved onto the ~5%
+#      of transitions whose outcome changes a value; beta = 0.5 is fixed a priori (one dose: half the representation
+#      term stays uniform, since in the decoder representation the CE also shapes the latent).
+#    - Arm (runs/sweeps/wumpus_retrain seeds 0-2, each run's own .hydra config, --representation decoder --horizon 5
+#      --seed <s> --train-buffer <run> --pool-cache runs/wumpus/supervised_filter/pools.pt, 6400 updates, --set
+#      model.decision_aware_weight=0.5, --save runs/wumpus/da_screen/DA50_seed<s>.pt): the 2i control
+#      (runs/wumpus/ve_screen/control_seed<s>.pt: same seed, init and batches, beta = 0) is the paired control, i.e.
+#      a final-retrain baseline, never best.pt. Played with retrain_play.py <run> control DA50 (512 analysis games,
+#      paired per game with the control), then feature_localise.py --networks DA50 for the mechanism, compared with
+#      feature_localise_control_seed<s>.json. Chain: runs/wumpus/da_screen_chain.sh, one GPU job at a time.
+#    - Pre-registered readout:
+#      * PLAY: DA50 - control > 0 on 3 of 3 seeds, mean of the three >= +30, deaths <= control + 2 points each.
+#      * MECHANISM: joint glitter ratio at the declined turned latents (c) >= control + 0.10 on >= 2 of 3 seeds.
+#      * Latent guard (reported): probe cell / heading not more than 5 points below the control's (2i probes).
+#      -> PLAY and MECHANISM: the in-agent screen (recipe + model.decision_aware_weight=0.5 + checkpoint_selection=
+#         final_retrain), seeds 0-2, pre-registered in run.py 20 before launch, paired with the recipe's
+#         final-retrain networks (runs/wumpus/absorbing_train/recipe_seed<s>_c100.returns.npy).
+#      -> PLAY only: the gain does not come through the value of information; diagnose (action mix, risk) first.
+#      -> MECHANISM only: the model repairs but the planner does not profit; report, then one higher dose (0.8).
+#      -> neither: FAIL; the next candidate is the Q-equivalent observation term (reward-carried outcomes).
+#
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \
 #        --horizon 5 --seed 1 --pool-cache runs/wumpus/supervised_filter/pools.pt
