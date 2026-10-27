@@ -408,6 +408,21 @@
 #      -> PLAY only: the gain does not come through the value of information; diagnose (action mix, risk) first.
 #      -> MECHANISM only: the model repairs but the planner does not profit; report, then one higher dose (0.8).
 #      -> neither: FAIL; the next candidate is the Q-equivalent observation term (reward-carried outcomes).
+#    - Result 2026-10-27 (runs/wumpus/da_screen/; ~1 h per seed; control replays reproduce the 2i plays and every
+#      best.pt replay reproduces report.json): FAIL (neither PLAY nor MECHANISM).
+#                 control   DA50    vs control       deaths c / DA     unfinished c / DA   joint glitter c / DA   cell / heading c / DA
+#      seed 0     270.0     208.7   -61.2 +- 34.1    1.0 / 5.9%        64.3 / 62.7%        0.45 / 0.31            88 / 93 -> 84 / 79
+#      seed 1     214.7     292.8   +78.2 +- 27.8    1.8 / 0.4%        69.1 / 62.5%        0.39 / 0.27            87 / 91 -> 84 / 80
+#      seed 2     194.3     244.7   +50.4 +- 40.7    7.2 / 0.8%        60.2 / 67.2%        0.33 / 0.40            82 / 86 -> 86 / 90
+#      Mean +22.5; PLAY fails on seed 0 (negative, deaths +4.9 points); MECHANISM fails (glitter ratio DOWN on seeds
+#      0-1, +0.07 on seed 2); the latent guard fails on seeds 0-1 (heading -14 / -11 points).
+#    - Reading: moving half the CE mass onto the ~5% of high-span transitions starves the uniform representation
+#      pressure that tracks heading, and the observation head does not become better calibrated where it matters (the
+#      glitter under-prediction gets worse on 2 of 3 seeds). The two positive seeds come with fewer deaths, not fewer
+#      unfinished games on seed 2, so the gains are not the value-of-information mechanism. The span weights are set by
+#      the model's OWN value at its own imagined children, which under-rates exactly the branches it under-predicts
+#      (the feedback the theory assumes away: V is the true value in the bound). Per the registered branch: the next
+#      candidate is the Q-equivalent observation term.
 #
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \
