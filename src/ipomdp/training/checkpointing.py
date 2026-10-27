@@ -37,13 +37,13 @@
 #      tensors to its device, so checkpoints are read with map_location="cpu".
 # ==============================================================================
 
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 import torch
 
 
-class CheckpointSelection(str, Enum):
+class CheckpointSelection(StrEnum):
     """Which networks best.pt holds (section 2b)."""
 
     BEST_EVAL = "best_eval"

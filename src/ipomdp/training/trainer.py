@@ -186,6 +186,37 @@
 #      factorial on the same data. Decoder only (with JEPA the term is already present, weight 1); w = 0 (the
 #      default and canonical Tiger) builds nothing.
 #
+# 2h. Optional Decision-Aware Weighting of the Observation Term (decision_aware_weight = beta in (0, 1];
+#     model.decision_aware_weight, 2026-10-27):
+#      Observation  mean_t  omega_t * CE( P(o | z_t, a_t), o_{t+1} ),
+#                   omega_t = (1 - beta) + beta * s_t^2 / mean_batch(s^2),   omega_t detached
+#                   s_t = span of sg V-bar(tau(z_t, a_t, o)) over the branches o the model gives mass >= 1e-3
+#                         (DECISION_AWARE_SUPPORT) plus the realised o_{t+1}
+#    - Why: the Bellman backup reads the observation model only through sum_o P(o) V-bar(tau(z, a, o)). By the
+#      span-Hoelder lemma (interpretability/error_bounds.py) and Pinsker's inequality, the backup's error from a
+#      model P_hat instead of P obeys
+#          | sum_o (P_hat - P)(o) V(o) |^2  <=  span(V)^2 / 4 * ||P_hat - P||_1^2  <=  span(V)^2 / 2 * KL(P || P_hat),
+#      and E[CE] = KL + H(P) with H independent of the model. A span^2-weighted cross-entropy therefore minimises
+#      an upper bound on the mean squared value-equivalence error of the backup, i.e. it is the decision-aware
+#      model loss (VaGraM, Voelcker et al. 2022; value equivalence, Grimm et al. 2020) for a discrete observation
+#      space, with the model's own value in place of the true one. Transitions whose branches all lead to the
+#      same value cannot change a decision and lose weight; a new cell whose GLITTER branch continues at +999
+#      gains it (on Wumpus the head predicts that branch 2.3-4.5x too rarely at the declined turned latents:
+#      reports/2026-10-02_wumpus_diagnostics/q_localise_diag.py, feature_localise.py).
+#    - Against section 2f (the next-value residual, which failed its screen, objective_ab.py 2i): the loss stays a
+#      proper scoring rule per transition (only the weights change), so calibration where it is trained is kept;
+#      and it uses the values at the CHILD latents of every branch, where the gold's value lives, rather than
+#      matching one scalar.
+#    - beta < 1 keeps a uniform floor: in the decoder representation this CE is the filter's representation
+#      term, and transitions of zero span (most of them) must still shape the latent. Weights are
+#      self-normalised per batch (mean omega = 1), so the term keeps the scale of one cross-entropy.
+#    - The support restriction: branches with no model mass contribute nothing to the backup, and their imagined
+#      children are off the filter's data; their values must not set the span. The realised observation is
+#      always in the support (it has mass under the true P).
+#    - Zero spans everywhere (e.g. at initialisation: value projections are zero-initialised) give uniform weights.
+#    - Needs the expansion's child values (section 3): not combined with the time-aware value. beta = 0 (the
+#      default and canonical Tiger) computes nothing new and leaves training unchanged.
+#
 # 3f. Optional Anchored Absorbing Value (absorbing_observation = o_abs; model.absorbing_value, 2026-10-25):
 #    - Every Bellman target values the successors through the absorbing percept at exactly 0: the expansion is
 #      wrapped in AbsorbingValueModel (planning/search_model.py, section 7), and the double / clipped-double
@@ -229,6 +260,8 @@ from ..models.world_model import BeliefFilter, RecurrentJEPA
 from ..planning.search_model import AbsorbingValueModel, LearnedSearchModel
 from .episode_buffer import EpisodeBatch
 from .privileged import PrivilegedBeliefLoss
+
+DECISION_AWARE_SUPPORT = 1e-3     # section 2h: branches with less model mass do not set the span
 
 
 class Representation(StrEnum):
@@ -274,6 +307,7 @@ class WorldModelTrainer:
         value_equivalent_scale: float = 1.0,
         self_predictive_weight: float = 0.0,
         absorbing_observation: int | None = None,
+        decision_aware_weight: float = 0.0,
     ):
         """
         Args:
@@ -290,6 +324,7 @@ class WorldModelTrainer:
             self_predictive_weight: w of the self-predictive term in the decoder representation (section 2g); needs jepa.
             absorbing_observation: The absorbing percept whose successors the targets value at exactly 0 (section 3f),
                 or None.
+            decision_aware_weight: beta of the decision-aware weighting of the observation term (section 2h); 0 = off.
         """
         if nstep < 0 or not 0.0 <= nstep_mix <= 1.0 or (nstep > 0 and nstep_mix == 0.0):
             raise ValueError(f"need nstep >= 0 and nstep_mix in (0, 1] when nstep > 0; got {nstep}, {nstep_mix}.")
@@ -312,8 +347,13 @@ class WorldModelTrainer:
         if value_equivalent_weight > 0.0 and (jepa is not None or horizon is not None or planning_observation_head is not None):
             raise ValueError("the value-equivalent term needs the decoder representation, no horizon and no planning head "
                              "(section 2f).")
+        if not 0.0 <= decision_aware_weight <= 1.0:
+            raise ValueError(f"need decision_aware_weight in [0, 1], got {decision_aware_weight} (section 2h).")
+        if decision_aware_weight > 0.0 and horizon is not None:
+            raise ValueError("decision-aware weighting needs the expansion's child values: no time-aware value (section 2h).")
         self.value_equivalent_weight = value_equivalent_weight
         self.value_equivalent_scale = value_equivalent_scale
+        self.decision_aware_weight = decision_aware_weight
         self.belief_filter = belief_filter
         self.jepa = jepa
         self.self_predictive_weight = self_predictive_weight
@@ -489,13 +529,16 @@ class WorldModelTrainer:
             # The decoder baseline's representation term; a detached planning-model fit otherwise.
             decoded = current if self.representation is Representation.DECODER else current.detach()
             observation_logits = self.observation_head(decoded, action_flat).float()
-            losses["observation"] = F.cross_entropy(observation_logits, episodes.observations.reshape(-1))
+            if self.decision_aware_weight > 0.0:                                         # section 2h
+                weights = self._decision_aware_weights(self._data_branches(child_values, episodes),
+                                                       observation_logits.detach(), episodes.observations.reshape(-1))
+                losses["observation"] = (weights * F.cross_entropy(observation_logits, episodes.observations.reshape(-1),
+                                                                   reduction="none")).mean()
+            else:
+                losses["observation"] = F.cross_entropy(observation_logits, episodes.observations.reshape(-1))
 
             if self.value_equivalent_weight > 0.0:                                       # section 2f
-                branches = child_values.view(batch, steps + 1, self.num_actions, self.num_observations)[:, :-1]
-                branches = branches.reshape(batch * steps, self.num_actions, self.num_observations)
-                branches = branches.gather(1, episodes.actions.reshape(-1, 1, 1).expand(-1, 1, self.num_observations))
-                branches = branches.squeeze(1).float()                                   # V-bar(tau(z_t, a_t, o)), (BT, O)
+                branches = self._data_branches(child_values, episodes)                  # V-bar(tau(z_t, a_t, o)), (BT, O)
                 realised = branches.gather(1, episodes.observations.reshape(-1, 1)).squeeze(1)   # V-bar(z_{t+1})
                 predicted = (F.softmax(observation_logits, dim=-1) * branches).sum(-1)
                 losses["value_equivalent"] = self.value_equivalent_weight * (
@@ -541,6 +584,26 @@ class WorldModelTrainer:
             "value_target_mean": targets_value.mean().item(),
             "value_abs_error": value_error.item(),
         }
+
+    def _data_branches(self, child_values: Tensor, episodes: EpisodeBatch) -> Tensor:
+        """The child values V-bar(tau(z_t, a_t, o)) of the data action a_t at every step, (B*T, O) float32 (2f, 2h)."""
+        batch, steps = episodes.actions.shape
+        branches = child_values.view(batch, steps + 1, self.num_actions, self.num_observations)[:, :-1]
+        branches = branches.reshape(batch * steps, self.num_actions, self.num_observations)
+        branches = branches.gather(1, episodes.actions.reshape(-1, 1, 1).expand(-1, 1, self.num_observations))
+        return branches.squeeze(1).float()
+
+    @torch.no_grad()
+    def _decision_aware_weights(self, branches: Tensor, logits: Tensor, observed: Tensor) -> Tensor:
+        """omega_t of section 2h, (B*T,): (1 - beta) + beta * s_t^2 / mean(s^2), uniform when every span is 0."""
+        support = F.softmax(logits, dim=-1) >= DECISION_AWARE_SUPPORT
+        support[torch.arange(len(observed), device=observed.device), observed] = True
+        span = (branches.masked_fill(~support, -torch.inf).max(-1).values
+                - branches.masked_fill(~support, torch.inf).min(-1).values)
+        squared = span.square()
+        scale = squared.mean()
+        ratio = torch.where(scale > 0.0, squared / scale.clamp_min(torch.finfo(squared.dtype).tiny), torch.ones_like(squared))
+        return (1.0 - self.decision_aware_weight) + self.decision_aware_weight * ratio
 
     def _mix_nstep(self, latents: Tensor, episodes: EpisodeBatch,
                    bellman: Tensor) -> tuple[Tensor, dict[str, float]]:

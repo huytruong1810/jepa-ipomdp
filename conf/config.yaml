@@ -114,6 +114,7 @@ model:
   value_equivalent_weight: 0.0  # w > 0: value-equivalent observation term into the filter, decoder only (run.py, 15; trainer.py, 2f)
   self_predictive_weight: 0.0   # w > 0: JEPA latent self-prediction added to the decoder representation (run.py, 18; trainer.py, 2g)
   absorbing_value: false        # true: V = 0 behind the absorbing percept in the value targets and the planner (run.py, 19)
+  decision_aware_weight: 0.0    # beta in (0, 1]: span^2-weighted observation cross-entropy (run.py, 20; trainer.py, 2h)
 
 mcts:
   num_simulations: 50         # Search simulations per decision (per parallel episode)

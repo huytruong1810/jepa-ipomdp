@@ -251,3 +251,48 @@ class TestValueEquivalentTerm:
             expected = 2.0 * ((((probs * branch).sum(-1) - realised) / 100.0) ** 2).mean()
         assert float(expected) > 0.0
         assert trainer.train_step(batch)["loss_value_equivalent"] == pytest.approx(float(expected), rel=1e-4)
+
+
+class TestDecisionAwareWeighting:
+    """Section 2h of training/trainer.py: CE weighted by (1 - beta) + beta * span^2 / mean(span^2)."""
+
+    @staticmethod
+    def _decoder(beta: float, **kwargs) -> WorldModelTrainer:
+        torch.manual_seed(0)
+        belief_filter = BeliefFilter(A, O, D, H, 1)
+        return WorldModelTrainer(belief_filter, None, ValueHead(D, H, 1, 255), RewardHead(D, A, H, 1, 255),
+                                 ObservationHead(D, A, O, H, 1), TwoHotSymlog(255, 2000.0), A, O, discount=0.95,
+                                 config=CONFIG, device=CPU, decision_aware_weight=beta, **kwargs)
+
+    def test_invalid_weight_and_horizon_raise(self):
+        for beta in (-0.1, 1.5):
+            with pytest.raises(ValueError):
+                self._decoder(beta)
+        with pytest.raises(ValueError):
+            self._decoder(0.5, horizon=6)
+
+    def test_zero_spans_give_the_unweighted_loss(self):
+        batch = _episodes(4, 0)          # V-bar is constant at initialisation (zero-initialised projection)
+        assert (self._decoder(0.5).train_step(batch)["loss_observation"]
+                == pytest.approx(self._decoder(0.0).train_step(batch)["loss_observation"], rel=1e-6))
+
+    def test_matches_the_weighted_cross_entropy_by_hand(self):
+        trainer = self._decoder(0.75)
+        with torch.no_grad():                         # a non-trivial V-bar
+            for p in trainer.target_value_head.parameters():
+                p.normal_(0.0, 0.5)
+        batch = _episodes(4, 0)
+        with torch.no_grad():
+            a1 = torch.nn.functional.one_hot(batch.actions, A).float()
+            latents = trainer.belief_filter.unroll(a1, torch.nn.functional.one_hot(batch.observations, O).float(), None)
+            z = latents[:, :-1].reshape(-1, D)
+            rows, observed = torch.arange(len(z)), batch.observations.reshape(-1)
+            branch = trainer.target_model.expand(z).next_values[rows, batch.actions.reshape(-1)]     # (BT, O)
+            logits = trainer.observation_head(z, a1.reshape(-1, A))
+            support = torch.softmax(logits, -1) >= 1e-3
+            support[rows, observed] = True
+            span = torch.stack([branch[i][support[i]].max() - branch[i][support[i]].min() for i in range(len(z))])
+            weights = 0.25 + 0.75 * span ** 2 / (span ** 2).mean()
+            expected = (weights * torch.nn.functional.cross_entropy(logits, observed, reduction="none")).mean()
+        assert float(span.max()) > 0.0 and float(weights.std()) > 0.0
+        assert trainer.train_step(batch)["loss_observation"] == pytest.approx(float(expected), rel=1e-4)

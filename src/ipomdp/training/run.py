@@ -332,6 +332,13 @@
 #      value every successor through the domain's absorbing percept (DomainSetup.absorbing_observation; Wumpus:
 #      GAME_OVER) at exactly 0. A domain without one (Tiger) raises.
 #    - False (the default, canonical Tiger) wraps and computes nothing new.
+#
+# 20. Decision-Aware Weighting of the Observation Term (2026-10-27; trainer.py 2h):
+#    - cfg.decision_aware_weight = beta in (0, 1]: each transition's observation cross-entropy is weighted by the
+#      squared span of the value-target expansion's child values over its observation branches (self-normalised,
+#      a uniform floor 1 - beta), which minimises a bound on the backup's squared value-equivalence error. Screened
+#      offline first (reports/2026-10-02_wumpus_diagnostics/objective_ab.py 2o).
+#    - 0 (the default, canonical Tiger) computes nothing new.
 # ==============================================================================
 
 from collections.abc import Callable
@@ -442,6 +449,7 @@ class RunConfig:
     trial_prob: float                 # own turn-then-step trials in collection (section 17); 0 = off
     self_predictive_weight: float     # self-predictive term in the decoder representation (section 18); 0 = off
     absorbing_value: bool             # V = 0 behind the absorbing percept, targets and planner (section 19)
+    decision_aware_weight: float      # decision-aware weighting of the observation term (section 20); 0 = off
 
 
 class TrainingRun:
@@ -498,7 +506,8 @@ class TrainingRun:
                                          self.multistep_predictor, horizon, cfg.value_nstep, cfg.value_nstep_mix,
                                          self.planning_observation_head, self.privileged, cfg.value_equivalent_weight,
                                          domain.value_bound * (1.0 - domain.discount), cfg.self_predictive_weight,
-                                         setup.absorbing_observation if cfg.absorbing_value else None)      # section 19
+                                         setup.absorbing_observation if cfg.absorbing_value else None,      # section 19
+                                         cfg.decision_aware_weight)                                         # section 20
 
         # Polyak-averaged copies the agent acts with (section 4).
         self.acting_filter = frozen_copy(self.belief_filter)
