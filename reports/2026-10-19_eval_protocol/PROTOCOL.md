@@ -61,6 +61,30 @@ Recipe: whole-buffer retrain + double value, training seeds 5-9, analysis seed 2
 - **C-c.** R2D2-lite 60.4 [36.4, 90.0] (wins 11.4%, deaths 0.0%, unfinished 88.6%). Recipe minus R2D2-lite, paired: **+135.2 [78.4, 190.7]**.
 - The development numbers replicate: development 200 ± 44 vs held-out 196 ± 58. The R2D2-lite development figure was ~90.
 
+## C-d result (read once, 2026-10-27 ~16:00)
+Source: `runs/wumpus/heldout_cd_readout.log`, from `selection_readout.py` on `runs/sweeps/wumpus_retrain_heldout`, `analysis_heldout` against `analysis_heldout_final`. The sweep aggregate is `runs/sweeps/wumpus_retrain_heldout_final/aggregate_analysis_heldout_final.json`.
+
+**Verdict: UNDECIDED.** Final retrain minus best.pt is **+7.5 [-21.6, +40.2]** per game (hierarchical bootstrap).
+- Seeds 5 and 6 read the same networks and reproduced their games exactly (pairing check passed).
+- Per seed, paired difference per game:
+
+  | Seed | Final retrain − best.pt | Deaths (best.pt → final) | Unfinished (best.pt → final) |
+  |---|---|---|---|
+  | 5 | 0 | — | — |
+  | 6 | 0 | — | — |
+  | 7 | −35.7 ± 19.4 | 1.8 → 4.3% | — |
+  | 8 | +61.8 ± 21.6 | 2.1 → 0.8% | — |
+  | 9 | +11.4 ± 21.8 | 2.9 → 8.8% | 71.3 → 59.2% |
+
+- Arms (hierarchical bootstrap):
+
+  | Arm | Return | Deaths | Unfinished |
+  |---|---|---|---|
+  | best.pt | 195.6 [155.3, 234.8] | 2.0% | 69.3% |
+  | Final retrain | 203.2 [171.7, 234.8] | 3.4% | 66.4% |
+
+- On held-out seeds the effect is far smaller than on development seeds (+60.4), and deaths do not fall. The registered next step is seeds 10-14, to be registered here before launch.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 
