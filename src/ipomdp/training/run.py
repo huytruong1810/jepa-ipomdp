@@ -248,6 +248,15 @@
 #      the recipe's collection-100 networks beat its best.pt by +0.0 / +115.0 +- 34.3 / +27.9 +- 36.0 (mean 256.5
 #      against 208.9; deaths 0.2-1.0% against 0.8-4.7%), i.e. picking best.pt by 128-game evaluations between
 #      retrains costs the recipe ~48 per game (found after the fact; a selection rule needs its own registration).
+#    - Pre-registered confirmation of the final-retrain rule (written 2026-10-27 before any play of these sets;
+#      known beforehand: best.pt is at collection 85 on seed 3 and 65 on seed 4): act with the networks of the
+#      final whole-buffer retrain (latest.pt, collection 100) instead of best.pt. Recipe seeds 3 and 4
+#      (runs/sweeps/wumpus_retrain, untouched by the post-hoc finding), retrain_play.py with each run's latest.pt
+#      networks against its best.pt replay (which must reproduce report.json), 512 games.
+#      * PASS: collection 100 > best.pt (paired mean) on both seeds, deaths <= best.pt + 2 points on each -> the
+#        rule becomes the recipe's selection and its claim is registered in PROTOCOL.md before held-out seeds.
+#      * FAIL: the post-hoc gain on seeds 0-2 was seed noise; best.pt stays.
+#      The 5-seed mean gain (seeds 0-2 post hoc, 3-4 confirmatory) is reported, not decided on.
 #    - Pre-registered test (2026-10-16, before launch; runs/wumpus/retrain_chain.sh): the current recipe +
 #      value_estimator=double + retrain_every=50, retrain_updates=6400 (retrains after collections 50 and 100;
 #      the second is the retrain_play.py condition, the first also changes the data of collections 51-100),
