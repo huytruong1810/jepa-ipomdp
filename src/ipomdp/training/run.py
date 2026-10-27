@@ -228,6 +228,18 @@
 #        128-game evaluations; the next screen changes selection (e.g. act with the final retrain), no retrain.
 #      * DATA: the collection-100 networks also fall short of offline -> the agent's own data under the anchor
 #        and weight decay differ from the recipe's buffer; report before any further run.
+#    - Follow-up result 2026-10-27 (runs/wumpus/absorbing_train/g2_c100_play_seed<s>.log; best.pt replays
+#      reproduce report.json): mostly SELECTION, not cleanly. Collection-100 networks 271.2 / 252.6 / 242.5:
+#      vs the in-agent best.pt +34.5 / +52.1 / -13.2 (mean +24.5); vs the offline u25600 sets +0.1 / -48.2 /
+#      -21.5 (seed 1 outside the +-30 noise); vs the recipe's best.pt +34.5 / +95.8 / +9.4 (mean +46.6, chosen
+#      after the fact, and the recipe arm still selected by best.pt).
+#    - Pre-registered selection screen (written 2026-10-27 before it ran): both arms act with the networks of
+#      their final retrain (latest.pt, collection 100), no best.pt selection: runs/sweeps/wumpus_retrain_wd1_abs
+#      collection 100 against runs/sweeps/wumpus_retrain collection 100 (retrain_play.py on each recipe run with
+#      its own latest.pt networks, unanchored as trained), 512 paired games, seeds 0-2.
+#      * PASS: paired mean > 0 on 3 of 3, mean >= +30, deaths <= recipe collection-100 + 2 points each -> G2's
+#        recipe with the final-retrain rule extends to seeds 3, 4.
+#      * FAIL: the gain over the recipe is the recipe's own selection noise, not the anchored retrain.
 #    - Pre-registered test (2026-10-16, before launch; runs/wumpus/retrain_chain.sh): the current recipe +
 #      value_estimator=double + retrain_every=50, retrain_updates=6400 (retrains after collections 50 and 100;
 #      the second is the retrain_play.py condition, the first also changes the data of collections 51-100),
