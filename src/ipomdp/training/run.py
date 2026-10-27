@@ -240,6 +240,14 @@
 #      * PASS: paired mean > 0 on 3 of 3, mean >= +30, deaths <= recipe collection-100 + 2 points each -> G2's
 #        recipe with the final-retrain rule extends to seeds 3, 4.
 #      * FAIL: the gain over the recipe is the recipe's own selection noise, not the anchored retrain.
+#    - Selection screen result 2026-10-27 (runs/wumpus/absorbing_train/{g2,recipe}_c100_play_seed<s>.log; seed 0's
+#      recipe best.pt is its collection 100 and reproduces exactly): FAIL. Collection 100 against collection 100:
+#      271.2 / 252.6 / 242.5 against 236.7 / 271.8 / 261.0, paired +34.5 +- 32.2 / -19.2 +- 36.2 / -18.5 +- 30.3,
+#      mean -1.1; deaths 0.4 / 0.4 / 0.4% against 0.8 / 1.0 / 0.2%. Once both arms act with their final retrain,
+#      the anchored strong-weight-decay retrain adds nothing in-agent. The selection itself is the larger effect:
+#      the recipe's collection-100 networks beat its best.pt by +0.0 / +115.0 +- 34.3 / +27.9 +- 36.0 (mean 256.5
+#      against 208.9; deaths 0.2-1.0% against 0.8-4.7%), i.e. picking best.pt by 128-game evaluations between
+#      retrains costs the recipe ~48 per game (found after the fact; a selection rule needs its own registration).
 #    - Pre-registered test (2026-10-16, before launch; runs/wumpus/retrain_chain.sh): the current recipe +
 #      value_estimator=double + retrain_every=50, retrain_updates=6400 (retrains after collections 50 and 100;
 #      the second is the retrain_play.py condition, the first also changes the data of collections 51-100),
