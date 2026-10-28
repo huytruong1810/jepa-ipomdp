@@ -424,6 +424,49 @@
 #      (the feedback the theory assumes away: V is the true value in the bound). Per the registered branch: the next
 #      candidate is the Q-equivalent observation term.
 #
+# 2p. Observation-conditioned reward and the Q-equivalent observation term, retrain screen (2026-10-27, written before
+#     any run; model.observation_reward, models/heads.py 2d, planning/search_model.py 8; model.q_equivalent_weight,
+#     trainer.py 2i; run.py 21):
+#    - Question: does matching the model's whole one-step backup, sum_o P(o | z, a) [r(z, a, o) + gamma V-bar(tau)],
+#      to the realised r_t + gamma V-bar(z_{t+1}) (proper value equivalence, Grimm et al. 2020/2021; MuZero's principle)
+#      repair the value of information at the declined states and make the retrain recipe's networks play better
+#      than the same retrain without it? It needs a reward that depends on the branch, r(z, a, o'): on Wumpus the
+#      reward is a function of (alive, a, o') (GAME_OVER after FORWARD is a death, after GRAB a win), so the joint
+#      model p(o', r | z, a) = P(o') p(r | o') holds every outcome's probability in P, and the term sees the death and
+#      the gold that 2i (V only) could not. Third arm of the decision-aware ablation: 2i (V-equivalence), 2o (span^2
+#      CE weights), 2p (Q-equivalence).
+#    - Arms (runs/sweeps/wumpus_retrain seeds 0-2, each run's own .hydra config, --representation decoder --horizon 5
+#      --seed <s> --train-buffer <run> --pool-cache runs/wumpus/supervised_filter/pools.pt, 6400 updates, --save into
+#      runs/wumpus/qe_screen/):
+#        OR       --set model.observation_reward=true                                      (the structure alone)
+#        QE<w>    --set model.observation_reward=true --set model.q_equivalent_weight=<w>  (structure + term)
+#      The 2i control (runs/wumpus/ve_screen/control_seed<s>.pt: same seed, R(z, a), no term; the wider reward head
+#      shifts the initial draws of the networks built after it, so the pairing is per seed and game, not per weight)
+#      is the paired control, a final-retrain baseline, never best.pt. OR isolates the
+#      restructured reward, so QE - OR is the term's own effect.
+#    - Dose rule (fixed now, applied once on seed 0 before the other runs): on the OR seed-0 networks and its run's
+#      buffer, 6 training batches, measure r = ||grad_filter QE(w = 1)|| / ||grad_filter (all other terms)||; w is the
+#      value of {10, 25, 50, 100, 250} (or 5 / 2.5 below that) closest in log ratio to w r = 0.375, i.e. the term
+#      carries ~25-50% of the other terms' filter gradient (2i's method). One dose, recorded here before the chain.
+#    - Plays: retrain_play.py <run> OR_seed<s>.pt QE<w>_seed<s>.pt --set model.observation_reward=true (512 analysis
+#      games; header 7: best.pt replays first with its own config and must reproduce report.json; QE paired in-script
+#      with OR), then feature_localise.py <run> cuda --networks <arm> --set model.observation_reward=true for each arm.
+#      Pairing with the control from the stored per-game arrays (control_seed<s>.returns.npy; plays 270.0 / 214.7 /
+#      194.3; glitter ratio 0.45 / 0.39 / 0.33; probes cell / heading 88 / 93, 87 / 91, 82 / 86) on the CPU.
+#    - Pre-registered readout:
+#      * PLAY (QE): QE - control > 0 on 3 of 3 seeds, mean of the three >= +30, deaths <= control + 2 points each.
+#      * MECHANISM (QE): joint glitter ratio at the declined turned latents (c) >= control + 0.10 on >= 2 of 3 seeds.
+#      * Latent guard (reported): probe cell / heading not more than 5 points below the control's.
+#      * Attribution (reported): OR - control and QE - OR per seed, with deaths and unfinished rates.
+#      -> QE passes PLAY and MECHANISM: the in-agent screen (recipe + both options + checkpoint_selection=final_retrain),
+#         seeds 0-2, pre-registered in run.py 21 before launch, paired with the recipe's final-retrain networks
+#         (runs/wumpus/absorbing_train/recipe_seed<s>_c100.returns.npy).
+#      -> OR meets PLAY's criterion on its own (whatever QE does): the restructured reward carries the effect; the
+#         in-agent candidate is OR (with QE only if QE - OR > 0 on 3 of 3).
+#      -> QE passes PLAY only: the gain does not come through the value of information; diagnose (action mix, deaths).
+#      -> QE passes MECHANISM only: the model repairs but the planner does not profit; report.
+#      -> neither (and OR does not pass PLAY): FAIL; report the 2i / 2o / 2p ablation, no further objective variant.
+#
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \
 #        --horizon 5 --seed 1 --pool-cache runs/wumpus/supervised_filter/pools.pt

@@ -96,6 +96,13 @@
 #      on the healthy sets), and GRAB at the gold works only while the absorbing latent shares that offset; pinning
 #      it to 0 at planning time removes the offset from the GRAB side alone. The anchor has to shape the value in
 #      training (objective_ab.py 2n), not be imposed on networks trained without it.
+#
+# 7. Config overrides for the saved sets (2026-10-27, objective_ab.py 2p; --set k=v, repeatable):
+#    - The saved sets are loaded into a run rebuilt with the overrides (saved_networks.py, header 2), e.g.
+#      --set model.observation_reward=true for sets whose reward head reads o'; best.pt still replays with the run's
+#      own config (and is checked against report.json). Every saved set of one call shares the overrides, so the
+#      in-script pairing is against the first of them; pairing with a set of another layout is done from the
+#      stored <saved>.returns.npy.
 # ==============================================================================
 
 import json
@@ -115,11 +122,16 @@ from ipomdp.planning import AbsorbingValueModel, BeliefTreeSearch
 from ipomdp.training import discounted_returns, play_episodes, stream_seed
 
 sys.path.insert(0, str(Path(__file__).parent))
-from saved_networks import in_layout  # noqa: E402  (same diagnostics directory)
+from saved_networks import host_run, in_layout  # noqa: E402  (same diagnostics directory)
 
 args = sys.argv[1:]
 absorbing = "--absorbing-value" in args                          # header 6
 args = [a for a in args if a != "--absorbing-value"]
+overrides = []                                                   # header 7
+while "--set" in args:
+    i = args.index("--set")
+    overrides.append(args[i + 1])
+    del args[i:i + 2]
 run_dir = Path(args[0])
 saved_sets = [Path(a) for a in args[1:] if a.endswith(".pt")]
 rest = [a for a in args[1:] if not a.endswith(".pt")]
@@ -206,6 +218,12 @@ if n == settings.episodes and not absorbing:
             raise RuntimeError(f"Replay is not faithful: {key} {float(out[key])} vs report.json {reported[key]}.")
     print("  replay reproduces report.json", flush=True)
 
+if overrides:                                                    # header 7
+    run = host_run(trained, overrides, dev)
+    model = run.eval_agent.model
+    if absorbing:
+        model = AbsorbingValueModel(model, trained.setup.absorbing_observation)
+    print(f"  saved sets play in a run with {overrides}", flush=True)
 control = None
 for saved in saved_sets:
     states = in_layout(torch.load(saved, map_location=dev), run.networks)       # saved_networks.py

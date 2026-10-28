@@ -181,13 +181,18 @@ from ipomdp.training import discounted_returns, play_episodes, stream_seed  # no
 from ipomdp.training.checkpointing import load_checkpoint  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).parent))
-from saved_networks import in_layout  # noqa: E402  (same diagnostics directory)
+from saved_networks import host_run, in_layout  # noqa: E402  (same diagnostics directory)
 
 args = sys.argv[1:]
 networks_path = None
 if "--networks" in args:
     i = args.index("--networks")
     networks_path = Path(args[i + 1])
+    del args[i:i + 2]
+overrides = []                     # --set k=v: the saved networks load into a run with these overrides (saved_networks.py 2)
+while "--set" in args:
+    i = args.index("--set")
+    overrides.append(args[i + 1])
     del args[i:i + 2]
 run_dir, dev = Path(args[0]), torch.device(args[1])
 settings = WumpusAnalysisSettings()
@@ -375,6 +380,10 @@ steps_idx = torch.tensor([r["t"] for r in rows], device=dev)
 if (history_latents()[games_idx, steps_idx] - z_root).abs().max() > 1e-4:
     raise RuntimeError("Unrolled history latents do not reproduce the planner's own at the declined states.")
 if networks_path is not None:
+    if overrides:
+        run = host_run(trained, overrides, dev)
+        model = run.eval_agent.model
+        print(f"  networks load into a run with {overrides}", flush=True)
     states = in_layout(torch.load(networks_path, map_location=dev), run.networks)   # saved_networks.py
     for name, net in run.networks.items():
         net.load_state_dict(states[name])

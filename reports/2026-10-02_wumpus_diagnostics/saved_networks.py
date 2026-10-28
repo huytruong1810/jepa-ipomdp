@@ -13,9 +13,27 @@
 #      layouts; the predictor and target filter are training-only. So such a set plays in a decoder run once
 #      "world_model" is replaced by its belief_filter part. Nothing else is renamed or dropped, and any other
 #      key mismatch still raises.
+#
+# 2. A host run with config overrides (2026-10-27, objective_ab.py 2p; --set in retrain_play.py and feature_localise.py):
+#    - A set trained with an option that changes a network's shape (model.observation_reward: the reward head reads
+#      o') does not load into the run's own networks. host_run rebuilds the run from its config with the OmegaConf
+#      dotlist overrides applied and returns that fresh TrainingRun; the saved set is loaded into it, and its
+#      evaluation planner plays with the option's model. The best.pt replay keeps the run's own config.
 # ==============================================================================
 
 PREFIX = "belief_filter."
+
+
+def host_run(trained, overrides: list[str], device):
+    """trained.run, or a fresh TrainingRun of the run's config with the dotlist overrides applied (header 2)."""
+    if not overrides:
+        return trained.run
+    from omegaconf import OmegaConf
+    from ipomdp.experiments.runs import build_training_run
+    cfg = OmegaConf.merge(trained.cfg, OmegaConf.from_dotlist(overrides))
+    _, run = build_training_run(cfg, device)
+    run.belief_filter.eval()
+    return run
 
 
 def in_layout(states: dict, run_keys) -> dict:
