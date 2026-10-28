@@ -5,8 +5,8 @@ import pytest
 import torch
 
 from ipomdp.domain import BatchedPOMDPEnv, build_tiger_pomdp
-from ipomdp.models import (BeliefFilter, HorizonValueHead, LatentPredictor, ObservationHead, RecurrentJEPA, RewardHead,
-                           TwoHotSymlog, ValueHead)
+from ipomdp.models import (BeliefFilter, HorizonValueHead, LatentPredictor, ObservationHead, ObservationRewardHead, RecurrentJEPA,
+                           RewardHead, TwoHotSymlog, ValueHead)
 from ipomdp.training import EpisodeBatch, EpisodeBuffer, Representation, TrainerConfig, WorldModelTrainer
 
 CPU = torch.device("cpu")
@@ -296,3 +296,91 @@ class TestDecisionAwareWeighting:
             expected = (weights * torch.nn.functional.cross_entropy(logits, observed, reduction="none")).mean()
         assert float(span.max()) > 0.0 and float(weights.std()) > 0.0
         assert trainer.train_step(batch)["loss_observation"] == pytest.approx(float(expected), rel=1e-4)
+
+
+class TestQEquivalentTerm:
+    """Section 2i of training/trainer.py: (sum_o P(o) [r(z, a, o) + gamma V-bar(tau)] - (r + gamma V-bar(z'))) / max|R|, squared."""
+
+    @staticmethod
+    def _decoder(weight: float, scale: float = 100.0, observation_reward: bool = True, **kwargs) -> WorldModelTrainer:
+        torch.manual_seed(0)
+        belief_filter = BeliefFilter(A, O, D, H, 1)
+        reward_head = ObservationRewardHead(D, A, O, H, 1, 255) if observation_reward else RewardHead(D, A, H, 1, 255)
+        return WorldModelTrainer(belief_filter, None, ValueHead(D, H, 1, 255), reward_head,
+                                 ObservationHead(D, A, O, H, 1), TwoHotSymlog(255, 2000.0), A, O, discount=0.95,
+                                 config=CONFIG, device=CPU, value_equivalent_scale=scale, q_equivalent_weight=weight,
+                                 **kwargs)
+
+    def test_off_by_default_and_invalid_combinations_raise(self):
+        assert "loss_q_equivalent" not in self._decoder(0.0).train_step(_episodes(4, 0))
+        with pytest.raises(ValueError):
+            self._decoder(-1.0)
+        with pytest.raises(ValueError):                        # needs the observation-conditioned reward
+            self._decoder(1.0, observation_reward=False)
+        with pytest.raises(ValueError):                        # one value-equivalence term at a time
+            self._decoder(1.0, value_equivalent_weight=1.0)
+        torch.manual_seed(0)
+        belief_filter = BeliefFilter(A, O, D, H, 1)
+        with pytest.raises(ValueError):                        # decoder only
+            WorldModelTrainer(belief_filter, RecurrentJEPA(belief_filter, LatentPredictor(D, A, H, 1), 0.99),
+                              ValueHead(D, H, 1, 255), ObservationRewardHead(D, A, O, H, 1, 255),
+                              ObservationHead(D, A, O, H, 1), TwoHotSymlog(255, 2000.0), A, O, discount=0.95,
+                              config=CONFIG, device=CPU, q_equivalent_weight=1.0)
+
+    def test_reward_head_is_trained_on_the_realised_observation(self):
+        trainer = self._decoder(0.0)
+        with torch.no_grad():                                  # a non-trivial reward head
+            torch.nn.init.normal_(trainer.reward_head.net[-1].weight)
+        batch = _episodes(4, 0)
+        with torch.no_grad():
+            a1 = torch.nn.functional.one_hot(batch.actions, A).float()
+            o1 = torch.nn.functional.one_hot(batch.observations, O).float()
+            z = trainer.belief_filter.unroll(a1, o1, None)[:, :-1].reshape(-1, D)
+            expected = trainer.twohot.loss(trainer.reward_head(z, a1.reshape(-1, A), o1.reshape(-1, O)),
+                                           batch.rewards.reshape(-1)).mean()
+        assert trainer.train_step(batch)["loss_reward"] == pytest.approx(float(expected), rel=1e-5)
+
+    def test_matches_the_q_equivalence_residual_by_hand(self):
+        trainer = self._decoder(2.0)
+        with torch.no_grad():                                  # non-trivial V-bar and r (zero-initialised projections)
+            for p in trainer.target_value_head.parameters():
+                p.normal_(0.0, 0.5)
+            torch.nn.init.normal_(trainer.reward_head.net[-1].weight)
+        batch = _episodes(4, 0)
+        with torch.no_grad():
+            a1 = torch.nn.functional.one_hot(batch.actions, A).float()
+            latents = trainer.belief_filter.unroll(a1, torch.nn.functional.one_hot(batch.observations, O).float(), None)
+            z = latents[:, :-1].reshape(-1, D)
+            rows, acts, observed = torch.arange(len(z)), batch.actions.reshape(-1), batch.observations.reshape(-1)
+            expansion = trainer.target_model.expand(z)
+            values = expansion.next_values[rows, acts]                                 # (BT, O)
+            q = expansion.branch_rewards[rows, acts] + 0.95 * values
+            realised = batch.rewards.reshape(-1) + 0.95 * values[rows, observed]
+            probs = torch.softmax(trainer.observation_head(z, a1.reshape(-1, A)), -1)
+            expected = 2.0 * ((((probs * q).sum(-1) - realised) / 100.0) ** 2).mean()
+        assert float(expected) > 0.0
+        assert trainer.train_step(batch)["loss_q_equivalent"] == pytest.approx(float(expected), rel=1e-4)
+
+    def test_gradient_reaches_only_the_observation_head_and_the_filter(self):
+        trainer = self._decoder(1.0)
+        with torch.no_grad():
+            for p in trainer.target_value_head.parameters():
+                p.normal_(0.0, 0.5)
+            torch.nn.init.normal_(trainer.reward_head.net[-1].weight)
+        batch = _episodes(4, 0)
+        a1 = torch.nn.functional.one_hot(batch.actions, A).float()
+        latents = trainer.belief_filter.unroll(a1, torch.nn.functional.one_hot(batch.observations, O).float(), None)
+        z = latents[:, :-1].reshape(-1, D)
+        rows, acts, observed = torch.arange(len(z)), batch.actions.reshape(-1), batch.observations.reshape(-1)
+        with torch.no_grad():
+            expansion = trainer.target_model.expand(z.detach())
+            values = expansion.next_values[rows, acts]
+            q = expansion.branch_rewards[rows, acts] + 0.95 * values
+            realised = batch.rewards.reshape(-1) + 0.95 * values[rows, observed]
+        probs = torch.softmax(trainer.observation_head(z, a1.reshape(-1, A)), -1)
+        (((probs * q).sum(-1) - realised) ** 2).mean().backward()
+        grads = lambda net: [p.grad for p in net.parameters()]  # noqa: E731
+        assert all(g is not None and g.abs().sum() > 0 for g in grads(trainer.observation_head)[-1:])
+        assert any(g is not None and g.abs().sum() > 0 for g in grads(trainer.belief_filter))
+        assert all(g is None for g in grads(trainer.reward_head) + grads(trainer.value_head)
+                   + grads(trainer.target_value_head))

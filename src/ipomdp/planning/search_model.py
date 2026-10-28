@@ -81,6 +81,17 @@
 #      objective_ab.py 2m). Q(GRAB at the gold) = r + gamma V(go) then decides whether the agent ends the game: at
 #      V(go) = -50 the agent stood on the gold and did not grab it (GRAB the argmax on 3.9% of GLITTER steps).
 #    - A domain without an absorbing percept (Tiger) is never wrapped.
+#
+# 8. Observation-Conditioned Reward (LearnedSearchModel with an ObservationRewardHead; model.observation_reward,
+#    2026-10-27; models/heads.py, section 2d):
+#    - The reward head reads (z, a, o'). The expansion evaluates it on the N x A x O rows it already builds for the
+#      filter's successors and returns
+#         branch_rewards (N, A, O)   r(z, a, o')
+#         rewards        (N, A)      sum_o P(o | z, a) r(z, a, o)
+#      The backup is linear, Q = sum_o P(o) [r(o) + gamma V(o)] = rewards + gamma sum_o P(o) V(o), so the tree search,
+#      the protocol and every wrapper read rewards (N, A) exactly as before. branch_rewards is read by the trainer's
+#      Q-equivalent term (training/trainer.py, section 2i) and is None for every other model.
+#    - Not combined with a finite horizon (raises).
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -92,7 +103,7 @@ from torch import Tensor
 
 from ..domain import AlphaVectorSet, FinitePOMDP, belief_update, initial_beliefs, observation_distribution
 from ..models.distributions import TwoHotSymlog
-from ..models.heads import HorizonValueHead, ObservationHead, RewardHead, ValueHead, ValuePair
+from ..models.heads import HorizonValueHead, ObservationHead, ObservationRewardHead, RewardHead, ValueHead, ValuePair
 from ..models.world_model import BeliefFilter
 
 
@@ -104,6 +115,7 @@ class Expansion:
     observation_probs: Tensor
     next_states: Tensor
     next_values: Tensor
+    branch_rewards: Tensor | None = None      # (N, A, O) r(s, a, o') of an observation-conditioned reward (section 8)
 
 
 class SearchModel(Protocol):
@@ -190,7 +202,7 @@ class LearnedSearchModel:
     def __init__(
         self,
         belief_filter: BeliefFilter,
-        reward_head: RewardHead,
+        reward_head: RewardHead | ObservationRewardHead,
         observation_head: ObservationHead,
         value_head: ValueHead | ValuePair | HorizonValueHead,
         codec: TwoHotSymlog,
@@ -204,7 +216,10 @@ class LearnedSearchModel:
             value_head: ValueHead or a ValuePair (one combined value; models/heads.py, section 2c), or
                 HorizonValueHead exactly when horizon is given (section 5).
             horizon: Steps per window H for the finite-horizon state [z, k] (section 5), or None.
+            reward_head: R(z, a), or r(z, a, o') (ObservationRewardHead, section 8; no horizon).
         """
+        if horizon is not None and isinstance(reward_head, ObservationRewardHead):
+            raise ValueError("an observation-conditioned reward is not combined with a horizon (section 8).")
         if (horizon is not None) != isinstance(value_head, HorizonValueHead):
             raise ValueError("A HorizonValueHead needs a horizon, and a horizon needs a HorizonValueHead.")
         if horizon is not None and value_head.horizon != horizon:
@@ -253,20 +268,24 @@ class LearnedSearchModel:
         eye_a = torch.eye(num_a, device=states.device)
         latents = z.repeat_interleave(num_a, dim=0)                                      # (N*A, D)
         actions = eye_a.repeat(n, 1)                                                     # (N*A, A)
-        rewards = self.codec.mean(self.reward_head(latents, actions)).view(n, num_a)
         observation_probs = F.softmax(self.observation_head(latents, actions).float(), dim=-1).view(n, num_a, num_o)
-        next_states = self.belief_filter.step(
-            latents.repeat_interleave(num_o, dim=0),
-            actions.repeat_interleave(num_o, dim=0),
-            torch.eye(num_o, device=states.device).repeat(n * num_a, 1),
-        )                                                                                # (N*A*O, D)
+        branch_latents, branch_actions = latents.repeat_interleave(num_o, dim=0), actions.repeat_interleave(num_o, dim=0)
+        branch_observations = torch.eye(num_o, device=states.device).repeat(n * num_a, 1)
+        if isinstance(self.reward_head, ObservationRewardHead):                          # section 8
+            branch_rewards = self.codec.mean(self.reward_head(branch_latents, branch_actions, branch_observations))
+            branch_rewards = branch_rewards.view(n, num_a, num_o)
+            rewards = (observation_probs * branch_rewards).sum(-1)
+        else:
+            branch_rewards = None
+            rewards = self.codec.mean(self.reward_head(latents, actions)).view(n, num_a)
+        next_states = self.belief_filter.step(branch_latents, branch_actions, branch_observations)  # (N*A*O, D)
         if self.horizon is not None:
             steps_left = states[:, -1]
             rewards = torch.where((steps_left > 0).unsqueeze(-1), rewards, 0.0)           # no reward past the window
             next_steps = (steps_left - 1.0).clamp(min=0.0).repeat_interleave(num_a * num_o)
             next_states = torch.cat([next_states, next_steps.unsqueeze(-1)], dim=-1)
         next_values = self.values(next_states).view(n, num_a, num_o)
-        return Expansion(rewards, observation_probs, next_states.view(n, num_a, num_o, -1), next_values)
+        return Expansion(rewards, observation_probs, next_states.view(n, num_a, num_o, -1), next_values, branch_rewards)
 
 
 class RiskMarginModel:
@@ -304,7 +323,7 @@ class RiskMarginModel:
         probs[:, a, fatal] = inflated
         p_r = ((rewards[:, a] - self.spec.step_cost) / self.spec.fatal_reward).clamp(0.0, 1.0)
         rewards[:, a] = rewards[:, a] + self.spec.fatal_reward * ((k * p_r).clamp(max=1.0) - p_r)
-        return Expansion(rewards, probs, e.next_states, e.next_values)
+        return Expansion(rewards, probs, e.next_states, e.next_values, e.branch_rewards)
 
 
 class AbsorbingValueModel:
@@ -327,4 +346,4 @@ class AbsorbingValueModel:
         e = self.inner.expand(states)
         values = e.next_values.clone()
         values[:, :, self.absorbing_observation] = 0.0
-        return Expansion(e.rewards, e.observation_probs, e.next_states, values)
+        return Expansion(e.rewards, e.observation_probs, e.next_states, values, e.branch_rewards)

@@ -18,7 +18,7 @@ import torch.nn.functional as F
 from ipomdp.agents import PlanningAgent
 from ipomdp.domain import (BatchedPOMDPEnv, TigerAction, belief_update, build_tiger_pomdp, observation_distribution,
                            solve_finite_horizon, solve_infinite_horizon)
-from ipomdp.models import BeliefFilter, HorizonValueHead, ObservationHead, RewardHead, TwoHotSymlog, ValueHead
+from ipomdp.models import BeliefFilter, HorizonValueHead, ObservationHead, ObservationRewardHead, RewardHead, TwoHotSymlog, ValueHead
 from ipomdp.planning import (AbsorbingValueModel, BeliefTreeSearch, ExactSearchModel, Expansion, LearnedSearchModel, MinMaxStats, RiskMarginModel,
                              RiskSpec, SearchStatistics)
 
@@ -153,6 +153,12 @@ class TestBeliefTreeSearch:
         assert (stats.normalize(-10.0), stats.normalize(0.0), stats.normalize(10.0)) == (0.0, 0.5, 1.0)
 
 
+def model_without_branches(belief_filter, codec, num_a, num_o, dim, hidden):
+    """A LearnedSearchModel with the plain R(z, a) head (search_model.py, section 8: no branch rewards)."""
+    return LearnedSearchModel(belief_filter, RewardHead(dim, num_a, hidden, 1, 255), ObservationHead(dim, num_a, num_o, hidden, 1),
+                              ValueHead(dim, hidden, 1, 255), codec, num_a, num_o, discount=0.95)
+
+
 class TestLearnedSearchModel:
 
     def test_expansion_is_consistent_with_filter_and_heads(self):
@@ -174,6 +180,31 @@ class TestLearnedSearchModel:
                 assert torch.allclose(expansion.next_states[:, a, o], expected, atol=1e-6)
         stepped = model.update(states, torch.tensor([0, 1, 2, 0]), torch.tensor([1, 0, 1, 0]))
         assert stepped.shape == (4, dim)
+
+    def test_observation_conditioned_reward_is_backed_up_in_expectation(self):
+        # search_model.py, section 8: branch_rewards r(z, a, o') and rewards = sum_o P(o) r(z, a, o).
+        torch.manual_seed(0)
+        num_a, num_o, dim, hidden = 3, 2, 16, 32
+        belief_filter = BeliefFilter(num_a, num_o, dim, hidden, 1)
+        reward_head = ObservationRewardHead(dim, num_a, num_o, hidden, 1, 255)
+        torch.nn.init.normal_(reward_head.net[-1].weight)            # leave the zero initialisation
+        codec = TwoHotSymlog(255, 2000.0)
+        model = LearnedSearchModel(belief_filter, reward_head, ObservationHead(dim, num_a, num_o, hidden, 1),
+                                   ValueHead(dim, hidden, 1, 255), codec, num_a, num_o, discount=0.95)
+        states = torch.randn(4, dim)
+        expansion = model.expand(states)
+        assert expansion.branch_rewards.shape == (4, num_a, num_o) and expansion.rewards.shape == (4, num_a)
+        for a in range(num_a):
+            for o in range(num_o):
+                expected = codec.mean(reward_head(states, F.one_hot(torch.full((4,), a), num_a).float(),
+                                                  F.one_hot(torch.full((4,), o), num_o).float()))
+                assert torch.allclose(expansion.branch_rewards[:, a, o], expected, atol=1e-5)
+        assert torch.allclose(expansion.rewards, (expansion.observation_probs * expansion.branch_rewards).sum(-1))
+        assert (expansion.branch_rewards[..., 0] != expansion.branch_rewards[..., 1]).any()
+        assert model_without_branches(belief_filter, codec, num_a, num_o, dim, hidden).expand(states).branch_rewards is None
+        with pytest.raises(ValueError):
+            LearnedSearchModel(belief_filter, reward_head, ObservationHead(dim, num_a, num_o, hidden, 1),
+                               HorizonValueHead(dim, hidden, 1, 255, 3), codec, num_a, num_o, discount=0.95, horizon=3)
 
     def test_finite_horizon_counts_down_to_a_terminal_zero(self):
         # search_model.py, section 5: state [z, k]; k counts down; reward and value are exactly 0 past the window.

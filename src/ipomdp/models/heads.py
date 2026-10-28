@@ -48,6 +48,20 @@
 #    - Every value head exposes value(latent, codec), the decoded V, so the search model reads one
 #      head or a pair the same way. A pair has no horizon variant (it raises in training/run.py).
 #
+# 2d. Observation-Conditioned Reward Head (optional, model.observation_reward; 2026-10-27):
+#    - r(z_t, a_t, o_{t+1}) as two-hot logits: the reward head also reads the one-hot NEXT observation. The model is
+#      then one joint p(o', r | z, a) = P(o' | z, a) p(r | z, a, o'), and the expected reward the planner backs up is
+#      sum_o P(o | z, a) r(z, a, o) (planning/search_model.py, section 8). DreamerV3 reads its reward off the
+#      posterior (post-observation) state for the same reason.
+#    - Why: with R(z, a) the model holds the same event twice. On Wumpus World a death is the GAME_OVER percept after
+#      FORWARD and a win the GAME_OVER percept after GRAB, and every other reward is a fixed step cost, so r is a
+#      function of (alive, a, o'). R(z, a) = -1 - 1000 P(death) carries its own estimate of the death risk, separate
+#      from the observation head's P(GAME_OVER | z, FORWARD), and the planner's death cost came from the reward head
+#      alone. Conditioning on o' puts every outcome's probability in P and leaves the reward head a near-deterministic
+#      lookup, so a term on P can see outcomes paid through the reward (training/trainer.py, section 2i).
+#    - Same residual stack and zero-initialised projection as RewardHead. Off (the default and canonical Tiger)
+#      builds the plain RewardHead.
+#
 # 3. Observation Head (the planning model):
 #    - P(o_{t+1} | z_t, a_t). The planner branches over its outcomes and steps the belief
 #      filter (world_model.py, section 6). It is trained on DETACHED latents, so it never
@@ -152,6 +166,20 @@ class RewardHead(nn.Module):
     def forward(self, latent: Tensor, action: Tensor) -> Tensor:
         """(B, D), one-hot (B, |A|) -> (B, num_bins) logits."""
         return self.net(torch.cat([latent, action], dim=-1))
+
+
+class ObservationRewardHead(nn.Module):
+    """r(z_t, a_t, o_{t+1}) as two-hot logits (section 2d)."""
+
+    def __init__(self, latent_dim: int, num_actions: int, num_observations: int, hidden_dim: int, num_blocks: int,
+                 num_bins: int):
+        super().__init__()
+        self.net = _zero_init_last_layer(build_residual_stack(latent_dim + num_actions + num_observations, hidden_dim,
+                                                              num_bins, num_blocks))
+
+    def forward(self, latent: Tensor, action: Tensor, observation: Tensor) -> Tensor:
+        """(B, D), one-hot (B, |A|), one-hot (B, |O|) -> (B, num_bins) logits."""
+        return self.net(torch.cat([latent, action, observation], dim=-1))
 
 
 class ObservationHead(nn.Module):

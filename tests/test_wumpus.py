@@ -214,7 +214,7 @@ class TestLearningStack:
             time_aware_value=False, value_nstep=0, value_nstep_mix=0.5,
             detached_planning_head=False, privileged_belief_loss=False, value_estimator=ValueEstimator.MAX,
             retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0, absorbing_value=False,
-            decision_aware_weight=0.0)
+            decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0)
         values.update(overrides)
         return RunConfig(**values)
 
@@ -286,6 +286,31 @@ class TestLearningStack:
         if estimator == "max":
             assert torch.allclose(targets(on), backup.max(-1).values)
         assert not torch.allclose(targets(on), targets(off))
+
+    def test_observation_reward_and_q_equivalent_term_train_and_resume(self, tmp_path):
+        # training/run.py, section 21: r(z, a, o') heads (online and acting), the Q-equivalent term in the losses,
+        # the combinations that raise, and a bit-exact resume.
+        from ipomdp.experiments import wumpus_setup
+        from ipomdp.models import ObservationRewardHead, ValueEstimator
+        from ipomdp.training import Representation, TrainingRun, load_checkpoint, save_checkpoint
+        setup = wumpus_setup(CPU, DISCOUNT)
+        config = lambda **kw: self._config(representation=Representation.DECODER, value_estimator=ValueEstimator.DOUBLE,  # noqa: E731
+                                           observation_reward=True, q_equivalent_weight=10.0, **kw)
+        reference = TrainingRun(setup, config(), CPU)
+        assert isinstance(reference.reward_head, ObservationRewardHead)
+        assert isinstance(reference.acting_reward_head, ObservationRewardHead)
+        expected = [reference.collect_and_train() for _ in range(3)] + [reference.evaluate()]
+        assert expected[2]["loss_q_equivalent"] >= 0.0
+        first = TrainingRun(setup, config(), CPU)
+        first.collect_and_train()
+        save_checkpoint(tmp_path / "latest.pt", first.state_dict())
+        resumed = TrainingRun(setup, config(seed=99), CPU)
+        resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
+        continued = [resumed.collect_and_train() for _ in range(2)] + [resumed.evaluate()]
+        assert repr(continued) == repr(expected[1:])
+        for bad in (dict(risk_margin=2.0), dict(q_equivalent_weight=1.0, observation_reward=False)):
+            with pytest.raises(ValueError):
+                TrainingRun(setup, self._config(representation=Representation.DECODER, **{"observation_reward": True, **bad}), CPU)
 
     def test_time_aware_value_trains_and_resumes(self, tmp_path):
         # training/run.py, section 9: the agent's state carries the steps left; resume stays bit-exact.

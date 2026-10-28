@@ -28,7 +28,7 @@ def _config(**overrides) -> RunConfig:
         time_aware_value=False, value_nstep=0, value_nstep_mix=0.5,
         detached_planning_head=False, privileged_belief_loss=False, value_estimator=ValueEstimator.MAX,
         retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0, absorbing_value=False,
-            decision_aware_weight=0.0)
+            decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0)
     values.update(overrides)
     return RunConfig(**values)
 

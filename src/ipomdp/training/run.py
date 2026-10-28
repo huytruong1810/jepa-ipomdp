@@ -339,6 +339,17 @@
 #      a uniform floor 1 - beta), which minimises a bound on the backup's squared value-equivalence error. Screened
 #      offline first (reports/2026-10-02_wumpus_diagnostics/objective_ab.py 2o).
 #    - 0 (the default, canonical Tiger) computes nothing new.
+#
+# 21. Observation-Conditioned Reward and the Q-Equivalent Observation Term (2026-10-27; models/heads.py 2d,
+#     planning/search_model.py 8, trainer.py 2i):
+#    - cfg.observation_reward = True builds ObservationRewardHead r(z, a, o') in place of R(z, a): trained on the
+#      realised o_{t+1}, read by the planner and the value targets as sum_o P(o | z, a) r(z, a, o). The death risk
+#      then lives in the observation head alone. Not combined with the risk margin (section 16 infers the risk from
+#      R, which no longer carries it; raises) or the time-aware value (raises).
+#    - cfg.q_equivalent_weight = w > 0 (needs observation_reward) adds w * ((sum_o P(o | z_t, a_t) [r(z_t, a_t, o) +
+#      gamma V-bar(tau)] - (r_t + gamma V-bar(z_{t+1}))) / max|R|)^2, gradients through P into the filter (decoder only).
+#      Screened offline first (reports/2026-10-02_wumpus_diagnostics/objective_ab.py 2p).
+#    - False / 0 (the defaults, canonical Tiger) build and compute nothing new.
 # ==============================================================================
 
 from collections.abc import Callable
@@ -349,7 +360,7 @@ import numpy as np
 import torch
 
 from ..agents import PlanningAgent, UniformRandomAgent
-from ..models import (BeliefFilter, HorizonValueHead, LatentPredictor, MultiStepObservationPredictor, ObservationHead, RecurrentJEPA, RewardHead, TwoHotSymlog, ValueEstimator, ValueHead, ValuePair,
+from ..models import (BeliefFilter, HorizonValueHead, LatentPredictor, MultiStepObservationPredictor, ObservationHead, ObservationRewardHead, RecurrentJEPA, RewardHead, TwoHotSymlog, ValueEstimator, ValueHead, ValuePair,
                       ema_update, frozen_copy)
 from ..planning import AbsorbingValueModel, BeliefTreeSearch, LearnedSearchModel, RiskMarginModel, RiskSpec
 from .episode_buffer import EpisodeBatch, EpisodeBuffer
@@ -450,6 +461,8 @@ class RunConfig:
     self_predictive_weight: float     # self-predictive term in the decoder representation (section 18); 0 = off
     absorbing_value: bool             # V = 0 behind the absorbing percept, targets and planner (section 19)
     decision_aware_weight: float      # decision-aware weighting of the observation term (section 20); 0 = off
+    observation_reward: bool          # reward head r(z, a, o') (section 21)
+    q_equivalent_weight: float        # Q-equivalent observation term (section 21); 0 = off, needs observation_reward
 
 
 class TrainingRun:
@@ -487,7 +500,11 @@ class TrainingRun:
         self.value_head = (HorizonValueHead(cfg.latent_dim, cfg.hidden_dim, cfg.num_blocks, cfg.num_bins, horizon)
                            if cfg.time_aware_value
                            else ValueHead(cfg.latent_dim, cfg.hidden_dim, cfg.num_blocks, cfg.num_bins)).to(device)
-        self.reward_head = RewardHead(cfg.latent_dim, num_a, cfg.hidden_dim, cfg.num_blocks, cfg.num_bins).to(device)
+        if cfg.observation_reward and (cfg.risk_margin != 1.0 or cfg.time_aware_value):                    # section 21
+            raise ValueError("observation_reward is not combined with risk_margin or time_aware_value (section 21).")
+        self.reward_head = (ObservationRewardHead(cfg.latent_dim, num_a, num_o, cfg.hidden_dim, cfg.num_blocks, cfg.num_bins)
+                            if cfg.observation_reward
+                            else RewardHead(cfg.latent_dim, num_a, cfg.hidden_dim, cfg.num_blocks, cfg.num_bins)).to(device)
         self.observation_head = ObservationHead(cfg.latent_dim, num_a, num_o, cfg.hidden_dim, cfg.num_blocks).to(device)
         self.codec = TwoHotSymlog(cfg.num_bins, domain.value_bound).to(device)
         self.multistep_predictor = (MultiStepObservationPredictor(cfg.latent_dim, num_a, num_o, cfg.hidden_dim,
@@ -507,7 +524,7 @@ class TrainingRun:
                                          self.planning_observation_head, self.privileged, cfg.value_equivalent_weight,
                                          domain.value_bound * (1.0 - domain.discount), cfg.self_predictive_weight,
                                          setup.absorbing_observation if cfg.absorbing_value else None,      # section 19
-                                         cfg.decision_aware_weight)                                         # section 20
+                                         cfg.decision_aware_weight, cfg.q_equivalent_weight)                # sections 20, 21
 
         # Polyak-averaged copies the agent acts with (section 4).
         self.acting_filter = frozen_copy(self.belief_filter)

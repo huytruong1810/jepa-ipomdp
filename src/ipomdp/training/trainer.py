@@ -217,6 +217,34 @@
 #    - Needs the expansion's child values (section 3): not combined with the time-aware value. beta = 0 (the
 #      default and canonical Tiger) computes nothing new and leaves training unchanged.
 #
+# 2i. Optional Q-Equivalent Observation Term (q_equivalent_weight = w > 0; model.q_equivalent_weight, 2026-10-27;
+#     needs the observation-conditioned reward r(z, a, o'), model.observation_reward, models/heads.py section 2d):
+#      QEquiv       w * mean_t ( ( sum_o P(o | z_t, a_t) * sg q_t(o)  -  ( r_t + gamma * sg V-bar(z_{t+1}) ) ) / max|R| )^2
+#                   q_t(o) = r-hat(z_t, a_t, o) + gamma * V-bar(tau(z_t, a_t, o))
+#                   gradients through P INTO the filter (decoder representation only)
+#      Reward       TwoHot( r(z_t, a_t, o_{t+1}), r_t )     the reward head reads the realised next observation
+#    - Why: the planner's one-step backup is Q(z, a) = sum_o P(o | z, a) q(o). Proper value equivalence (Grimm et al.
+#      2020, 2021; MuZero's training principle) asks the model's backup to equal the true one; on a real transition
+#      r_t + gamma V-bar(z_{t+1}) is a one-sample estimate of the true backup at the data action, and
+#          E[ (sum_o P(o) q(o) - q(o'))^2 ] = ( sum_o (P - P*)(o) q(o) )^2 + Var_{P*}[q(o')],   o' ~ P*,
+#      so the term is minimised exactly when the model's backup of q is right (the variance does not depend on P).
+#    - Against section 2f (next-value equivalence, FAILED its screen, objective_ab.py 2i): there the branches carry only
+#      V-bar, but on Wumpus the death (-1000) and the gold (+1000) are paid in r_t, not in the next value, so a death
+#      and a win both look like "the value drops to V(GAME_OVER)". With r(z, a, o') the GAME_OVER branch after FORWARD
+#      carries -1001 and after GRAB +999, so the term moves P where reward-carried outcomes are mis-predicted. Against
+#      section 2h (decision-aware weighting, FAILED, 2o): the cross-entropy is not reweighted (the uniform
+#      representation pressure stays), and the term is grounded in the realised return rather than in the spread of
+#      the model's own child values.
+#    - With R(z, a) the reward is the same on every branch and the gradient into P would be section 2f's up to gamma,
+#      hence the requirement of the observation-conditioned reward (raises otherwise).
+#    - Collapse guard as in section 2f: q_t and the target are detached; the branch rewards, child values and the
+#      realised branch come from the value targets' own expansion (section 3), so only P(o | z_t, a_t) moves. With a
+#      value pair the children carry the pair's combined value; with the anchored absorbing value (section 3f) the
+#      GAME_OVER children are already 0, and the target V-bar(z_{t+1}) is read from the same (anchored) branch.
+#    - Scale: divided by max|R| (= value_bound * (1 - gamma)), as in section 2f.
+#    - Decoder only, single horizon-free value, no planning head, not with section 2f (raises otherwise). w = 0 (the
+#      default and canonical Tiger) computes nothing new.
+#
 # 3f. Optional Anchored Absorbing Value (absorbing_observation = o_abs; model.absorbing_value, 2026-10-25):
 #    - Every Bellman target values the successors through the absorbing percept at exactly 0: the expansion is
 #      wrapped in AbsorbingValueModel (planning/search_model.py, section 7), and the double / clipped-double
@@ -254,8 +282,8 @@ from torch import Tensor
 
 from ..models.distributions import TwoHotSymlog
 from ..models.ema import ema_update, frozen_copy
-from ..models.heads import (HorizonValueHead, MultiStepObservationPredictor, ObservationHead, RewardHead, ValueEstimator, ValueHead,
-                            ValuePair)
+from ..models.heads import (HorizonValueHead, MultiStepObservationPredictor, ObservationHead, ObservationRewardHead, RewardHead,
+                            ValueEstimator, ValueHead, ValuePair)
 from ..models.world_model import BeliefFilter, RecurrentJEPA
 from ..planning.search_model import AbsorbingValueModel, LearnedSearchModel
 from .episode_buffer import EpisodeBatch
@@ -289,7 +317,7 @@ class WorldModelTrainer:
         belief_filter: BeliefFilter,
         jepa: RecurrentJEPA | None,
         value_head: ValueHead | ValuePair | HorizonValueHead,
-        reward_head: RewardHead,
+        reward_head: RewardHead | ObservationRewardHead,
         observation_head: ObservationHead,
         codec: TwoHotSymlog,
         num_actions: int,
@@ -308,6 +336,7 @@ class WorldModelTrainer:
         self_predictive_weight: float = 0.0,
         absorbing_observation: int | None = None,
         decision_aware_weight: float = 0.0,
+        q_equivalent_weight: float = 0.0,
     ):
         """
         Args:
@@ -325,6 +354,8 @@ class WorldModelTrainer:
             absorbing_observation: The absorbing percept whose successors the targets value at exactly 0 (section 3f),
                 or None.
             decision_aware_weight: beta of the decision-aware weighting of the observation term (section 2h); 0 = off.
+            reward_head: R(z, a), or r(z, a, o') (ObservationRewardHead, trained on the realised o_{t+1}; section 2i).
+            q_equivalent_weight: w of the Q-equivalent observation term (section 2i; scale value_equivalent_scale); 0 = off.
         """
         if nstep < 0 or not 0.0 <= nstep_mix <= 1.0 or (nstep > 0 and nstep_mix == 0.0):
             raise ValueError(f"need nstep >= 0 and nstep_mix in (0, 1] when nstep > 0; got {nstep}, {nstep_mix}.")
@@ -351,6 +382,15 @@ class WorldModelTrainer:
             raise ValueError(f"need decision_aware_weight in [0, 1], got {decision_aware_weight} (section 2h).")
         if decision_aware_weight > 0.0 and horizon is not None:
             raise ValueError("decision-aware weighting needs the expansion's child values: no time-aware value (section 2h).")
+        if q_equivalent_weight < 0.0:
+            raise ValueError(f"need q_equivalent_weight >= 0, got {q_equivalent_weight} (section 2i).")
+        if q_equivalent_weight > 0.0 and (not isinstance(reward_head, ObservationRewardHead) or jepa is not None
+                                          or horizon is not None or planning_observation_head is not None
+                                          or value_equivalent_weight > 0.0):
+            raise ValueError("the Q-equivalent term needs the observation-conditioned reward, the decoder representation, "
+                             "no horizon, no planning head and no value-equivalent term (section 2i).")
+        self.observation_reward = isinstance(reward_head, ObservationRewardHead)
+        self.q_equivalent_weight = q_equivalent_weight
         self.value_equivalent_weight = value_equivalent_weight
         self.value_equivalent_scale = value_equivalent_scale
         self.decision_aware_weight = decision_aware_weight
@@ -411,12 +451,12 @@ class WorldModelTrainer:
         return self._value_targets_and_children(latents)[0]
 
     @torch.no_grad()
-    def _value_targets_and_children(self, latents: Tensor) -> tuple[Tensor, Tensor]:
-        """value_targets plus the expansion's child values V-bar(tau(z, a, o)), (N, A, O) (section 2f reads them)."""
+    def _value_targets_and_children(self, latents: Tensor) -> tuple[Tensor, Tensor, Tensor | None]:
+        """value_targets plus the expansion's child values V-bar(tau(z, a, o)) and branch rewards, (N, A, O) (2f, 2i)."""
         with torch.autocast(self.device.type, enabled=False):
             expansion = self.target_search.expand(latents.float())
             q = expansion.rewards + self.discount * (expansion.observation_probs * expansion.next_values).sum(-1)
-        return q.max(dim=-1).values, expansion.next_values
+        return q.max(dim=-1).values, expansion.next_values, expansion.branch_rewards
 
     @torch.no_grad()
     def pair_value_targets(self, latents: Tensor) -> tuple[Tensor, Tensor]:
@@ -432,14 +472,14 @@ class WorldModelTrainer:
         return self._pair_value_targets_and_children(latents)[:2]
 
     @torch.no_grad()
-    def _pair_value_targets_and_children(self, latents: Tensor) -> tuple[Tensor, Tensor, Tensor]:
-        """pair_value_targets plus the expansion's child values (the pair's combined value), (N, A, O)."""
+    def _pair_value_targets_and_children(self, latents: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor | None]:
+        """pair_value_targets plus the expansion's child values (the pair's combined value) and branch rewards, (N, A, O)."""
         with torch.autocast(self.device.type, enabled=False):
             expansion = self.target_search.expand(latents.float())
             backup = lambda v: expansion.rewards + self.discount * (expansion.observation_probs * v).sum(-1)  # noqa: E731
             if self.value_head.estimator is ValueEstimator.CLIPPED_DOUBLE:
                 target = backup(expansion.next_values).max(dim=-1).values          # next_values = min(A, B)
-                return target, target, expansion.next_values
+                return target, target, expansion.next_values, expansion.branch_rewards
             children = expansion.next_states.flatten(0, 2)
             va, vb = (v.view_as(expansion.next_values) for v in self.target_value_head.head_values(children, self.twohot))
             if self.absorbing_observation is not None:                                       # section 3f
@@ -448,7 +488,7 @@ class WorldModelTrainer:
                 vb[:, :, self.absorbing_observation] = 0.0
             qa, qb = backup(va), backup(vb)
         return (qb.gather(1, qa.argmax(-1, keepdim=True)).squeeze(1),
-                qa.gather(1, qb.argmax(-1, keepdim=True)).squeeze(1), expansion.next_values)
+                qa.gather(1, qb.argmax(-1, keepdim=True)).squeeze(1), expansion.next_values, expansion.branch_rewards)
 
     @torch.no_grad()
     def nstep_returns(self, states: Tensor, rewards: Tensor) -> Tensor:
@@ -501,18 +541,19 @@ class WorldModelTrainer:
                 if self.self_predictive_weight > 0.0:                                        # section 2g
                     losses["prediction"] = self.self_predictive_weight * losses["prediction"]
 
-            losses["reward"] = self.twohot.loss(self.reward_head(current, action_flat),
-                                                episodes.rewards.reshape(-1)).mean()
+            reward_logits = (self.reward_head(current, action_flat, flat(observations)) if self.observation_reward   # 2i
+                             else self.reward_head(current, action_flat))
+            losses["reward"] = self.twohot.loss(reward_logits, episodes.rewards.reshape(-1)).mean()
 
             all_latents = latents.reshape(batch * (steps + 1), -1)
             if isinstance(self.value_head, ValuePair):                                    # section 3e
                 head_a = (torch.arange(batch, device=self.device) % 2 == 0).repeat_interleave(steps + 1)
-                target_a, target_b, child_values = self._pair_value_targets_and_children(all_latents.detach())
+                target_a, target_b, child_values, branch_rewards = self._pair_value_targets_and_children(all_latents.detach())
                 targets_value = torch.where(head_a, target_a, target_b)
                 value_logits = torch.where(head_a.unsqueeze(-1), self.value_head.a(all_latents.detach()),
                                            self.value_head.b(all_latents.detach()))
             elif self.horizon is None:
-                targets_value, child_values = self._value_targets_and_children(all_latents.detach())
+                targets_value, child_values, branch_rewards = self._value_targets_and_children(all_latents.detach())
                 value_logits = self.value_head(all_latents.detach())
             else:
                 if steps != self.horizon:
@@ -542,6 +583,15 @@ class WorldModelTrainer:
                 realised = branches.gather(1, episodes.observations.reshape(-1, 1)).squeeze(1)   # V-bar(z_{t+1})
                 predicted = (F.softmax(observation_logits, dim=-1) * branches).sum(-1)
                 losses["value_equivalent"] = self.value_equivalent_weight * (
+                    ((predicted - realised) / self.value_equivalent_scale) ** 2).mean()
+
+            if self.q_equivalent_weight > 0.0:                                           # section 2i
+                values = self._data_branches(child_values, episodes)                     # V-bar(tau(z_t, a_t, o)), (BT, O)
+                q_branches = self._data_branches(branch_rewards, episodes) + self.discount * values
+                realised = (episodes.rewards.reshape(-1).float() + self.discount
+                            * values.gather(1, episodes.observations.reshape(-1, 1)).squeeze(1))
+                predicted = (F.softmax(observation_logits, dim=-1) * q_branches).sum(-1)
+                losses["q_equivalent"] = self.q_equivalent_weight * (
                     ((predicted - realised) / self.value_equivalent_scale) ** 2).mean()
 
             if self.planning_observation_head is not None:                               # section 3d
@@ -586,7 +636,7 @@ class WorldModelTrainer:
         }
 
     def _data_branches(self, child_values: Tensor, episodes: EpisodeBatch) -> Tensor:
-        """The child values V-bar(tau(z_t, a_t, o)) of the data action a_t at every step, (B*T, O) float32 (2f, 2h)."""
+        """The child values V-bar(tau(z_t, a_t, o)) (or branch rewards) of the data action a_t, (B*T, O) float32 (2f, 2h, 2i)."""
         batch, steps = episodes.actions.shape
         branches = child_values.view(batch, steps + 1, self.num_actions, self.num_observations)[:, :-1]
         branches = branches.reshape(batch * steps, self.num_actions, self.num_observations)
