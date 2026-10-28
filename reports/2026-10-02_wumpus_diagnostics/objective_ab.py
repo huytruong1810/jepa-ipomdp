@@ -448,6 +448,10 @@
 #      buffer, 6 training batches, measure r = ||grad_filter QE(w = 1)|| / ||grad_filter (all other terms)||; w is the
 #      value of {10, 25, 50, 100, 250} (or 5 / 2.5 below that) closest in log ratio to w r = 0.375, i.e. the term
 #      carries ~25-50% of the other terms' filter gradient (2i's method). One dose, recorded here before the chain.
+#      Smoke 2026-10-27 (runs/wumpus/qe_screen/dose_smoke_seed0.log; OR seed 0: cell / heading 87 / 92, held-out NLL
+#      0.269, as the control): r = 0.082 (0.023-0.166 over the 6 batches) -> **w = 5** (w r = 0.41). The residual lives
+#      on FORWARD (RMS 300, mean +41: the model's backup is optimistic there on average; SHOOT 15, the others < 0.4),
+#      and the backed-up FORWARD reward equals -1 - 1000 P(GAME_OVER) to 0.15 on live latents (the factorisation holds).
 #    - Plays: retrain_play.py <run> OR_seed<s>.pt QE<w>_seed<s>.pt --set model.observation_reward=true (512 analysis
 #      games; header 7: best.pt replays first with its own config and must reproduce report.json; QE paired in-script
 #      with OR), then feature_localise.py <run> cuda --networks <arm> --set model.observation_reward=true for each arm.
