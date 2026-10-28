@@ -470,6 +470,26 @@
 #      -> QE passes PLAY only: the gain does not come through the value of information; diagnose (action mix, deaths).
 #      -> QE passes MECHANISM only: the model repairs but the planner does not profit; report.
 #      -> neither (and OR does not pass PLAY): FAIL; report the 2i / 2o / 2p ablation, no further objective variant.
+#    - Result 2026-10-28 (runs/wumpus/qe_screen/, chain qe_screen_chain.sh at 57bb994, w = 5; ~45 min per arm per seed;
+#      every best.pt replay reproduces report.json): FAIL (neither PLAY nor MECHANISM; OR does not pass PLAY either).
+#                 control   OR      QE5     QE - control     OR - control     QE - OR          deaths c / OR / QE   unfinished c / OR / QE
+#      seed 0     270.0     224.1   179.0   -91.0 +- 40.9    -45.9 +- 31.8    -45.1 +- 41.6    1.0 / 3.1 / 7.4%     64.3 / 65.0 / 61.9%
+#      seed 1     214.7     235.2   256.4   +41.7 +- 30.1    +20.6 +- 25.8    +21.2 +- 25.2    1.8 / 0.6 / 2.5%     69.1 / 68.4 / 62.3%
+#      seed 2     194.3     151.5   234.3   +40.1 +- 38.9    -42.8 +- 39.1    +82.8 +- 33.0    7.2 / 3.3 / 1.2%     60.2 / 70.1 / 68.2%
+#      QE - control mean -3.1 (PLAY: > 0 on 2 of 3, deaths +6.4 points on seed 0); OR - control mean -22.7; QE - OR mean
+#      +19.6. Joint glitter ratio at (c), control / OR / QE: 0.45 / 0.32 / 0.44, 0.39 / 0.30 / 0.34, 0.33 / 0.48 / 0.34
+#      (MECHANISM: QE - control -0.00 / -0.05 / +0.02, 0 of 3). Latent guard holds: cell / heading QE 84 / 91, 86 / 91,
+#      87 / 91, OR 87 / 92, 87 / 91, 87 / 91 (control 88 / 93, 87 / 91, 82 / 86); held-out NLL QE 0.285 / 0.316 / 0.301,
+#      OR 0.269 / 0.297 / 0.286 (control 0.269 / 0.299 / 0.342).
+#    - Reading: the Q-equivalent term does not put the value of information into the model: the glitter under-prediction
+#      at the declined turned latents is unchanged (it is the same 2-3x as the control's), and the unfinished games move
+#      within the retrain-to-retrain noise. Its residual lives on FORWARD (smoke: RMS 300, mean +41) and is dominated by
+#      the death branch, so the term mostly re-prices P(GAME_OVER), which moves deaths in either direction (seed 0 7.4%,
+#      seed 2 1.2%). The restructured reward alone is not neutral either: moving the death risk from R(z, a) into P makes
+#      the planner rely on one head for both the risk and the branching, and it lost on 2 of 3 seeds. Across the three
+#      decision-aware objectives (2i V-equivalence, 2o span^2 CE weights, 2p Q-equivalence) none moves the glitter ratio
+#      at the declined states: with the agent's own value and its own data, the objective cannot supply information that
+#      the data do not show (the declined turn-then-step outcomes are rare in the buffer; C10 (V), coverage_games.py).
 #
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \

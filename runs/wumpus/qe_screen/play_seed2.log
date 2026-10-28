@@ -1,0 +1,25 @@
+== seed2 best.pt (collection 80) vs ['runs/wumpus/qe_screen/OR_seed2.pt', 'runs/wumpus/qe_screen/QE5_seed2.pt'], 512 games
+    decision 10; 61 s
+    decision 20; 129 s
+    decision 30; 200 s
+    decision 40; 268 s
+    decision 50; 336 s
+  best.pt       : return   233.1 +-  21.5  {'win_rate': 0.3359, 'death_rate': 0.041, 'unfinished_rate': 0.623, 'mean_win_step': 12.814}
+      live action mix FORWARD 0.267, TURN_LEFT 0.116, TURN_RIGHT 0.086, GRAB 0.408, SHOOT 0.124
+  replay reproduces report.json
+  saved sets play in a run with ['model.observation_reward=true']
+    decision 10; 69 s
+    decision 20; 151 s
+    decision 30; 230 s
+    decision 40; 305 s
+    decision 50; 380 s
+  OR_seed2      : return   151.5 +-  18.5  {'win_rate': 0.2656, 'death_rate': 0.0332, 'unfinished_rate': 0.7012, 'mean_win_step': 21.1471}  paired gain   -81.6 +-  38.1
+      live action mix FORWARD 0.171, TURN_LEFT 0.181, TURN_RIGHT 0.047, GRAB 0.319, SHOOT 0.281
+    decision 10; 72 s
+    decision 20; 144 s
+    decision 30; 212 s
+    decision 40; 279 s
+    decision 50; 348 s
+  QE5_seed2     : return   234.3 +-  20.0  {'win_rate': 0.3066, 'death_rate': 0.0117, 'unfinished_rate': 0.6816, 'mean_win_step': 10.7197}  paired gain    +1.2 +-  33.0  vs control   +82.8 +-  33.0
+      live action mix FORWARD 0.264, TURN_LEFT 0.274, TURN_RIGHT 0.220, GRAB 0.148, SHOOT 0.094
+DONE

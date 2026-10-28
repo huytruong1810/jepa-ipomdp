@@ -1,0 +1,19 @@
+arm representation=decoder horizon=5 seed=0 weight_decay=0.0001; 8960 training games from the buffer of runs/sweeps/wumpus_retrain/seed0
+update 1600: loss_total 1.5111 loss_reward 0.4089 loss_value 0.6928 loss_observation 0.1197 loss_multistep_observation 0.2897
+update 3200: loss_total 1.6914 loss_reward 0.5618 loss_value 0.7902 loss_observation 0.1033 loss_multistep_observation 0.2361
+update 4800: loss_total 1.2942 loss_reward 0.4779 loss_value 0.6121 loss_observation 0.0613 loss_multistep_observation 0.1429
+update 6400: loss_total 2.0064 loss_reward 0.4939 loss_value 1.2448 loss_observation 0.0718 loss_multistep_observation 0.1960
+training took 1657s
+RESULT probe_pit_error 0.0519
+RESULT probe_wumpus_error 0.0350
+RESULT probe_gold_error 0.0229
+RESULT probe_cell_acc 0.8700
+RESULT probe_heading_acc 0.9211
+RESULT probe_danger_error 0.0296
+RESULT probe_certain_death 0.7781
+RESULT head_danger_error 0.0527
+RESULT head_safe 0.0212
+RESULT head_certain_death 0.6614
+RESULT head_safe_miss 0.0045
+RESULT head_nll_train 0.3676
+RESULT head_nll_held 0.2693

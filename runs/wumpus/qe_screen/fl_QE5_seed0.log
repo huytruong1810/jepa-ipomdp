@@ -1,0 +1,24 @@
+== seed0 best.pt (collection 100), 512 games on cuda
+   [22:05:34] decision 10/50, 266 declined distance-2 states, 82s
+   [22:06:52] decision 20/50, 658 declined distance-2 states, 160s
+   [22:08:13] decision 30/50, 923 declined distance-2 states, 241s
+   [22:09:32] decision 40/50, 1184 declined distance-2 states, 320s
+   [22:10:50] decision 50/50, 1407 declined distance-2 states, 398s
+  replay return 236.6892, 1407 declined states, 398 s
+  networks load into a run with ['model.observation_reward=true']
+  networks runs/wumpus/qe_screen/QE5_seed0.pt: root latents recomputed from the histories
+  turned latents: joint-head TV median 0.458; exact glitter at (c) 0.126, wall 0.000, unvisited 1.000
+  decision share M (Q_mac > Q2(chosen)) 0.254
+  buffer: 8960 games x 50 steps at collection 100, 316261 train / 34868 held-out live states; factors in 75 s
+  mlp    (a): wall=acc 0.976+ unvisited=acc 0.957+ gold=mae 0.011+ pit=mae 0.025+ wumpus=mae 0.017+ glitter=mae 0.014+ breeze=mae 0.046+ stench=mae 0.040+
+  mlp    (b): wall=acc 0.958+ unvisited=acc 0.934+ gold=mae 0.014+ pit=mae 0.011+ wumpus=mae 0.019+ glitter=mae 0.013+ breeze=mae 0.083- stench=mae 0.075-
+  mlp    (c): wall=acc 0.984+ unvisited=acc 0.765- gold=mae 0.073- pit=mae 0.030+ wumpus=mae 0.071- glitter=mae 0.074- breeze=mae 0.226- stench=mae 0.186-
+  mlp: early-stopped at step 3000, held-out loss 0.1307, 13 s
+  linear (a): wall=acc 0.958+ unvisited=acc 0.924+ gold=mae 0.018+ pit=mae 0.040+ wumpus=mae 0.024+ glitter=mae 0.024- breeze=mae 0.199- stench=mae 0.128-
+  linear (b): wall=acc 0.906+ unvisited=acc 0.891- gold=mae 0.021- pit=mae 0.015+ wumpus=mae 0.031+ glitter=mae 0.023- breeze=mae 0.238- stench=mae 0.195-
+  linear (c): wall=acc 0.982+ unvisited=acc 0.788- gold=mae 0.076- pit=mae 0.034+ wumpus=mae 0.036- glitter=mae 0.075- breeze=mae 0.269- stench=mae 0.336-
+  linear: early-stopped at step 11750, held-out loss 0.1901, 21 s
+  random (a): wall=acc 0.773- unvisited=acc 0.713- gold=mae 0.026- pit=mae 0.093- wumpus=mae 0.038- glitter=mae 0.031- breeze=mae 0.218- stench=mae 0.129-
+  random: early-stopped at step 11750, held-out loss 0.2808, 32 s
+  glitter at (c), learned / exact: joint head 0.44, mlp direct 0.45, composed (1 - wall^) gold^ 0.45
+DONE

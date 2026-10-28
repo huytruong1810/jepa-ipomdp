@@ -1,0 +1,13 @@
+batch 0: loss_q_equivalent(w=1) 0.0106  |g_qe| 0.0369  |g_other| 0.5766  r 0.0640  loss_total 2.405  loss_reward 0.543  loss_value 1.606  loss_observation 0.069  loss_multistep_observation 0.186
+batch 1: loss_q_equivalent(w=1) 0.0023  |g_qe| 0.0105  |g_other| 0.4470  r 0.0234  loss_total 1.641  loss_reward 0.548  loss_value 0.754  loss_observation 0.100  loss_multistep_observation 0.239
+batch 2: loss_q_equivalent(w=1) 0.0096  |g_qe| 0.0366  |g_other| 0.2210  r 0.1655  loss_total 1.591  loss_reward 0.456  loss_value 0.848  loss_observation 0.074  loss_multistep_observation 0.213
+batch 3: loss_q_equivalent(w=1) 0.0073  |g_qe| 0.0382  |g_other| 0.6591  r 0.0580  loss_total 2.017  loss_reward 0.519  loss_value 1.248  loss_observation 0.069  loss_multistep_observation 0.180
+batch 4: loss_q_equivalent(w=1) 0.0104  |g_qe| 0.0334  |g_other| 0.3696  r 0.0904  loss_total 1.655  loss_reward 0.430  loss_value 0.980  loss_observation 0.067  loss_multistep_observation 0.178
+batch 5: loss_q_equivalent(w=1) 0.0061  |g_qe| 0.0224  |g_other| 0.2516  r 0.0889  loss_total 1.443  loss_reward 0.482  loss_value 0.752  loss_observation 0.053  loss_multistep_observation 0.155
+mean r 0.0817; dose rule -> w = 5 (w r = 0.408)
+  FORWARD    n    311  RMS residual   299.71  mean   +40.58
+  TURN_LEFT  n    512  RMS residual     0.02  mean    +0.00
+  TURN_RIGHT n    442  RMS residual     0.00  mean    +0.00
+  GRAB       n    605  RMS residual     0.37  mean    -0.02
+  SHOOT      n    634  RMS residual    15.19  mean    -0.70
+  FORWARD backed-up reward vs -1 - 1000 P(GAME_OVER) on live latents: mean |diff| 0.151, mean P(GAME_OVER) 0.0979, mean reward -98.963
