@@ -150,6 +150,29 @@
 #        risk is still 2-5% of exact. The deaths are the optimizer's curse on a calibrated-on-average model.
 #      - Registered branch "FAIL with deaths up": even mixed data leave an exploitable risk error, so pessimism is
 #        required on top; but E0' (pessimism_play.py section 4) shows a uniform margin does not remove it either.
+# 7. Arm "own" at a higher dose (2026-10-28): the dose-response of the agent's own unfiltered trials.
+#    - Why: the two deficits separate by data source. The union arm repaired the value-of-information deficit (V) on
+#      5 of 5 seeds by the glitter ratio; its deaths are attributable to the safety-filtered cover half (cover alone
+#      calibrates risky new cells at 0.53-0.73 of control, own at 0.85-1.24). Own kept (R) but reached the declined
+#      states only 0.34-0.50 times per game at OWN_EPS 0.2, against ~1.3 for cover. The trial rate in collection
+#      costs nothing at evaluation (the greedy planner plays without trials), so the untested lever is the dose:
+#      does a higher trial probability give cover's declined-state dose with own's calibrated risk? Theory: model-
+#      based DAgger (Ross & Bagnell 2012) needs the data on the planner's counterfactual choices; temporally-
+#      extended exploration (Dabney et al. 2021) supplies them without a privileged chooser.
+#    - Method: the own rule of section 5 with the trial probability as argument 6 (usage: ... own <out .pt>
+#      <batches> <games> <eps>; default OWN_EPS 0.2 reproduces section 5). Everything else is unchanged.
+#    - Pre-registered readout (written 2026-10-28 before any run):
+#        DOSE smoke (seed 0, 1 x 512 games, eps 0.5 and 1.0): declined-state entries per game (count_dose). The
+#              screen eps is the smallest of {0.5, 1.0} with >= 1.0 declined per game (~75% of cover). If neither
+#              reaches 1.0, the dose saturates (trials displace the states they should reach): report, no screen.
+#        Screen (5 seeds, 4 x 512 games, against the SAME control games and control retrains as sections 4-6):
+#              PLAY, MECHANISM and RISK exactly as in section 5 (PLAY: own_hi - control mean >= +50 with the t95
+#              interval over seeds above 0, deaths at most control's + 2 points on >= 4 of 5; MECHANISM: section 3;
+#              RISK: calibration ratio >= 0.85 x control's on >= 4 of 5).
+#        PASS -> the in-agent screen with agent.trial_prob at that eps (training/run.py section 17), paired with the
+#              recipe's final-retrain plays. MECHANISM pass + RISK fail -> the risk error is not a filter artefact
+#              (the optimizer's curse remains even with unfiltered data). MECHANISM fail at dose >= 1.0 -> dose is
+#              not the lever: the union's repair came from the cover data's state distribution, not its quantity.
 # ==============================================================================
 
 import sys
@@ -168,12 +191,16 @@ from ipomdp.planning import BeliefTreeSearch
 from ipomdp.training import play_episodes, stream_seed
 
 COVERAGE_BASE = 20261020
-OWN_EPS = 0.2
 run_dir, arm, out_path = Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3])
 batches = int(sys.argv[4]) if len(sys.argv) > 4 else 4
 GAMES = int(sys.argv[5]) if len(sys.argv) > 5 else 512
+OWN_EPS = float(sys.argv[6]) if len(sys.argv) > 6 else 0.2      # section 7: the trial probability of the own arm
 if arm not in ("cover", "control", "own"):
     raise ValueError(f"arm must be cover, control or own, not {arm}.")
+if len(sys.argv) > 6 and arm != "own":
+    raise ValueError("the trial probability (argument 6) applies to the own arm only.")
+if not 0.0 < OWN_EPS <= 1.0:
+    raise ValueError(f"the trial probability must lie in (0, 1], not {OWN_EPS}.")
 dev = torch.device("cuda")
 trained = load_trained_run(run_dir, dev)
 world, run, cfg = trained.setup.domain, trained.run, trained.cfg
@@ -282,7 +309,8 @@ class CoverageAgent:
             self.dose["declined"] += int(target_distance(cell, heading, safe, goal) == 2)
 
 
-print(f"== {run_dir.name} best.pt (collection {trained.checkpoint_collection}), arm {arm}, {batches} x {GAMES} games",
+print(f"== {run_dir.name} best.pt (collection {trained.checkpoint_collection}), arm {arm}"
+      + (f" (trial probability {OWN_EPS})" if arm == "own" else "") + f", {batches} x {GAMES} games",
       flush=True)
 parts, overrides, dose = [], 0, {}
 for k in range(batches):
