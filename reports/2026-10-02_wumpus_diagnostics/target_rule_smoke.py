@@ -37,6 +37,19 @@
 #      turned latent against the buffer (Tang et al. 2017) to the score, with the same bars. If D(delta) never
 #      reaches 1.0 at T <= 3.0 with either score, targeting from the agent's own quantities is not achievable at
 #      this dose: report, and the fallback (bank the 3-way decision-aware ablation and the Step B bound) applies.
+#
+# 4. Result 2026-10-28 (runs/wumpus/target/smoke_seed0.{log,npz}; the replay equals games_control_seed0.pt batch 0):
+#    **FAIL: no delta meets the bars.** 23.0 non-FORWARD decisions per game, 1.17 of them strictly declined. The gap
+#    q_chosen - q_mac has median +31.9 at the declined states and +35.9 elsewhere: it does not separate them.
+#    | delta | trials/game | declined/game | precision | risky/game | wall/game |
+#    | 3     | 0.39        | 0.09          | 0.225     | 0.00       | 0.14      |
+#    | 10    | 2.04        | 0.23          | 0.114     | 0.01       | 0.95      |
+#    | 15    | 3.78        | 0.35          | 0.093     | 0.02       | 2.14      |
+#    | 30    | 7.97        | 0.56          | 0.071     | 0.04       | 4.72      |
+#    | 100   | 19.18       | 0.74          | 0.038     | 0.10       | 14.75     |
+#    - The model already rates risky macros far below the chosen action (risky trials ~0 at small delta), and
+#      at large delta the trials are mostly turns into a wall. The stream's 1.17 declined states per game also
+#      cap any first-order selector below cover's 1.3. Pass 2 (section 3): target_novelty_smoke.py.
 # ==============================================================================
 
 import sys

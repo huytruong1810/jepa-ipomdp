@@ -34,6 +34,23 @@
 #      plan: DOSE, MECHANISM, RISK, PLAY vs the coverage control). FAIL -> no rule built from the agent's own
 #      quantities reaches the declined states at cover's dose; report, and the fallback (bank the 3-way decision-
 #      aware ablation with the Step B bound) applies.
+#
+# 4. Result 2026-10-28 (runs/wumpus/target/novelty_seed0.log, smoke_seed0_novelty.npz; CPU, 4.2 GB RSS):
+#    **FAIL, and the signal points the wrong way.** Buffer 8960 games (448000 latents, 16979 of 65536 codes
+#    occupied). At the declined states the turned latent's FORWARD count has median 4 (zero 19.5%); elsewhere
+#    median 2 (zero 40.8%): the declined pairs are MORE common in the buffer than the other macros.
+#    | c     | trials/game | declined/game | precision | risky/game | wall/game |
+#    | 0     | 9.12        | 0.23          | 0.025     | 0.81       | 7.16      |
+#    | 5     | 13.71       | 0.80          | 0.059     | 1.78       | 9.13      |
+#    | 20    | 19.02       | 1.02          | 0.054     | 2.36       | 12.42     |
+#    - No c gives T <= 3.0 at all (the rarest pairs are mostly turns into a wall). Precision 3-6%, below own's
+#      untargeted ~15%.
+#    - Reading: at the resolution of a 16-bit SimHash, the declined turned latents sit in occupied regions of the
+#      agent's buffer. Step D's "off support" holds for the decoded FACTORS (gold ahead, unvisited), not for latent
+#      density, so a density/novelty signal on the agent's own latent cannot find them. With the Q-gap pass
+#      (target_rule_smoke.py) this closes the registered search: neither the planner's own near-misses nor
+#      latent novelty target the declined decisions, so no non-privileged collection rule tested here gets
+#      cover's dose. Branch: report; the fallback applies.
 # ==============================================================================
 
 import sys
