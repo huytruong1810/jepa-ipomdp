@@ -173,6 +173,20 @@
 #              recipe's final-retrain plays. MECHANISM pass + RISK fail -> the risk error is not a filter artefact
 #              (the optimizer's curse remains even with unfiltered data). MECHANISM fail at dose >= 1.0 -> dose is
 #              not the lever: the union's repair came from the cover data's state distribution, not its quantity.
+#    - Result 2026-10-29 (runs/wumpus/coverage_dose: games_own{0.5,1.0}_seed0.log; seed 0, 1 x 512 games each).
+#      **Readout: DOSE FAIL (the dose saturates); no screen.**
+#      | Trial probability | declined / game | unvisited / game | risky / game | collection deaths | wins  | unfinished |
+#      | 0 (control)       | -               | -                | -            | 1.2%              | 28.9% | 69.9%      |
+#      | 0.2 (section 5)   | 0.34            | 1.31             | 0.55         | 36.7%             | 30.7% | 32.6%      |
+#      | 0.5               | 0.60            | 2.32             | 0.88         | 59.8%             | 20.7% | 19.5%      |
+#      | 1.0               | 0.82            | 3.36             | 1.33         | 84.6%             | 0.0%  | 15.4%      |
+#      (0.2: batch 3 of games_own_seed0.log, the section-5 games; control: batch 3 of games_control_seed0.log.)
+#      - Five times the trial probability gives 2.4 times the declined dose: the unfiltered trials step into risky
+#        cells and end most games before the hunter reaches the next declined decision. At 1.0, 85% of the games end
+#        in death and none is won, so the data are concentrated on early, short histories.
+#      - Registered branch: untargeted trials cannot reach cover's dose; with the targeting smokes
+#        (target_rule_smoke.py, target_novelty_smoke.py) this closes non-privileged coverage of the declined
+#        decisions through collection rules that rely on the agent's own estimates or on untargeted trials.
 # ==============================================================================
 
 import sys
