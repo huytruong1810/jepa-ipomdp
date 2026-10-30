@@ -257,6 +257,19 @@
 #      seed 0), so the anchor must reach the targets, which the planner then shares.
 #    - None (the default and canonical Tiger) computes nothing new.
 #
+# 2j. Optional Per-Step Loss Mask (EpisodeBatch.loss_mask; offline retrains on branch data, 2026-10-29):
+#    - Restore-and-branch data (reports/2026-10-02_wumpus_diagnostics/coverage_games.py section 8) restore the
+#      simulator to a stored decision of the agent's own game and play a short counterfactual branch. The trainer
+#      unrolls whole episodes from z_0, so each branch is stored with its game's prefix (already in the buffer)
+#      in front and padding behind. The mask marks the branch transitions: only they enter the losses, so the
+#      duplicated prefixes and the padding add no weight, while the filter is still warmed on the real prefix.
+#    - Every term is a masked mean over its own index: reward, observation, JEPA prediction over transitions
+#      t (a_t, o_{t+1}, r_t); the value over latents z_t touched by a live transition (mask[t] or mask[t-1]);
+#      the j-step observation term over the target transition t + j.
+#    - Terms the mask is not defined for (finite-horizon value, n-step grounding, the detached planning head,
+#      the value-/Q-equivalent and decision-aware terms, the privileged term) raise instead of ignoring it.
+#    - With loss_mask None (the default and every online run) the code path is the unmasked one, unchanged.
+#
 # 4. No Imagination Losses:
 #    - An earlier version also trained V on latents imagined by a stochastic latent
 #      transition ("consistency"). Planning now imagines through the real filter
@@ -288,6 +301,11 @@ from ..models.world_model import BeliefFilter, RecurrentJEPA
 from ..planning.search_model import AbsorbingValueModel, LearnedSearchModel
 from .episode_buffer import EpisodeBatch
 from .privileged import PrivilegedBeliefLoss
+
+
+def _masked_mean(values: Tensor, weights: Tensor) -> Tensor:
+    """Mean of `values` over the entries with weight 1 (section 2j); an all-zero mask raises (non-finite loss)."""
+    return (values * weights).sum() / weights.sum()
 
 DECISION_AWARE_SUPPORT = 1e-3     # section 2h: branches with less model mass do not set the span
 
@@ -526,6 +544,20 @@ class WorldModelTrainer:
                    else F.one_hot(episodes.initial_observations, self.num_observations).float())
         batch, steps = episodes.actions.shape
         losses: dict[str, Tensor] = {}
+        mask = episodes.loss_mask                                                        # section 2j
+        if mask is not None:
+            if mask.shape != (batch, steps) or mask.dtype != torch.bool or not bool(mask.any()):
+                raise ValueError(f"loss_mask must be a non-empty bool tensor of shape {(batch, steps)}.")
+            if (self.horizon is not None or self.nstep > 0 or self.planning_observation_head is not None
+                    or self.privileged is not None or self.decision_aware_weight > 0.0
+                    or self.value_equivalent_weight > 0.0 or self.q_equivalent_weight > 0.0):
+                raise ValueError("loss_mask is defined for the reward, observation, multi-step, JEPA and value terms only "
+                                 "(section 2j).")
+            flat_mask = mask.reshape(-1).float()
+            latent_mask = torch.zeros(batch, steps + 1, dtype=torch.bool, device=mask.device)
+            latent_mask[:, :-1] |= mask
+            latent_mask[:, 1:] |= mask
+            latent_mask = latent_mask.reshape(-1).float()
 
         with torch.autocast(self.device.type, dtype=torch.bfloat16, enabled=self.device.type == "cuda"):
             latents = self.belief_filter.unroll(actions, observations, initial)            # (B, T+1, D)
@@ -537,13 +569,16 @@ class WorldModelTrainer:
                 with torch.no_grad():
                     targets = self.jepa.target_filter.unroll(actions, observations, initial)  # (B, T+1, D)
                 predicted = self.jepa.predictor(current, action_flat)
-                losses["prediction"] = F.mse_loss(predicted.float(), flat(targets[:, 1:]).float())
+                losses["prediction"] = (F.mse_loss(predicted.float(), flat(targets[:, 1:]).float()) if mask is None
+                                        else _masked_mean(F.mse_loss(predicted.float(), flat(targets[:, 1:]).float(),
+                                                                     reduction="none").mean(-1), flat_mask))
                 if self.self_predictive_weight > 0.0:                                        # section 2g
                     losses["prediction"] = self.self_predictive_weight * losses["prediction"]
 
             reward_logits = (self.reward_head(current, action_flat, flat(observations)) if self.observation_reward   # 2i
                              else self.reward_head(current, action_flat))
-            losses["reward"] = self.twohot.loss(reward_logits, episodes.rewards.reshape(-1)).mean()
+            reward_loss = self.twohot.loss(reward_logits, episodes.rewards.reshape(-1))
+            losses["reward"] = reward_loss.mean() if mask is None else _masked_mean(reward_loss, flat_mask)
 
             all_latents = latents.reshape(batch * (steps + 1), -1)
             if isinstance(self.value_head, ValuePair):                                    # section 3e
@@ -565,7 +600,8 @@ class WorldModelTrainer:
                 value_logits = self.value_head(all_latents.detach()[live], steps_left[live])
             if self.nstep > 0:
                 targets_value, nstep_metrics = self._mix_nstep(latents.detach(), episodes, targets_value)
-            losses["value"] = self.twohot.loss(value_logits, targets_value).mean()
+            value_loss = self.twohot.loss(value_logits, targets_value)
+            losses["value"] = value_loss.mean() if mask is None else _masked_mean(value_loss, latent_mask)
 
             # The decoder baseline's representation term; a detached planning-model fit otherwise.
             decoded = current if self.representation is Representation.DECODER else current.detach()
@@ -575,8 +611,11 @@ class WorldModelTrainer:
                                                        observation_logits.detach(), episodes.observations.reshape(-1))
                 losses["observation"] = (weights * F.cross_entropy(observation_logits, episodes.observations.reshape(-1),
                                                                    reduction="none")).mean()
-            else:
+            elif mask is None:
                 losses["observation"] = F.cross_entropy(observation_logits, episodes.observations.reshape(-1))
+            else:
+                losses["observation"] = _masked_mean(F.cross_entropy(observation_logits, episodes.observations.reshape(-1),
+                                                                     reduction="none"), flat_mask)
 
             if self.value_equivalent_weight > 0.0:                                       # section 2f
                 branches = self._data_branches(child_values, episodes)                  # V-bar(tau(z_t, a_t, o)), (BT, O)
@@ -600,10 +639,17 @@ class WorldModelTrainer:
 
             if self.multistep_predictor is not None:
                 horizons = self.multistep_predictor(latents[:, :-1], actions)
-                losses["multistep_observation"] = sum(
-                    F.cross_entropy(logits.float().reshape(-1, self.num_observations),
-                                    episodes.observations[:, j:].reshape(-1))
-                    for j, logits in enumerate(horizons)) / len(horizons)
+                if mask is None:
+                    losses["multistep_observation"] = sum(
+                        F.cross_entropy(logits.float().reshape(-1, self.num_observations),
+                                        episodes.observations[:, j:].reshape(-1))
+                        for j, logits in enumerate(horizons)) / len(horizons)
+                else:                                                                    # section 2j: target t + j
+                    losses["multistep_observation"] = sum(
+                        _masked_mean(F.cross_entropy(logits.float().reshape(-1, self.num_observations),
+                                                     episodes.observations[:, j:].reshape(-1), reduction="none"),
+                                     mask[:, j:].reshape(-1).float())
+                        for j, logits in enumerate(horizons)) / len(horizons)
 
             if self.privileged is not None:                                              # section 2e
                 losses["privileged_belief"] = self.privileged(latents, episodes)

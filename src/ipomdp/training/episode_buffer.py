@@ -55,6 +55,8 @@ class EpisodeBatch:
 
     greedy (B,) bool and index (B,) int64 (the buffer slots, section 5) are set on batches sampled
     from an EpisodeBuffer (section 4); freshly played episodes carry None.
+    loss_mask (B, T) bool marks the transitions the trainer's losses count (trainer.py section 2j); None
+    counts every transition. The buffer never stores it: only offline retrains on branch data set it.
     """
 
     actions: Tensor
@@ -63,6 +65,7 @@ class EpisodeBatch:
     initial_observations: Tensor | None
     greedy: Tensor | None = None
     index: Tensor | None = None
+    loss_mask: Tensor | None = None
 
 
 class EpisodeBuffer:

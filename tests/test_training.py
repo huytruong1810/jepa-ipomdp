@@ -209,6 +209,59 @@ class TestDecoderBaseline:
         assert sum(float(p.grad.abs().sum()) for p in trainer.belief_filter.parameters()) > 0.0
 
 
+class TestLossMask:
+    """Section 2j of training/trainer.py: the per-step loss mask of offline retrains on branch data."""
+
+    @staticmethod
+    def _losses(batch: EpisodeBatch, representation: Representation) -> dict[str, float]:
+        trainer = _trainer(representation=representation)
+        trainer.optimizer.step = lambda: None  # compare the losses of identical initialisations
+        return {k: v for k, v in trainer.train_step(batch).items() if k.startswith("loss")}
+
+    @pytest.mark.parametrize("representation", [Representation.JEPA, Representation.DECODER])
+    def test_all_true_mask_gives_the_unmasked_losses(self, representation):
+        batch = _episodes(8, 0)
+        masked = EpisodeBatch(batch.actions, batch.observations, batch.rewards, None,
+                              loss_mask=torch.ones_like(batch.actions, dtype=torch.bool))
+        plain, full = self._losses(batch, representation), self._losses(masked, representation)
+        assert plain.keys() == full.keys()
+        for key in plain:
+            assert full[key] == pytest.approx(plain[key], rel=1e-5, abs=1e-6), key
+
+    @pytest.mark.parametrize("representation", [Representation.JEPA, Representation.DECODER])
+    def test_masked_out_final_transition_has_no_effect(self, representation):
+        # The last transition (a_{T-1}, o_T, r_{T-1}) touches only its own reward/observation/prediction terms and
+        # the value at z_T; masked out, changing its observation and reward must leave every loss unchanged.
+        batch = _episodes(8, 0)
+        mask = torch.ones_like(batch.actions, dtype=torch.bool)
+        mask[:, -1] = False
+        observations, rewards = batch.observations.clone(), batch.rewards.clone()
+        observations[:, -1] = 1 - observations[:, -1]
+        rewards[:, -1] = rewards[:, -1] + 50.0
+        first = self._losses(EpisodeBatch(batch.actions, batch.observations, batch.rewards, None, loss_mask=mask),
+                             representation)
+        second = self._losses(EpisodeBatch(batch.actions, observations, rewards, None, loss_mask=mask), representation)
+        assert first == pytest.approx(second, rel=1e-5, abs=1e-6)
+        unmasked = self._losses(EpisodeBatch(batch.actions, observations, rewards, None), representation)
+        # The reward head is zero-initialised (uniform two-hot logits: the same loss for any target), so the
+        # unmasked contrast is read on the observation term.
+        assert unmasked["loss_observation"] != pytest.approx(first["loss_observation"], rel=1e-4)
+
+    def test_invalid_masks_and_unsupported_terms_raise(self):
+        batch = _episodes(4, 0)
+        trainer = _trainer()
+        with pytest.raises(ValueError):
+            trainer.train_step(EpisodeBatch(batch.actions, batch.observations, batch.rewards, None,
+                                            loss_mask=torch.zeros_like(batch.actions, dtype=torch.bool)))
+        with pytest.raises(ValueError):
+            trainer.train_step(EpisodeBatch(batch.actions, batch.observations, batch.rewards, None,
+                                            loss_mask=torch.ones(4, T + 1, dtype=torch.bool)))
+        trainer.nstep = 2
+        with pytest.raises(ValueError):
+            trainer.train_step(EpisodeBatch(batch.actions, batch.observations, batch.rewards, None,
+                                            loss_mask=torch.ones_like(batch.actions, dtype=torch.bool)))
+
+
 class TestValueEquivalentTerm:
     """Section 2f of training/trainer.py: (sum_o P(o) V-bar(tau(z, a, o)) - V-bar(z')) / max|R|, squared."""
 

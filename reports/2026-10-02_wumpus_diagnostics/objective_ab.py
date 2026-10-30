@@ -214,6 +214,12 @@
 #    result: coverage_games.py. Several files may be given (2026-10-21): the union arm appends the
 #    cover AND own games of a seed (4096 extra games), the data upper bound of the two coverage deficits together.
 #
+# 2q. Masked branch games (2026-10-29; question, arms and readout in coverage_games.py section 8): an --extra-games
+#    file may carry a (G, T) bool "loss_mask" (restore-and-branch data: the game's prefix, the branch steps, then
+#    padding; only the branch steps are live). When any file carries one, every other row (buffer and unmasked extra
+#    games) gets an all-True mask and each update passes its rows' mask to the trainer (trainer.py section 2j), so
+#    the losses are means over live transitions. Without masked files nothing changes (no mask is built or passed).
+#
 # 2k. Bootstrapped whole-model retrains (2026-10-21; question, readout and result in
 #    ensemble_disagreement.py): --bootstrap <j> resamples the uniform retrain's games (buffer plus --extra-games)
 #    with replacement, as many as there are, from a generator seeded with j that is separate from the update
@@ -712,16 +718,25 @@ def main() -> None:
         if data["actions"].shape[1] != length:
             raise ValueError(f"buffer episodes have {data['actions'].shape[1]} steps, the pool {length}.")
         del buf
+        masks = []                                                         # section 2q
         for extra_path in args.extra_games or []:                         # section 2j
             extra = torch.load(extra_path, map_location=device)
+            masks.append((data["actions"].shape[0], extra.get("loss_mask")))
             if extra["actions"].shape[1] != length:
                 raise ValueError(f"{extra_path} has {extra['actions'].shape[1]}-step games, the buffer {length}.")
             for key, source in (("actions", "actions"), ("observations", "observations"), ("rewards", "rewards"),
                                 ("initial", "initial_observations")):
                 data[key] = torch.cat([data[key], extra[source].to(device)])
             print(f"extra games: {extra['actions'].shape[0]} from {extra_path} (arm {extra['arm']}, "
-                  f"{extra['overrides']} overrides)", flush=True)
+                  f"{extra['overrides']} overrides)"
+                  + (f", {int(extra['loss_mask'].sum())} live transitions" if "loss_mask" in extra else ""), flush=True)
             del extra
+        if any(m is not None for _, m in masks):                           # section 2q
+            data["mask"] = torch.ones_like(data["actions"], dtype=torch.bool)
+            for start, m in masks:
+                if m is not None:
+                    data["mask"][start:start + m.shape[0]] = m.to(device)
+            print(f"loss mask: {int(data['mask'].sum())} live of {data['mask'].numel()} transitions", flush=True)
         fit_rows = torch.arange(data["actions"].shape[0], device=device)
     if args.extra_games is not None and (args.train_buffer is None or args.buffer_schedule != "uniform"):
         raise ValueError("--extra-games extends a uniform --train-buffer retrain (2j).")
@@ -760,7 +775,8 @@ def main() -> None:
                 raise ValueError(f"update {update} needs {available} games, the buffer holds {len(fit_rows)}.")
         rows = fit_rows[torch.randint(0, available, (cfg.training.batch_size,), device=device, generator=generator)]
         metrics = run.trainer.train_step(EpisodeBatch(data["actions"][rows], data["observations"][rows],
-                                                      data["rewards"][rows], data["initial"][rows]))
+                                                      data["rewards"][rows], data["initial"][rows],
+                                                      loss_mask=data["mask"][rows] if "mask" in data else None))
         run._update_acting()
         if update in args.reset_at:                                        # section 2g
             reset_cfg = cfg.copy()
@@ -772,7 +788,8 @@ def main() -> None:
                 rows = fit_rows[torch.randint(0, available, (cfg.training.batch_size,), device=device,
                                               generator=generator)]
                 run.trainer.train_step(EpisodeBatch(data["actions"][rows], data["observations"][rows],
-                                                    data["rewards"][rows], data["initial"][rows]))
+                                                    data["rewards"][rows], data["initial"][rows],
+                                                    loss_mask=data["mask"][rows] if "mask" in data else None))
                 run._update_acting()
             print(f"reset after update {update}: {args.catch_up} catch-up updates on {available} games", flush=True)
         if update in args.score_at:
