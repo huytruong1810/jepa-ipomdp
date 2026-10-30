@@ -44,7 +44,8 @@
 #                declined per game; every non-FORWARD decision would give 23.0 and 1.17.
 #        random: the same number of branch points per game, uniformly among the game's live decisions
 #                (generator stream_seed(COVERAGE_BASE, 400 + k)); the attribution control at equal volume.
-#    - Branch: the turn whose root Q in the control replay is higher (the agent's own estimate at that decision),
+#    - Branch: the turn whose root Q in the control replay is higher (the agent's own estimate at that decision;
+#      section 4 amends this to the turns other than the chosen action),
 #      then FORWARD, then BRANCH_TAIL = 3 greedy planner steps, truncated at the window. Branch points are grouped
 #      by their time t_b (<= 512 rows per group): a WumpusSimulator is restored with load_state_dict (s_{t_b},
 #      elapsed t_b), a fresh greedy PlanningAgent (search 500 + k, agent 600 + k) is warmed by filtering the stored
@@ -71,6 +72,19 @@
 #      data (optimizer's curse not a data artefact). MECHANISM FAIL at full dose -> data at the agent's own
 #      decisions do not repair the turned-latent model: the cover arm's repair came from its privileged choice.
 #    - Reported alongside: live branch transitions vs buffer transitions, environment steps per arm, branch deaths.
+#
+# 4. Dose smoke 2026-10-29 (runs/wumpus/branch/smoke_branch_seed0.{pt,log}; replay equal to games_control_seed0 batch
+#    0, restore self-check passed; ~12 min, ~3.5 GB RAM). Rule of section 2 (the turn with the higher root Q):
+#    13.21 branches per game; count_dose labels per game: declined 1.81, unvisited 5.71, risky 1.90, wall 2.88;
+#    branch deaths 10.2%; 33040 live steps (64.5 per control game).
+#    - The registered count passes (1.81 >= 0.9), but 5225 of 6761 branches repeat the planner's own turn (when the
+#      planner chose a turn, the higher-Q turn is mostly that turn). count_dose labels those as declined too (as the
+#      own arm did); cover's ~1.3 and the 0.98 estimate behind the bar count only turns the planner did NOT take.
+#      With that strict definition the dose is 0.44 per game: the bar's intent is not met.
+#    - Amendment (2026-10-29, after this dose-only smoke, before any retrain or play; nothing but the dose has been
+#      seen): the branch turn is the higher-root-Q turn among the turns other than the chosen action (target_rule_
+#      smoke.py's x*), so every branch is a counterfactual the planner declined. DOSE is read with the strict
+#      definition (declined and turn != chosen) on a new smoke, bar unchanged (>= 0.9 per game).
 # ==============================================================================
 
 import sys
@@ -122,6 +136,13 @@ def target_distance(cell: int, heading: int, safe: list[bool], is_target) -> int
     return 10 ** 6
 
 
+def branch_turn(q: torch.Tensor, chosen: int) -> int:
+    """The turn with the higher root Q among the turns other than the chosen action (section 4 amendment)."""
+    if chosen in TURNS:
+        return TURNS[1] if chosen == TURNS[0] else TURNS[0]
+    return TURNS[0] if q[TURNS[0]] >= q[TURNS[1]] else TURNS[1]
+
+
 def planner_for(rows: int, search_seed: int, agent_seed: int) -> PlanningAgent:
     return PlanningAgent(
         model, BeliefTreeSearch(model, cfg.mcts.num_simulations, cfg.mcts.c_puct, cfg.mcts.dirichlet_alpha,
@@ -154,9 +175,9 @@ class LabelledReplay:
         self.q.append(q)
         pit, wumpus, gold = m.pit.cpu().tolist(), m.wumpus.cpu().tolist(), m.gold.cpu().tolist()
         alive = m.wumpus_alive.tolist()
-        row = []
+        row, chosen_list = [], chosen.tolist()
         for b in range(GAMES):
-            turn = TURNS[0] if q[b, TURNS[0]] >= q[b, TURNS[1]] else TURNS[1]
+            turn = branch_turn(q[b], chosen_list[b])                                   # section 4 amendment
             row.append(self.label(b, turn, heuristic[b], pit[b], wumpus[b], gold[b], alive[b], int(m.cell[b]),
                                   int(m.heading[b])))
         self.labels.append(row)
@@ -228,8 +249,8 @@ def play_branches(episodes, states, q, points, k: int) -> dict:
             agent.reset(episodes.initial_observations[games.to(dev)])
             for t in range(t_b):
                 agent.update(acts[games, t].to(dev), obs[games, t].to(dev))
-            qb = q[t_b][games]
-            turn = torch.where(qb[:, TURNS[0]] >= qb[:, TURNS[1]], TURNS[0], TURNS[1]).to(dev)
+            turn = torch.tensor([branch_turn(q[t_b][g], int(acts[g, t_b])) for g in games.tolist()], dtype=torch.int64,
+                                device=dev)
             a_seq, o_seq, r_seq = [], [], []
             for j in range(steps):
                 action = turn if j == 0 else torch.full_like(turn, FWD) if j == 1 else agent.act()
