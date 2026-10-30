@@ -85,6 +85,13 @@
 #      seen): the branch turn is the higher-root-Q turn among the turns other than the chosen action (target_rule_
 #      smoke.py's x*), so every branch is a counterfactual the planner declined. DOSE is read with the strict
 #      definition (declined and turn != chosen) on a new smoke, bar unchanged (>= 0.9 per game).
+#    - Smoke 2 (amended rule; runs/wumpus/branch/smoke2_branch_seed0.{pt,log}): every branch turn differs from the
+#      chosen action; 13.21 branches per game; per game: declined 1.12 (strict), unvisited 5.21, risky 3.36, wall 5.53;
+#      branch deaths 16.9%. **DOSE PASS (1.12 >= 0.9; ~86% of cover's ~1.3).** Deaths by label: declined 0.2%,
+#      unvisited safe 0.2%, risky 66%: the deaths sit on the risky branches, as unfiltered data should.
+#    - Reporting bug found and fixed after smoke 2: branch_labels were saved in branch-point order (game, then time)
+#      but branch_rows / branch_outcomes in restore-group order (time); the per-label death rates above were computed
+#      after re-aligning them. The data, the masks and the dose totals were not affected (sums over the same set).
 # ==============================================================================
 
 import sys
@@ -295,7 +302,7 @@ for k in range(batches):
     self_check(episodes, states)
     points = branch_points(episodes, k)
     branches = play_branches(episodes, states, replay.q, points, k)
-    lab = [replay.labels[t][g] for g, t in points]
+    lab = [replay.labels[t][g] for _, g, t, *_ in branches["rows"]]          # row order of the saved branches
     labels_all += lab
     steps_live = int(torch.cat(branches["loss_mask"]).sum())
     env_steps += steps_live
