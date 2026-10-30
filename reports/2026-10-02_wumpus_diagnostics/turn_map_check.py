@@ -43,6 +43,21 @@
 #      a candidate method arm (retrain screen, objective_ab.py). FIT fails -> the latent's turn is not linear on the
 #      buffer, the check cannot speak (report R^2, drop). FIT passes, CLOSES fails -> the shift is not a turn-map
 #      failure: the mapped latent under-rates glitter too (the deficit is in z_root's state or in the head), drop.
+#
+# 4. Result 2026-10-30 (seeds 0-4, the networks of declined_states.pt reproduced on every seed; ~1 min per seed on
+#    CPU; log runs/wumpus/turn_map_check_summary.log). **Readout: FAIL (FIT 5 of 5, CLOSES 0 of 5).**
+#    | seed | R^2 left / right | glitter ratio z_turn -> z_map | TV median z_turn -> z_map |
+#    | 0    | .983 / .979      | .44 -> .43                    | .404 -> .405              |
+#    | 1    | .976 / .972      | .29 -> .29                    | .464 -> .479              |
+#    | 2    | .970 / .973      | .30 -> .26                    | .511 -> .520              |
+#    | 3    | .965 / .967      | .22 -> .25                    | .426 -> .392              |
+#    | 4    | .971 / .966      | .34 -> .31                    | .501 -> .409              |
+#    - The filter's turn IS close to a fixed affine map on the buffer (R^2 0.97-0.98), yet the head at the mapped
+#      latent under-rates glitter as much as at the filter's own turned latent (the two latents are ~1 unit apart,
+#      the ratios within 0.04). The deficit is not an off-support turn transition: the state "facing an unvisited
+#      cell at a declined state" is itself under-rated by the observation head, wherever the turn lands. An
+#      equivariance regulariser on the turn cannot fix it; dropped. Consistent with the data-coverage reading that
+#      restore-and-branch tests (branch_games.py).
 # ==============================================================================
 
 import json

@@ -1,0 +1,6 @@
+seed0: R^2 left 0.983 right 0.979; glitter ratio z_turn 0.44 -> z_map 0.43; TV median 0.404 -> 0.405; FIT True CLOSES False
+seed1: R^2 left 0.976 right 0.972; glitter ratio z_turn 0.29 -> z_map 0.29; TV median 0.464 -> 0.479; FIT True CLOSES False
+seed2: R^2 left 0.970 right 0.973; glitter ratio z_turn 0.30 -> z_map 0.26; TV median 0.511 -> 0.520; FIT True CLOSES False
+seed3: R^2 left 0.965 right 0.967; glitter ratio z_turn 0.22 -> z_map 0.25; TV median 0.426 -> 0.392; FIT True CLOSES False
+seed4: R^2 left 0.971 right 0.966; glitter ratio z_turn 0.34 -> z_map 0.31; TV median 0.501 -> 0.409; FIT True CLOSES False
+pass on 0 of 5 seeds; readout FAIL
