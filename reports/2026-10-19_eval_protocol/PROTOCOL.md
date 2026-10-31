@@ -45,6 +45,14 @@ Every Wumpus screen, threshold and design choice up to 2026-10-18 was read on tr
     - Interval above 0: **PASS**. `final_retrain` becomes the recipe's selection, and later headline numbers use it.
     - Interval contains 0: **UNDECIDED**. Extend to training seeds 10-14 (trained with `final_retrain`, both `best.pt` and `best_eval.pt` analysed), registered here before launch.
     - Interval below 0: **FAIL**. `best.pt` stays.
+- **C-e (leave-one-out ablation; registered 2026-10-31, before any ablation run on any held-out seed).** Each arm removes one design decision from the frozen recipe and is trained on the held-out training seeds 5-9 with the recipe's command otherwise unchanged, then analysed on analysis seed 20261019 (`--analysis-output analysis_heldout`, `best.pt`, as C-a). No arm was ever selected on these seeds: the recipe was chosen on development seeds, and the arms are fixed here.
+  - **Arms** (sweeps `abl_max`, `abl_noretrain`, `abl_jepa`; recipe overrides as in "Frozen choices" with one change each):
+    1. `abl_max`: `model.value_estimator=max` (the plain maximum backup instead of the double value).
+    2. `abl_noretrain`: without `training.retrain_every=50 training.retrain_updates=6400` (no whole-buffer retraining).
+    3. `abl_jepa`: `model.representation=jepa` (the JEPA filter instead of the decoder).
+  - **Quantity:** per arm, the per-game paired difference recipe minus arm (`runs/sweeps/wumpus_retrain_heldout/seed<k>/analysis_heldout/games.npz` against the arm's), hierarchical-bootstrap 95% interval over the 5 seeds, then games. Win, death and unfinished rates and the C-b probes of each arm beside it.
+  - **Decision rule, per arm:** interval above 0: the removed component **contributes**. Interval contains 0: **no detectable contribution** (reported as such). Interval below 0: the component **hurts**. Three arms are read; no correction is applied, and the paper states that three intervals were read.
+  - **Order and stopping:** arms run in the order 1, 2, 3 in one serial queue. An arm that has not finished all 5 seeds by the end of the week is reported with the seeds it has, labelled incomplete, and not given a verdict.
 - Later method claims (for example, a new objective against this recipe) must be added to this file **before** their held-out runs start. Each states its comparison, its interval and its decision rule.
 
 ## Confirmatory results (read once, 2026-10-20 22:20)
