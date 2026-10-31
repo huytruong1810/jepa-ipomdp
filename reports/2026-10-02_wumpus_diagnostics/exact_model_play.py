@@ -84,6 +84,25 @@
 #    every seed; unfinished 50-65%. The observation head carries ~75% of the model's cost in play (EP / EPR =
 #    157 / 208), the reward head (phantom death risk after imagined turns, q_localise_diag.py) the rest, as the
 #    offline depth-2 split said (56-85%).
+#
+# 5. Controlled coupling experiment (added 2026-10-31; pre-registered before any MIX play): is the gain from the
+#    double value conditional on the one-step model's accuracy (C6)? So far C6 rests on 3 development seeds and on
+#    two different latents (oracle vs own); here the model's accuracy is the only thing that varies.
+#    - Arms MIX<alpha> (0 < alpha < 1): the planner's one-step model is alpha * exact + (1 - alpha) * learned, for
+#      both P(o | b, a) and R(b, a), with the learned value and filter (EPR is alpha = 1, the stock planner alpha =
+#      0). Pruning applies to the mixed probabilities, so the search may branch on an observation the exact model
+#      rules out; the node below has an impossible history, the exact model is undefined there, and the mixture is
+#      the learned model at such nodes (documented semantics of the mixture, counted by nothing else).
+#    - --heldout plays the held-out analysis games (analysis seed 20261019) and writes into <run>/analysis_heldout/.
+#    - Networks (best.pt, as C-a): double = runs/sweeps/wumpus_retrain_heldout/seed<k> (the recipe); max =
+#      runs/sweeps/abl_max/seed<k> (PROTOCOL.md C-e arm 1, the recipe with the plain max backup); k = 5..9.
+#      alpha = 0 is each run's own analysis_heldout/games.npz (learned_planner.return); alpha = 0.5 and 1 are played
+#      here (MIX0.5, EPR), 512 games each. A learned replay on seed 5 of each sweep must reproduce report.json.
+#    - Quantity: g(alpha) = mean over games of (double - max) per seed; paired per game (same layouts).
+#    - PASS (C6 holds as a controlled effect): g(1) - g(0) > 0 on >= 4 of 5 seeds AND the 5-seed mean of g(1) - g(0)
+#      has a Student-t 95% interval above 0. FAIL: the double value's benefit does not depend on model accuracy
+#      (C6 is withdrawn from the paper as a claim; the oracle-latent evidence is reported as an observation).
+#      g(0.5) is descriptive (shape of the dependence). Deaths and unfinished rates per arm reported beside it.
 # ==============================================================================
 
 import json
@@ -104,13 +123,22 @@ from ipomdp.planning import BeliefTreeSearch
 from ipomdp.planning.search_model import Expansion
 from ipomdp.training import discounted_returns, play_episodes, stream_seed
 
-run_dir, arm = Path(sys.argv[1]), sys.argv[2]
+args = [a for a in sys.argv[1:] if a != "--heldout"]
+run_dir, arm = Path(args[0]), args[1]
 ARMS = {"EP": (True, False, False), "EPR": (True, True, False), "EPRt": (True, True, True)}  # exact P, R, terminal
+MIX = arm.startswith("MIX")                       # section 5: MIX<alpha> = alpha * exact + (1 - alpha) * learned P, R
+ALPHA = float(arm[3:]) if MIX else 1.0
+if MIX:
+    if not 0.0 < ALPHA < 1.0:
+        raise ValueError("MIX<alpha> needs 0 < alpha < 1 (alpha 0 is the learned planner, alpha 1 is EPR).")
+    ARMS[arm] = (True, True, False)
 if arm not in ("learned", "smoke", *ARMS) and not (arm.startswith("smoke:") and arm[6:] in ARMS):
     raise ValueError(f"unknown arm {arm}")
 dev = torch.device("cuda")
-settings = WumpusAnalysisSettings()
-n = int(sys.argv[3]) if len(sys.argv) > 3 else (32 if arm.startswith("smoke") else settings.episodes)
+# --heldout: the held-out analysis games of PROTOCOL.md (analysis seed 20261019, <run>/analysis_heldout/).
+settings = (WumpusAnalysisSettings(seed=20261019, output="analysis_heldout") if "--heldout" in sys.argv[1:]
+            else WumpusAnalysisSettings())
+n = int(args[2]) if len(args) > 2 else (32 if arm.startswith("smoke") else settings.episodes)
 trained = load_trained_run(run_dir, dev)
 world, run, cfg = trained.setup.domain, trained.run, trained.cfg
 model = run.eval_agent.model
@@ -127,8 +155,9 @@ class HybridSearchModel:
     """The learned search model with the exact one-step model (P, optionally R, terminal flags) swapped in (section 2)."""
 
     def __init__(self, learned, exact_p: bool, exact_r: bool, exact_terminal: bool, batch_size: int,
-                 check: bool = False):
+                 check: bool = False, alpha: float = 1.0):
         self.learned, self.exact_p, self.exact_r, self.check = learned, exact_p, exact_r, check
+        self.alpha = alpha                         # section 5: weight of the exact one-step model in the mixture
         self.exact_terminal = exact_terminal
         self.num_actions, self.num_observations, self.discount = NUM_A, NUM_O, learned.discount
         self.tracker, self.batch = WumpusBeliefTracker(world), batch_size
@@ -176,7 +205,7 @@ class HybridSearchModel:
                 raise RuntimeError("a lazy node's parent has no materialised mask.")
             _, obs, _ = world.step_rules(self._hypotheses(parents), self.action[lazy].unsqueeze(1))
             masks = self.bank[self.bank_row[parents]] & (obs == self.obs[lazy].unsqueeze(1))
-            if not bool(masks.any(1).all()):
+            if self.alpha == 1.0 and not bool(masks.any(1).all()):
                 raise RuntimeError("an expanded node has no consistent layout (an exact-zero branch was expanded).")
             rows = torch.arange(self.next_row, self.next_row + lazy.numel(), device=dev)
             if int(rows[-1]) >= self.bank.shape[0]:
@@ -215,6 +244,14 @@ class HybridSearchModel:
         parts = [self._exact(ids[i:i + CHUNK], child_ids[i:i + CHUNK]) for i in range(0, num, CHUNK)]
         rewards, probs, child_done = (torch.cat([p[k] for p in parts]) for k in range(3))
         values = torch.where(child_done & self.exact_terminal, 0.0, e.next_values.double())
+        if self.alpha < 1.0:
+            # Section 5: the mixture alpha * exact + (1 - alpha) * learned. A node reached through an observation the
+            # exact model gives probability 0 has no consistent layout (impossible history): the exact model is
+            # undefined there, so the mixture is the learned model at such nodes (rows with valid = False).
+            valid = torch.cat([p[3] for p in parts])
+            a = torch.where(valid, self.alpha, 0.0).double()
+            rewards = a[:, None] * rewards + (1 - a[:, None]) * e.rewards.double()
+            probs = a[:, None, None] * probs + (1 - a[:, None, None]) * e.observation_probs.double()
         return Expansion(rewards if self.exact_r else e.rewards, probs if self.exact_p else e.observation_probs,
                          next_states, values)
 
@@ -224,6 +261,8 @@ class HybridSearchModel:
         masks = self.bank[self._materialise(ids)]                                      # (g, L)
         hyp = self._hypotheses(ids)
         count = masks.sum(1).double()
+        valid = count > 0                          # False only on impossible histories of a MIX arm (section 5)
+        count = count.clamp(min=1.0)
         rewards = torch.zeros(g, NUM_A, dtype=torch.float64, device=dev)
         probs = torch.zeros(g, NUM_A, NUM_O, dtype=torch.float64, device=dev)
         child_done = torch.zeros(g, NUM_A, NUM_O, dtype=torch.bool, device=dev)
@@ -245,7 +284,7 @@ class HybridSearchModel:
         if self.check and not self.checked_this_decision:
             self._check(ids[0], rewards[0], probs[0])
             self.checked_this_decision = True
-        return rewards, probs, child_done
+        return rewards, probs, child_done, valid
 
     def _check(self, node: Tensor, rewards: Tensor, probs: Tensor) -> None:
         """Per-node reference (q_localise_diag.py's exact_outcomes) for the first expansion of a decision."""
@@ -324,20 +363,20 @@ if arm.startswith("smoke"):
     gain = report(exact_arm, epr, secs) - base
     print(f"  {exact_arm} paired gain {gain.mean():+.1f} +- {1.96 * gain.std() / np.sqrt(n):.1f} (smoke, {n} games)", flush=True)
 else:
-    search_model = model if arm == "learned" else HybridSearchModel(model, *ARMS[arm], n)
+    search_model = model if arm == "learned" else HybridSearchModel(model, *ARMS[arm], n, alpha=ALPHA)
     episodes, _, secs = play(search_model)
     returns = report(arm, episodes, secs)
     if n == settings.episodes:
         if arm == "learned":
-            reported = json.loads((run_dir / "analysis" / "report.json").read_text())["returns"]["learned_planner"]
+            reported = json.loads((run_dir / settings.output / "report.json").read_text())["returns"]["learned_planner"]
             if abs(reported["discounted_return"] - returns.mean()) > 1e-6:
                 raise RuntimeError(f"Replay is not faithful: {returns.mean()} vs {reported['discounted_return']}.")
             print("  replay reproduces report.json", flush=True)
         out = game_outcomes(episodes.rewards)
-        np.savez(run_dir / "analysis" / f"exact_play_{arm}.npz", returns=returns,
+        np.savez(run_dir / settings.output / f"exact_play_{arm}.npz", returns=returns,
                  rewards=episodes.rewards.cpu().numpy(), actions=episodes.actions.cpu().numpy(),
                  **{k: float(v) for k, v in out.items()})
-        base_file = run_dir / "analysis" / "exact_play_learned.npz"
+        base_file = run_dir / settings.output / "exact_play_learned.npz"
         if arm != "learned" and base_file.exists():
             base = np.load(base_file)
             d = returns - base["returns"]
