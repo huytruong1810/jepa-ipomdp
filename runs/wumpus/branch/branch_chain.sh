@@ -1,6 +1,6 @@
 #!/bin/bash
 # branch_games.py section 3 screen, seeds 0-2: arms branch and random vs the coverage control retrains.
-# One GPU job at a time; each step waits for >= 9 GB MemAvailable (another project shares the machine).
+# One GPU job at a time; each step waits on the week queue's gate (runs/week/queue.sh).
 cd /home/andyj1810/projects/jepa_ipomdp
 O=runs/wumpus/branch
 C=runs/wumpus/coverage
@@ -8,9 +8,9 @@ D=reports/2026-10-02_wumpus_diagnostics
 PY="nice -n 10 .venv/bin/python"
 export OMP_NUM_THREADS=2
 log() { echo "[$(date '+%F %T')] $*" >> $O/branch_chain.log; }
-memgate() { until [ "$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)" -ge 9000 ]; do sleep 120; done; }
+memgate() { gate; }  # shared gate of runs/week/queue.sh (PAUSE file, >= 8 GB MemAvailable, free GPU)
 log "commit $(git log -1 --format=%h)"
-for s in 0 1 2; do
+for s in ${SEEDS:-0 1 2}; do
   R=runs/sweeps/wumpus_retrain/seed$s
   for arm in branch random; do
     [ -f $O/games_${arm}_seed$s.pt ] || { memgate; $PY $D/branch_games.py $R $arm $O/games_${arm}_seed$s.pt > $O/games_${arm}_seed$s.log 2>&1; log "seed $s games $arm exit $?"; }

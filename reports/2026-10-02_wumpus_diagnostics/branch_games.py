@@ -92,6 +92,20 @@
 #    - Reporting bug found and fixed after smoke 2: branch_labels were saved in branch-point order (game, then time)
 #      but branch_rows / branch_outcomes in restore-group order (time); the per-label death rates above were computed
 #      after re-aligning them. The data, the masks and the dose totals were not affected (sums over the same set).
+#
+# 5. Pre-registered follow-up of the RANDOM arm (written 2026-10-31, before any seed-1 or seed-2 number exists; only
+#    seed 0 is known: random - control +78.1 +- 33.7 per game, branch - control -45.9 +- 32.4). Seed 0 alone is not
+#    a result; the random arm was registered as an attribution control, so a random-arm gain is a NEW hypothesis
+#    (broad restore coverage repairs the model where the agent's own data are thin; targeting the declined decisions
+#    adds risk-taking). Its test, fixed now:
+#    - R-PLAY (seeds 0-2, the registered plays): random - control >= +30 per game on >= 2 of 3 seeds. FAIL -> both arms
+#      enter the paper as one remedies row; restore-and-branch closes.
+#    - R-CONFIRM (only after R-PLAY passes): random and branch arms on seeds 3-4 by the same pipeline. PASS when the
+#      5-seed mean of random - control has a Student-t 95% interval above 0 AND random deaths <= control + 2 points on
+#      every seed. Seed 0 counts (it was observed before this registration; stated in the paper).
+#    - R-CONFIRM PASS -> an in-agent default-off option (agent.restore_branch: off / declined / random; Tiger
+#      fingerprint), development seeds 0-4 in-agent paired with the recipe's final-retrain plays, then a PROTOCOL.md
+#      claim registered before held-out training seeds 10-14.
 # ==============================================================================
 
 import sys
