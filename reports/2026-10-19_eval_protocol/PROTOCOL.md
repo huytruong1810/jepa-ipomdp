@@ -93,6 +93,22 @@ Source: `runs/wumpus/heldout_cd_readout.log`, from `selection_readout.py` on `ru
 
 - On held-out seeds the effect is far smaller than on development seeds (+60.4), and deaths do not fall. The registered next step is seeds 10-14, to be registered here before launch.
 
+## C-e results (each arm read once; `reports/2026-10-19_eval_protocol/ablation_readout.py`, logs `runs/week/readout_<arm>.log`)
+
+### Arm 1, `abl_max` (read 2026-11-01 13:50): NO DETECTABLE CONTRIBUTION
+
+| Training seed | Recipe | Max backup | Recipe - arm (per game, +- s.e.) |
+|---|---|---|---|
+| 5 | 246.5 | 120.9 | +125.6 +- 21.1 |
+| 6 | 229.8 | 137.6 | +92.1 +- 19.3 |
+| 7 | 204.6 | 203.6 | +1.0 +- 18.3 |
+| 8 | 132.7 | 123.1 | +9.6 +- 16.7 |
+| 9 | 164.6 | 225.3 | -60.7 +- 16.7 |
+
+- Hierarchical bootstrap: recipe - arm +33.5 [-25.5, +94.4] per game; recipe 195.6 [155.3, 234.8] (reproduces C-a), arm 162.1 [122.6, 205.1]. Deaths 2.0% vs 2.1%; unfinished 69.3% vs 72.6%.
+- Probes: the arm's latent matches the recipe's (linear, agent histories: cell 0.861 vs 0.861, heading 0.897 vs 0.877; random histories: cell 0.682 vs 0.699).
+- Reading: the double value helps on two seeds by ~+100, is neutral on two and hurts on one; over five held-out seeds its contribution is not detectable. The paper reports it as such.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 

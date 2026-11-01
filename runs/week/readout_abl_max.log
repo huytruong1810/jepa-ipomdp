@@ -1,0 +1,18 @@
+seed 5: recipe  246.5 (deaths 0.2%, unfinished 66.6%) | arm  120.9 (deaths 3.3%, unfinished 75.2%) | recipe - arm +125.6 +- 21.1
+seed 6: recipe  229.8 (deaths 3.1%, unfinished 64.3%) | arm  137.6 (deaths 2.7%, unfinished 72.9%) | recipe - arm  +92.1 +- 19.3
+seed 7: recipe  204.6 (deaths 1.8%, unfinished 68.8%) | arm  203.6 (deaths 0.8%, unfinished 70.9%) | recipe - arm   +1.0 +- 18.3
+seed 8: recipe  132.7 (deaths 2.1%, unfinished 75.8%) | arm  123.1 (deaths 2.5%, unfinished 75.4%) | recipe - arm   +9.6 +- 16.7
+seed 9: recipe  164.6 (deaths 2.9%, unfinished 71.3%) | arm  225.3 (deaths 1.0%, unfinished 68.6%) | recipe - arm  -60.7 +- 16.7
+
+hierarchical bootstrap over 5 seeds, then games:
+  difference           33.536 [ -25.523,   94.398]
+  recipe              195.639 [ 155.339,  234.797]
+  arm                 162.103 [ 122.618,  205.096]
+  recipe deaths         0.020 [   0.010,    0.031]
+  arm deaths            0.021 [   0.011,    0.031]
+  recipe unfinished     0.693 [   0.655,    0.734]
+  arm unfinished        0.726 [   0.696,    0.754]
+  probes (recipe): linear_agent.alive_accuracy 1.000, linear_agent.arrow_accuracy 1.000, linear_agent.cell_accuracy 0.861, linear_agent.heading_accuracy 0.877, linear_agent.rows 10350.000, linear_random.alive_accuracy 0.999, linear_random.arrow_accuracy 1.000, linear_random.cell_accuracy 0.699, linear_random.heading_accuracy 0.781, linear_random.rows 7336.000, mlp_agent.alive_accuracy 0.999, mlp_agent.arrow_accuracy 1.000, mlp_agent.cell_accuracy 0.882, mlp_agent.heading_accuracy 0.917, mlp_agent.rows 10350.000, mlp_random.alive_accuracy 0.999, mlp_random.arrow_accuracy 1.000, mlp_random.cell_accuracy 0.759, mlp_random.heading_accuracy 0.833, mlp_random.rows 7336.000
+  probes (arm): linear_agent.alive_accuracy 0.999, linear_agent.arrow_accuracy 1.000, linear_agent.cell_accuracy 0.861, linear_agent.heading_accuracy 0.897, linear_agent.rows 10711.800, linear_random.alive_accuracy 0.999, linear_random.arrow_accuracy 1.000, linear_random.cell_accuracy 0.682, linear_random.heading_accuracy 0.787, linear_random.rows 7336.000, mlp_agent.alive_accuracy 0.998, mlp_agent.arrow_accuracy 1.000, mlp_agent.cell_accuracy 0.884, mlp_agent.heading_accuracy 0.940, mlp_agent.rows 10711.800, mlp_random.alive_accuracy 1.000, mlp_random.arrow_accuracy 1.000, mlp_random.cell_accuracy 0.737, mlp_random.heading_accuracy 0.833, mlp_random.rows 7336.000
+
+C-e verdict for abl_max: NO DETECTABLE CONTRIBUTION
