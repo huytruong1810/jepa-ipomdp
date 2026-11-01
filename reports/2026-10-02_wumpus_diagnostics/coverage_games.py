@@ -187,8 +187,13 @@
 #      - Registered branch: untargeted trials cannot reach cover's dose; with the targeting smokes
 #        (target_rule_smoke.py, target_novelty_smoke.py) this closes non-privileged coverage of the declined
 #        decisions through collection rules that rely on the agent's own estimates or on untargeted trials.
+#
+# 8. BATCH_OFFSET (environment variable, default 0; 2026-10-31): batch k uses streams k + BATCH_OFFSET, so a second
+#    control file on fresh layouts (branch_games.py section 7, data-quantity control "more": BATCH_OFFSET=4, 7 batches)
+#    never repeats the games of games_control_seed<s>.pt (offset 0, batches 0-3). Offset 0 reproduces every earlier file.
 # ==============================================================================
 
+import os
 import sys
 import time
 from collections import deque
@@ -327,7 +332,8 @@ print(f"== {run_dir.name} best.pt (collection {trained.checkpoint_collection}), 
       + (f" (trial probability {OWN_EPS})" if arm == "own" else "") + f", {batches} x {GAMES} games",
       flush=True)
 parts, overrides, dose = [], 0, {}
-for k in range(batches):
+BATCH_OFFSET = int(os.environ.get("BATCH_OFFSET", "0"))  # header 8
+for k in range(BATCH_OFFSET, BATCH_OFFSET + batches):
     planner = PlanningAgent(
         model, BeliefTreeSearch(model, cfg.mcts.num_simulations, cfg.mcts.c_puct, cfg.mcts.dirichlet_alpha,
                                 dirichlet_epsilon=0.0, seed=stream_seed(COVERAGE_BASE, 100 + k),

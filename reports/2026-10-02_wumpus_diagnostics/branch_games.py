@@ -105,7 +105,41 @@
 #      every seed. Seed 0 counts (it was observed before this registration; stated in the paper).
 #    - R-CONFIRM PASS -> an in-agent default-off option (agent.restore_branch: off / declined / random; Tiger
 #      fingerprint), development seeds 0-4 in-agent paired with the recipe's final-retrain plays, then a PROTOCOL.md
-#      claim registered before held-out training seeds 10-14.
+#      claim registered before held-out training seeds 10-14. (Amended by section 7: the in-agent step also needs
+#      R-DATA.)
+#
+# 6. Result, seeds 0-2 (2026-10-31; runs/wumpus/branch: play_seed*.log, risk_seed*.log, compare_*.log; 512 analysis
+#    games per seed, paired; every best.pt replay reproduced). Glitter ratio = joint head / exact at the declined turned
+#    latents (c); predicted / exact risk at the chosen risky FORWARDs; deaths in % of games.
+#    | seed | control: return, deaths, glitter | branch: return (vs control), deaths, glitter, risk | random: return (vs control), deaths, glitter |
+#    | 0    | 255.9, 4.5, 0.45 | 210.0 (-45.9 +- 32.4), 2.9, 0.38, 0.45  | 334.1 (+78.1 +- 33.7), 0.0, 0.72 |
+#    | 1    |  64.7, 3.1, 0.39 |  86.0 (+21.4 +- 56.0), 20.3, 0.47, 0.02 | 266.5 (+201.8 +- 47.2), 4.3, 0.59 |
+#    | 2    | 218.9, 5.5, 0.33 | 145.7 (-73.3 +- 47.8), 0.0, 0.51, 0.05  | 271.8 (+52.9 +- 37.6), 4.3, 0.92 |
+#    - Section 3 (branch arm): MECHANISM FAIL (glitter +0.18 only on seed 2; -0.07 / +0.08 on seeds 0-1); RISK FAIL
+#      (predicted risk at chosen risky FORWARDs 2-45% of exact; seed 1 deaths +17.2 points); PLAY FAIL (0 of 3);
+#      ATTRIBUTION FAIL (random beats branch on glitter on 3 of 3: 0.72 / 0.59 / 0.92 vs 0.38 / 0.47 / 0.51). At full
+#      dose, branch data at the agent's own declined decisions do not repair the turned-latent model.
+#    - Section 5: R-PLAY PASS (random - control +78.1 / +201.8 / +52.9, 3 of 3; random deaths within control + 1.2
+#      points on every seed). Random also lifts the glitter ratio by >= 0.15 on 3 of 3 seeds (+0.27 / +0.20 / +0.59),
+#      the registered MECHANISM bar, which the targeted arm misses: broad restore coverage repairs the value-of-
+#      information error, and coverage targeted at the declined decisions does not. Seed 1's control is weak
+#      (64.7; -92 vs best.pt), so part of its +202 repairs the control. Versus the recipe's best.pt the random arm
+#      gains +97.4 / +109.7 / +38.7. R-CONFIRM (seeds 3-4) runs as week stage 15.
+#    - Correction: the seed-0 interim of 2026-10-30 had the glitter ratios of the two arms swapped (it read branch 0.72,
+#      random 0.38); feature_localise_{branch,random}_seed0.json give branch 0.38, random 0.72.
+#
+# 7. Pre-registered data-quantity control R-DATA (written 2026-10-31, after the seeds 0-2 readout, before any seed-3
+#    or seed-4 number exists). Every arm retrain adds ~130k live transitions (+24% over the base buffer and the 2048
+#    control games) that the control retrain does not have, so random - control confounds restore coverage with data
+#    quantity. Control arm "more": coverage_games.py control arm with BATCH_OFFSET=4 and 7 batches x 512 games (fresh
+#    layouts, streams k = 4..10; ~40 live steps per game, ~140k live transitions, slightly MORE than the arms), the
+#    same retrain (objective_ab.py, --extra-games games_control + games_more), seeds 0-4; played by retrain_play.py
+#    <run> more random branch (paired on the same analysis games). Week stage 17.
+#    - R-DATA PASS: the 5-seed mean of random - more has a Student-t 95% interval above 0. PASS -> the gain is restore
+#      coverage, not quantity; FAIL -> reported as "more own data explains the gain at the tested scale" and the
+#      in-agent step of section 5 is replaced by none (no restore option is built).
+#    - Descriptive: more - control (the value of extra own data), glitter ratio of more (feature_localise).
+#    - The in-agent step needs R-CONFIRM PASS and R-DATA PASS.
 # ==============================================================================
 
 import sys
