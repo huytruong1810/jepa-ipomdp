@@ -140,6 +140,21 @@
 #      in-agent step of section 5 is replaced by none (no restore option is built).
 #    - Descriptive: more - control (the value of extra own data), glitter ratio of more (feature_localise).
 #    - The in-agent step needs R-CONFIRM PASS and R-DATA PASS.
+#
+# 8. Result R-CONFIRM, seeds 0-4 (2026-11-01; play_seed{3,4}.log, risk_seed{3,4}.log, compare_*_5seeds.log):
+#    | seed | control: return, deaths, glitter | branch: return (vs control), deaths, glitter | random: return (vs control), deaths, glitter |
+#    | 3    | 159.6, 19.0, 0.44 | 207.7 (+48.0 +- 50.5), 8.0, 0.54   | 246.6 (+87.0 +- 47.9), 4.9, 0.66   |
+#    | 4    | 306.5, 2.7, 0.60  | 114.8 (-191.7 +- 49.3), 15.0, 0.58 |  86.4 (-220.1 +- 53.5), 18.2, 0.63 |
+#    - R-CONFIRM FAIL on both clauses: random - control over 5 seeds +39.9, Student-t 95% [-154.0, +233.9]; seed 4
+#      deaths +15.5 points (control's best seed collapses: 93 fatal FORWARDs, predicted risk at the chosen risky
+#      FORWARDs 15% of exact). Branch - control over 5 seeds -48.3 [-165.0, +68.4].
+#    - Glitter ratio (descriptive, 5 seeds): random lifts it by >= 0.15 on 4 of 5 seeds (+0.27 / +0.20 / +0.59 / +0.22 /
+#      +0.04), branch on 1 of 5. Broad restore data repair the value-of-information error more reliably than targeted
+#      data, but the repair does not carry into play reliably: on seed 4 the same data that leave glitter unchanged
+#      bring back the optimizer's curse (under-rated risks picked by argmax), as the coverage arms did.
+#    - Restore-and-branch CLOSES (section 5: no in-agent option). R-DATA (section 7) was cancelled before its first
+#      retrain finished: it could not change any decision once R-CONFIRM failed (stage file kept in
+#      runs/week/cancelled/). Paper: one remedies row (both arms, 5 seeds, the seed-0 pre-registration caveat).
 # ==============================================================================
 
 import sys
