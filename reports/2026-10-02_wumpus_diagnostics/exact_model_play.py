@@ -103,6 +103,26 @@
 #      has a Student-t 95% interval above 0. FAIL: the double value's benefit does not depend on model accuracy
 #      (C6 is withdrawn from the paper as a claim; the oracle-latent evidence is reported as an observation).
 #      g(0.5) is descriptive (shape of the dependence). Deaths and unfinished rates per arm reported beside it.
+#
+# 6. Result of section 5 (read 2026-11-01 22:30; logs runs/week/mix/, readout runs/week/readout_mix.log; both seed-5
+#    learned replays reproduce report.json). Return per game, held-out games, 512 per seed; g = double - max, paired:
+#    | seed | alpha = 0: double / max, g | alpha = 0.5: double / max, g | alpha = 1 (EPR): double / max, g |
+#    | 5    | 246.5 / 120.9, +125.6      | 366.7 / 237.7, +129.0        | 430.6 / 284.0, +146.6            |
+#    | 6    | 229.8 / 137.6,  +92.1      | 361.0 / 242.4, +118.5        | 433.0 /  64.5, +368.4            |
+#    | 7    | 204.6 / 203.6,   +1.0      | 251.3 / 327.8,  -76.5        | 340.8 / 372.5,  -31.7            |
+#    | 8    | 132.7 / 123.1,   +9.6      | 239.3 / 176.1,  +63.3        | 271.0 / 332.9,  -61.9            |
+#    | 9    | 164.6 / 225.3,  -60.7      | 203.2 / 311.0, -107.8        | 340.8 / 374.9,  -34.1            |
+#    - FAIL: g(1) - g(0) = +21.0 / +276.3 / -32.7 / -71.5 / +26.6, positive on 3 of 5; mean +43.9, Student-t 95%
+#      [-124.9, +212.8]. The 5-seed means: g(0) +33.5, g(0.5) +25.3, g(1) +77.5, all intervals containing 0; the mean
+#      rise is carried by seed 6, where the max-trained value idles under the exact model (unfinished 86.7%).
+#      C6 ("the double value helps only with an accurate model") is WITHDRAWN as a claim; the oracle-latent
+#      observation stays an observation.
+#    - Descriptive, held-out (not registered beforehand; exploratory, labelled so): the exact one-step model with the
+#      recipe's own value and filter beats the recipe's learned model on 5 of 5 held-out seeds: EPR - learned
+#      +184 / +203 / +136 / +138 / +176, mean +167.6, t95 [+131.1, +204.1], hierarchical bootstrap [+139.3, +195.4];
+#      deaths 0 on every seed, unfinished 69% -> 56%. Half-exact (MIX0.5) gives +88.7 [+52.4, +124.2]. This replicates
+#      the development localisation (Step B, +208 +- 48) on held-out training seeds and games. With the max-trained
+#      networks: EPR +123.7 [+21.8, +192.4] (seed 6 -73), MIX0.5 +96.9 [+69.6, +121.7].
 # ==============================================================================
 
 import json
