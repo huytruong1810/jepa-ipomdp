@@ -120,7 +120,7 @@
 #    - Descriptive, held-out (not registered beforehand; exploratory, labelled so): the exact one-step model with the
 #      recipe's own value and filter beats the recipe's learned model on 5 of 5 held-out seeds: EPR - learned
 #      +184 / +203 / +136 / +138 / +176, mean +167.6, t95 [+131.1, +204.1], hierarchical bootstrap [+139.3, +195.4];
-#      deaths 0 on every seed, unfinished 69% -> 56%. Half-exact (MIX0.5) gives +88.7 [+52.4, +124.2]. This replicates
+#      deaths 0 on every seed, unfinished 69% -> 55%. Half-exact (MIX0.5) gives +88.7 [+52.4, +124.2]. This replicates
 #      the development localisation (Step B, +208 +- 48) on held-out training seeds and games. With the max-trained
 #      networks: EPR +123.7 [+21.8, +192.4] (seed 6 -73), MIX0.5 +96.9 [+69.6, +121.7].
 # ==============================================================================
