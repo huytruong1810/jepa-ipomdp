@@ -109,6 +109,20 @@ Source: `runs/wumpus/heldout_cd_readout.log`, from `selection_readout.py` on `ru
 - Probes: the arm's latent matches the recipe's (linear, agent histories: cell 0.861 vs 0.861, heading 0.897 vs 0.877; random histories: cell 0.682 vs 0.699).
 - Reading: the double value helps on two seeds by ~+100, is neutral on two and hurts on one; over five held-out seeds its contribution is not detectable. The paper reports it as such.
 
+### Arm 2, `abl_noretrain` (read 2026-11-02 16:25): CONTRIBUTES
+
+| Training seed | Recipe | No whole-buffer retrain | Recipe - arm (per game, +- s.e.) |
+|---|---|---|---|
+| 5 | 246.5 | 117.9 | +128.6 +- 22.6 |
+| 6 | 229.8 | 211.2 | +18.6 +- 18.7 |
+| 7 | 204.6 | 172.2 | +32.4 +- 13.6 |
+| 8 | 132.7 | 136.4 | -3.7 +- 24.2 |
+| 9 | 164.6 | 140.3 | +24.3 +- 17.9 |
+
+- Hierarchical bootstrap: recipe - arm +40.0 [+2.6, +87.7] per game; arm 155.6 [123.9, 189.8]. Deaths 2.0% vs 2.8%; unfinished 69.3% vs 72.7%.
+- Probes (random histories, MLP / linear): cell 0.759 / 0.699 vs 0.574 / 0.542, heading 0.833 / 0.781 vs 0.574 / 0.538; on the agent's own histories the gap is small (linear cell 0.861 vs 0.851, heading 0.877 vs 0.835).
+- Reading: whole-buffer retraining contributes on held-out seeds, in return (positive on 4 of 5 seeds) and, most clearly, in the latent: about +18 points of cell and +25 points of heading accuracy on histories the agent did not choose.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 
