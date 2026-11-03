@@ -123,6 +123,20 @@ Source: `runs/wumpus/heldout_cd_readout.log`, from `selection_readout.py` on `ru
 - Probes (random histories, MLP / linear): cell 0.759 / 0.699 vs 0.574 / 0.542, heading 0.833 / 0.781 vs 0.574 / 0.538; on the agent's own histories the gap is small (linear cell 0.861 vs 0.851, heading 0.877 vs 0.835).
 - Reading: whole-buffer retraining contributes on held-out seeds, in return (positive on 4 of 5 seeds) and, most clearly, in the latent: about +18 points of cell and +25 points of heading accuracy on histories the agent did not choose.
 
+### Arm 3, `abl_jepa` (read 2026-11-03 13:40): NO DETECTABLE CONTRIBUTION
+
+| Training seed | Recipe | JEPA representation | Recipe - arm (per game, +- s.e.) |
+|---|---|---|---|
+| 5 | 246.5 | 68.1 | +178.5 +- 22.0 |
+| 6 | 229.8 | 198.1 | +31.7 +- 19.4 |
+| 7 | 204.6 | 148.5 | +56.1 +- 15.4 |
+| 8 | 132.7 | 105.2 | +27.5 +- 19.5 |
+| 9 | 164.6 | 192.5 | -27.9 +- 18.9 |
+
+- Hierarchical bootstrap: recipe - arm +53.2 [-1.0, +120.0] per game; arm 142.5 [95.1, 187.2]. Deaths 2.0% vs 1.9%; unfinished 69.3% vs 76.2%.
+- Probes (random histories, MLP / linear): cell 0.759 / 0.699 vs 0.595 / 0.564, heading 0.833 / 0.781 vs 0.641 / 0.616; on the agent's own histories the JEPA latent decodes slightly better (MLP cell 0.906 vs 0.882, heading 0.936 vs 0.917).
+- Reading: the decoder is better on 4 of 5 seeds, but the interval just includes 0, so by the registered rule the choice of the decoder over JEPA has no detectable contribution to return. The JEPA latent is more specialised to the agent's own histories and generalises worse to histories it did not choose (~16 / ~19 points lower cell / heading accuracy). Three intervals were read (arms 1-3), no correction.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 
