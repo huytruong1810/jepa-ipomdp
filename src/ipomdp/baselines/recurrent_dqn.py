@@ -66,6 +66,11 @@
 #      CHOSEN by the registered rule: the R2D2 defaults (lr 1e-4, n 5), since the best arm (n 10)
 #      lies within one standard error of them. lr 3e-4 destabilises the learner (final networks
 #      die), so the faster rate is not an untried lever. Fixed for the held-out runs.
+#    - Second screen (PROTOCOL.md C-f, 2026-11-03; same seeds, games and budget; runs/baselines/r2d2_f*):
+#        F1 batch 64:          70 / 93 /  78 -> 80.3 (final networks -40 / 93 / 125)
+#        F2 width 512:         58 / 46 /  72 -> 58.6
+#        F3 n 10 + batch 64:   62 / 73 /  74 -> 69.8 (final networks -62 / 73 / 100)
+#      NOT CHOSEN: the best arm (F1) is below the defaults' 87.2, so the defaults stay and no held-out run follows.
 # ==============================================================================
 
 from dataclasses import dataclass

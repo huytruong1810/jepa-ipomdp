@@ -144,6 +144,10 @@ Source: `runs/wumpus/heldout_cd_readout.log`, from `selection_readout.py` on `ru
 - Probes (random histories, MLP / linear): cell 0.759 / 0.699 vs 0.595 / 0.564, heading 0.833 / 0.781 vs 0.641 / 0.616; on the agent's own histories the JEPA latent decodes slightly better (MLP cell 0.906 vs 0.882, heading 0.936 vs 0.917).
 - Reading: the decoder is better on 4 of 5 seeds, but the interval just includes 0, so by the registered rule the choice of the decoder over JEPA has no detectable contribution to return. The JEPA latent is more specialised to the agent's own histories and generalises worse to histories it did not choose (~16 / ~19 points lower cell / heading accuracy). Three intervals were read (arms 1-3), no correction.
 
+## C-f result (read 2026-11-03 22:55): DEFAULTS KEPT
+
+Best-network return on the development games (training seeds 0 / 1 / 2, mean): defaults 65 / 70 / 126 (87.2); F1 batch 64 70 / 93 / 78 (80.3); F2 width 512 58 / 46 / 72 (58.6); F3 n 10 + batch 64 62 / 73 / 74 (69.8). The best arm is below the defaults, so none is chosen and C-f stops without a held-out run. The held-out model-free number stays C-c's 60.4 [36.4, 90.0]. Across the two screens, seven settings were tried and the R2D2 defaults remain the best on development.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 
