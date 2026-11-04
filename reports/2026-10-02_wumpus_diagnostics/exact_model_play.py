@@ -123,6 +123,12 @@
 #      deaths 0 on every seed, unfinished 69% -> 55%. Half-exact (MIX0.5) gives +88.7 [+52.4, +124.2]. This replicates
 #      the development localisation (Step B, +208 +- 48) on held-out training seeds and games. With the max-trained
 #      networks: EPR +123.7 [+21.8, +192.4] (seed 6 -73), MIX0.5 +96.9 [+69.6, +121.7].
+#
+# 7. Search budget (PROTOCOL.md C-g, added 2026-11-04): --sims=<N> plays with N simulations per decision instead of the
+#    run's cfg.mcts.num_simulations (default unchanged); outputs get the suffix _sims<N> and the learned replay check
+#    (report.json) applies only at the run's own count. Smoke 2026-11-04 (development seed 0, learned arm, 100
+#    simulations): 32 games 972 MiB peak, 128 games 2682 MiB (~18 MiB per game, so ~9.5 GB at 512 games; run only
+#    behind the week gate holding GPU_BUSY); EPR at 100 simulations ~29 MiB per game (~15 GB at 512: not run).
 # ==============================================================================
 
 import json
@@ -143,7 +149,10 @@ from ipomdp.planning import BeliefTreeSearch
 from ipomdp.planning.search_model import Expansion
 from ipomdp.training import discounted_returns, play_episodes, stream_seed
 
-args = [a for a in sys.argv[1:] if a != "--heldout"]
+# --sims=<N> (section 7): search simulations per decision instead of the run's cfg.mcts.num_simulations; output files
+# get the suffix _sims<N>, and the learned replay check applies only at the run's own count.
+SIMS_FLAG = [a for a in sys.argv[1:] if a.startswith("--sims=")]
+args = [a for a in sys.argv[1:] if a != "--heldout" and not a.startswith("--sims=")]
 run_dir, arm = Path(args[0]), args[1]
 ARMS = {"EP": (True, False, False), "EPR": (True, True, False), "EPRt": (True, True, True)}  # exact P, R, terminal
 MIX = arm.startswith("MIX")                       # section 5: MIX<alpha> = alpha * exact + (1 - alpha) * learned P, R
@@ -162,6 +171,8 @@ n = int(args[2]) if len(args) > 2 else (32 if arm.startswith("smoke") else setti
 trained = load_trained_run(run_dir, dev)
 world, run, cfg = trained.setup.domain, trained.run, trained.cfg
 model = run.eval_agent.model
+SIMS = int(SIMS_FLAG[0].split("=", 1)[1]) if SIMS_FLAG else cfg.mcts.num_simulations
+SUFFIX = "" if SIMS == cfg.mcts.num_simulations else f"_sims{SIMS}"
 if model.horizon is not None:
     raise ValueError("Time-aware runs carry steps-left in the state; this script reads plain latents only.")
 if cfg.mcts.observation_prune <= 0.0:
@@ -182,7 +193,7 @@ class HybridSearchModel:
         self.num_actions, self.num_observations, self.discount = NUM_A, NUM_O, learned.discount
         self.tracker, self.batch = WumpusBeliefTracker(world), batch_size
         self.layouts = torch.arange(NUM_L, device=dev)
-        bank_cap = batch_size * (cfg.mcts.num_simulations + 2)
+        bank_cap = batch_size * (SIMS + 2)
         cap = bank_cap * NUM_A * NUM_O + batch_size
         if cap >= 2 ** 24:
             raise ValueError("node ids would not be exact in float32.")
@@ -345,7 +356,7 @@ class Progress:
 
 def play(search_model):
     planner = PlanningAgent(
-        search_model, BeliefTreeSearch(search_model, cfg.mcts.num_simulations, cfg.mcts.c_puct,
+        search_model, BeliefTreeSearch(search_model, SIMS, cfg.mcts.c_puct,
                                        cfg.mcts.dirichlet_alpha, dirichlet_epsilon=0.0,
                                        seed=stream_seed(settings.seed, 2), observation_prune=cfg.mcts.observation_prune),
         n, temperature=0.0, seed=stream_seed(settings.seed, 3), device=dev)
@@ -369,7 +380,8 @@ def report(name: str, episodes, seconds: float) -> np.ndarray:
     return returns
 
 
-print(f"== {run_dir.name} best.pt (collection {trained.checkpoint_collection}), arm {arm}, {n} games", flush=True)
+print(f"== {run_dir.name} best.pt (collection {trained.checkpoint_collection}), arm {arm}, {n} games, {SIMS} simulations",
+      flush=True)
 if arm.startswith("smoke"):
     exact_arm = arm[6:] or "EPR"
     stock, stock_actions, secs = play(model)
@@ -387,16 +399,16 @@ else:
     episodes, _, secs = play(search_model)
     returns = report(arm, episodes, secs)
     if n == settings.episodes:
-        if arm == "learned":
+        if arm == "learned" and not SUFFIX:
             reported = json.loads((run_dir / settings.output / "report.json").read_text())["returns"]["learned_planner"]
             if abs(reported["discounted_return"] - returns.mean()) > 1e-6:
                 raise RuntimeError(f"Replay is not faithful: {returns.mean()} vs {reported['discounted_return']}.")
             print("  replay reproduces report.json", flush=True)
         out = game_outcomes(episodes.rewards)
-        np.savez(run_dir / settings.output / f"exact_play_{arm}.npz", returns=returns,
+        np.savez(run_dir / settings.output / f"exact_play_{arm}{SUFFIX}.npz", returns=returns,
                  rewards=episodes.rewards.cpu().numpy(), actions=episodes.actions.cpu().numpy(),
                  **{k: float(v) for k, v in out.items()})
-        base_file = run_dir / settings.output / "exact_play_learned.npz"
+        base_file = run_dir / settings.output / f"exact_play_learned{SUFFIX}.npz"
         if arm != "learned" and base_file.exists():
             base = np.load(base_file)
             d = returns - base["returns"]
