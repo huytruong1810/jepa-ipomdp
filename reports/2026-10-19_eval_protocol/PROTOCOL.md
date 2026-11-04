@@ -152,6 +152,20 @@ Source: `runs/wumpus/heldout_cd_readout.log`, from `selection_readout.py` on `ru
 
 Best-network return on the development games (training seeds 0 / 1 / 2, mean): defaults 65 / 70 / 126 (87.2); F1 batch 64 70 / 93 / 78 (80.3); F2 width 512 58 / 46 / 72 (58.6); F3 n 10 + batch 64 62 / 73 / 74 (69.8). The best arm is below the defaults, so none is chosen and C-f stops without a held-out run. The held-out model-free number stays C-c's 60.4 [36.4, 90.0]. Across the two screens, seven settings were tried and the R2D2 defaults remain the best on development.
 
+## C-g result (read 2026-11-04 08:50; `reports/2026-10-19_eval_protocol/search_budget_readout.py`, log `runs/week/readout_search_budget.log`): SEARCH IS NOT THE LEVER (as predicted)
+
+| Training seed | N = 10 | N = 50 (C-a) | N = 100 | deaths N50 -> N100 | unfinished N50 -> N100 |
+|---|---|---|---|---|---|
+| 5 | 227.5 | 246.5 | 235.0 | 0.2 -> 0.6% | 66.6 -> 67.6% |
+| 6 | 206.5 | 229.8 | 203.3 | 3.1 -> 5.7% | 64.3 -> 62.3% |
+| 7 | 200.0 | 204.6 | 198.8 | 1.8 -> 4.5% | 68.8 -> 63.9% |
+| 8 | 122.0 | 132.7 | 138.0 | 2.1 -> 2.9% | 75.8 -> 74.2% |
+| 9 | 110.1 | 164.6 | 162.6 | 2.9 -> 3.7% | 71.3 -> 70.5% |
+
+- Hierarchical bootstrap: N100 - N50 -8.1 [-23.2, +6.2] per game (upper end below the +84 bar); N10 - N50 -22.4 [-43.2, -3.4]; N10 173.2, N100 187.5.
+- Descriptive, not registered: at 100 simulations the deaths rise on 5 of 5 seeds (mean 2.0% -> 3.5%) while wins rise and unfinished games fall slightly. Deeper search over the learned model finds more of the steps whose risk the model under-rates, which matches the optimizer's-curse reading of the remedies.
+- Reading: the planner's budget is not what limits it. Doubling the search does not recover any of the +168 that the exact one-step model gives at 50 simulations.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 
