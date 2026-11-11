@@ -102,9 +102,21 @@
 #      > delta, so the sum is never 0. Rewards, successor states and values are unchanged, as in the tree (an
 #      observation-conditioned reward keeps its unpruned expectation, exactly as the tree's edge reward does).
 #    - Used only for the trainer's targets; the planners prune in the tree. delta = 0 is never wrapped.
+#
+# 10. History-Token States (TokenSearchModel; model.filter=transformer, 2026-11-11; models/history_filter.py):
+#    - A history filter has no step(z, a, o): its state is the history. A state is an int64 vector
+#      [length, a_-1, o_0, a_0, o_1, ...] of 1 + 2 L_max entries (pairs = the filter's tokens; unused pairs are 0).
+#      update appends one pair; L_max = the filter's max_len, and a history that would exceed it raises.
+#    - expand(states), in chunks of `chunk` parents: encode the parents once (trimmed to the chunk's longest history),
+#      read reward and P(o | h, a) from the parents' hidden states, then append the |A| |O| one-token children against
+#      the parents' keys and values (read-only) and read their values. next_states are the parents' histories with the
+#      pair appended; next_latents (Expansion) carries the children's hidden states, which the trainer's double-value
+#      target reads instead of next_states.
+#    - Not combined with a finite horizon or an observation-conditioned reward (raises). The tree search, the planning
+#      agent and every wrapper (sections 6, 7, 9) work unchanged: they only pass states through.
 # ==============================================================================
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 import torch
@@ -126,6 +138,7 @@ class Expansion:
     next_states: Tensor
     next_values: Tensor
     branch_rewards: Tensor | None = None      # (N, A, O) r(s, a, o') of an observation-conditioned reward (section 8)
+    next_latents: Tensor | None = None        # (N, A, O, D) the children's latents when states are not latents (section 10)
 
 
 class SearchModel(Protocol):
@@ -333,7 +346,7 @@ class RiskMarginModel:
         probs[:, a, fatal] = inflated
         p_r = ((rewards[:, a] - self.spec.step_cost) / self.spec.fatal_reward).clamp(0.0, 1.0)
         rewards[:, a] = rewards[:, a] + self.spec.fatal_reward * ((k * p_r).clamp(max=1.0) - p_r)
-        return Expansion(rewards, probs, e.next_states, e.next_values, e.branch_rewards)
+        return replace(e, rewards=rewards, observation_probs=probs)
 
 
 class PrunedModel:
@@ -356,7 +369,7 @@ class PrunedModel:
         e = self.inner.expand(states)
         kept = e.observation_probs * (e.observation_probs >= self.threshold)
         probs = kept / kept.sum(-1, keepdim=True)
-        return Expansion(e.rewards, probs, e.next_states, e.next_values, e.branch_rewards)
+        return replace(e, observation_probs=probs)
 
 
 class AbsorbingValueModel:
@@ -379,4 +392,87 @@ class AbsorbingValueModel:
         e = self.inner.expand(states)
         values = e.next_values.clone()
         values[:, :, self.absorbing_observation] = 0.0
-        return Expansion(e.rewards, e.observation_probs, e.next_states, values, e.branch_rewards)
+        return replace(e, next_values=values)
+
+
+class TokenSearchModel:
+    """History-token states over a CausalTransformerFilter (section 10)."""
+
+    def __init__(self, history_filter, reward_head: RewardHead, observation_head, value_head: ValueHead | ValuePair,
+                 codec: TwoHotSymlog, num_actions: int, num_observations: int, discount: float, chunk: int = 256):
+        if isinstance(reward_head, ObservationRewardHead) or isinstance(value_head, HorizonValueHead):
+            raise ValueError("history-token states are not combined with an observation-conditioned reward or a horizon "
+                             "(section 10).")
+        self.belief_filter, self.reward_head, self.observation_head, self.value_head = (history_filter, reward_head,
+                                                                                         observation_head, value_head)
+        self.codec, self.num_actions, self.num_observations, self.discount = codec, num_actions, num_observations, discount
+        self.max_len, self.chunk = history_filter.max_len, chunk
+        self.horizon = None
+
+    def _parse(self, states: Tensor) -> tuple[Tensor, Tensor]:
+        """states (N, 1 + 2 L_max) -> lengths (N,), tokens (N, L, 2) trimmed to the longest history."""
+        lengths = states[:, 0]
+        longest = int(lengths.max())
+        return lengths, states[:, 1:1 + 2 * longest].view(-1, longest, 2)
+
+    def latents(self, states: Tensor) -> Tensor:
+        """The filter's hidden state at the end of each history, (N, D)."""
+        out = []
+        for i in range(0, states.shape[0], self.chunk):
+            lengths, tokens = self._parse(states[i:i + self.chunk])
+            out.append(self.belief_filter.encode(tokens, lengths)[0].float())
+        return torch.cat(out)
+
+    def values(self, states: Tensor) -> Tensor:
+        return self.value_head.value(self.latents(states), self.codec)
+
+    @torch.no_grad()
+    def initial_states(self, batch_size: int, initial_observations: Tensor | None) -> Tensor:
+        device = next(self.belief_filter.parameters()).device
+        states = torch.zeros(batch_size, 1 + 2 * self.max_len, dtype=torch.long, device=device)
+        states[:, 0] = 1
+        states[:, 1] = self.belief_filter.null_action
+        states[:, 2] = (self.belief_filter.null_observation if initial_observations is None else initial_observations)
+        return states
+
+    @torch.no_grad()
+    def update(self, states: Tensor, actions: Tensor, observations: Tensor) -> Tensor:
+        lengths = states[:, 0]
+        if bool((lengths >= self.max_len).any()):
+            raise RuntimeError(f"history longer than the filter's max_len {self.max_len} (section 10).")
+        out = states.clone()
+        rows = torch.arange(states.shape[0], device=states.device)
+        out[rows, 1 + 2 * lengths] = actions
+        out[rows, 2 + 2 * lengths] = observations
+        out[:, 0] = lengths + 1
+        return out
+
+    @torch.no_grad()
+    def expand(self, states: Tensor) -> Expansion:
+        parts = [self._expand(states[i:i + self.chunk]) for i in range(0, states.shape[0], self.chunk)]
+        return Expansion(*(torch.cat([getattr(p, f) for p in parts]) for f in ("rewards", "observation_probs", "next_states",
+                                                                                 "next_values")),
+                         next_latents=torch.cat([p.next_latents for p in parts]))
+
+    def _expand(self, states: Tensor) -> Expansion:
+        n, num_a, num_o = states.shape[0], self.num_actions, self.num_observations
+        lengths, tokens = self._parse(states)
+        if bool((lengths >= self.max_len).any()):
+            raise RuntimeError(f"a child would exceed the filter's max_len {self.max_len} (section 10).")
+        h, keys, values = self.belief_filter.encode(tokens, lengths)
+        h = h.float()
+        eye_a = torch.eye(num_a, device=states.device)
+        parents, actions = h.repeat_interleave(num_a, dim=0), eye_a.repeat(n, 1)
+        observation_probs = F.softmax(self.observation_head(parents, actions).float(), dim=-1).view(n, num_a, num_o)
+        rewards = self.codec.mean(self.reward_head(parents, actions)).view(n, num_a)
+        child_a = torch.arange(num_a, device=states.device).repeat_interleave(num_o).expand(n, -1)
+        child_o = torch.arange(num_o, device=states.device).repeat(num_a).expand(n, -1)
+        child_h = self.belief_filter.append(keys, values, lengths, child_a, child_o).float()       # (N, A*O, D)
+        next_values = self.value_head.value(child_h.flatten(0, 1), self.codec).view(n, num_a, num_o)
+        next_states = states[:, None].expand(-1, num_a * num_o, -1).clone()
+        pos = (1 + 2 * lengths)[:, None].expand(-1, num_a * num_o)
+        next_states.scatter_(2, pos[..., None], child_a[..., None])
+        next_states.scatter_(2, (pos + 1)[..., None], child_o[..., None])
+        next_states[:, :, 0] = (lengths + 1)[:, None]
+        return Expansion(rewards, observation_probs, next_states.view(n, num_a, num_o, -1), next_values,
+                         next_latents=child_h.view(n, num_a, num_o, -1))

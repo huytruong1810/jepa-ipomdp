@@ -1,7 +1,7 @@
 """Belief-tree search over exact or learned models."""
 
 from .mcts import BeliefTreeSearch, DecisionNode, Edge, MinMaxStats, SearchStatistics
-from .search_model import AbsorbingValueModel, ExactSearchModel, Expansion, LearnedSearchModel, PrunedModel, RiskMarginModel, RiskSpec, SearchModel
+from .search_model import AbsorbingValueModel, ExactSearchModel, Expansion, LearnedSearchModel, PrunedModel, RiskMarginModel, TokenSearchModel, RiskSpec, SearchModel
 
 __all__ = [
     "AbsorbingValueModel",
@@ -16,5 +16,6 @@ __all__ = [
     "RiskMarginModel",
     "RiskSpec",
     "SearchModel",
+    "TokenSearchModel",
     "SearchStatistics",
 ]
