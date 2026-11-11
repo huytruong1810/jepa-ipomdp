@@ -126,9 +126,15 @@
 #      value above anything a game can pay (maximisation bias). On frozen Wumpus latents the plain max
 #      diverges, and both pair targets remove most impossible values and stop much of the idling
 #      (reports/2026-10-02_wumpus_diagnostics/fvi_screen.py, section 4).
-#    - Each row trains ONE head: rows of even-indexed episodes in the batch train A, odd ones B, so the
-#      two heads see independent samples at every step (double Q-learning updates one estimator per
-#      sample). Both are computed on every row and selected, so the loss has the scale of one head.
+#    - Each row trains ONE head. Both are computed on every row and selected, so the loss has the scale of one head.
+#      double_partition=batch (the default): rows of even POSITIONS in the batch train A, odd ones B. The buffer
+#      samples with replacement, so across updates every stored episode trains both heads: the two estimates are
+#      NOT independent (the 2026-11-09 audit, F2, measured corr(V_A, V_B) = 0.9996-0.9999 on the recipe's final
+#      networks), and the double target removes little bias.
+#      double_partition=slot (2026-11-10): episodes in even buffer SLOTS (EpisodeBatch.index) train A, odd slots B,
+#      so each stored episode trains one head for as long as it stays in the buffer, as double Q-learning assumes.
+#      A batch can then hold more rows of one head than the other; the loss stays a mean over rows. Needs buffer
+#      batches (raises without an index) and a value pair (raises otherwise).
 #    - The targets come from the same LearnedSearchModel.expand; its next_values are the pair's
 #      combined value, which is exactly the clipped target's child value. The double target reads
 #      each head on the children again (one extra pass of the two target heads).
@@ -324,6 +330,13 @@ def _masked_mean(values: Tensor, weights: Tensor) -> Tensor:
 DECISION_AWARE_SUPPORT = 1e-3     # section 2h: branches with less model mass do not set the span
 
 
+class DoublePartition(StrEnum):
+    """How a ValuePair's rows are split between heads A and B (section 3e)."""
+
+    BATCH = "batch"     # by position in the batch (default)
+    SLOT = "slot"       # by the episode's buffer slot (EpisodeBatch.index)
+
+
 class Representation(StrEnum):
     """What shapes the belief filter besides reward grounding (sections 2 and 2b)."""
 
@@ -371,6 +384,7 @@ class WorldModelTrainer:
         q_equivalent_weight: float = 0.0,
         target_bound: float | None = None,
         target_prune: float = 0.0,
+        double_partition: DoublePartition | None = None,
     ):
         """
         Args:
@@ -392,6 +406,7 @@ class WorldModelTrainer:
             q_equivalent_weight: w of the Q-equivalent observation term (section 2i; scale value_equivalent_scale); 0 = off.
             target_bound: B of the projection of the value targets onto [-B, B] (section 3g), or None.
             target_prune: delta of the planner-consistent pruning of the targets' observation branches (section 3h); 0 = off.
+            double_partition: How a ValuePair's rows are split between its heads (section 3e); None = BATCH.
         """
         if nstep < 0 or not 0.0 <= nstep_mix <= 1.0 or (nstep > 0 and nstep_mix == 0.0):
             raise ValueError(f"need nstep >= 0 and nstep_mix in (0, 1] when nstep > 0; got {nstep}, {nstep_mix}.")
@@ -421,6 +436,9 @@ class WorldModelTrainer:
         if target_bound is not None and target_bound != codec.max_abs_value:
             raise ValueError(f"target_bound {target_bound} must equal the codec range {codec.max_abs_value} (section 3g).")
         self.target_bound = target_bound
+        self.double_partition = DoublePartition.BATCH if double_partition is None else double_partition
+        if self.double_partition is DoublePartition.SLOT and not isinstance(value_head, ValuePair):
+            raise ValueError("double_partition=slot needs a value pair (model.value_estimator double; section 3e).")
         if q_equivalent_weight < 0.0:
             raise ValueError(f"need q_equivalent_weight >= 0, got {q_equivalent_weight} (section 2i).")
         if q_equivalent_weight > 0.0 and (not isinstance(reward_head, ObservationRewardHead) or jepa is not None
@@ -605,7 +623,7 @@ class WorldModelTrainer:
 
             all_latents = latents.reshape(batch * (steps + 1), -1)
             if isinstance(self.value_head, ValuePair):                                    # section 3e
-                head_a = (torch.arange(batch, device=self.device) % 2 == 0).repeat_interleave(steps + 1)
+                head_a = self._head_a_rows(episodes, batch).repeat_interleave(steps + 1)       # section 3e
                 target_a, target_b, child_values, branch_rewards = self._pair_value_targets_and_children(all_latents.detach())
                 targets_value = torch.where(head_a, target_a, target_b)
                 value_logits = torch.where(head_a.unsqueeze(-1), self.value_head.a(all_latents.detach()),
@@ -705,6 +723,14 @@ class WorldModelTrainer:
             "value_target_mean": targets_value.mean().item(),
             "value_abs_error": value_error.item(),
         }
+
+    def _head_a_rows(self, episodes: EpisodeBatch, batch: int) -> Tensor:
+        """(B,) bool: the episodes whose rows train head A of a ValuePair (section 3e)."""
+        if self.double_partition is DoublePartition.BATCH:
+            return torch.arange(batch, device=self.device) % 2 == 0
+        if episodes.index is None:
+            raise ValueError("double_partition=slot needs buffer batches (EpisodeBatch.index; section 3e).")
+        return episodes.index.to(self.device) % 2 == 0
 
     def _data_branches(self, child_values: Tensor, episodes: EpisodeBatch) -> Tensor:
         """The child values V-bar(tau(z_t, a_t, o)) (or branch rewards) of the data action a_t, (B*T, O) float32 (2f, 2h, 2i)."""

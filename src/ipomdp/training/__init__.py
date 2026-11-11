@@ -7,13 +7,14 @@ from .privileged import PrivilegedBeliefLoss, PrivilegedSpec, PrivilegedTargets
 from .rollout import Agent, Simulator, discounted_returns, play_episodes
 from .run import CodecBound, Domain, DomainSetup, RunConfig, TrainingRun
 from .seeding import RunStream, stream_seed
-from .trainer import Representation, TrainerConfig, WorldModelTrainer
+from .trainer import DoublePartition, Representation, TrainerConfig, WorldModelTrainer
 
 __all__ = [
     "CodecBound",
     "Agent",
     "CheckpointSelection",
     "Domain",
+    "DoublePartition",
     "DomainSetup",
     "Simulator",
     "EpisodeBatch",

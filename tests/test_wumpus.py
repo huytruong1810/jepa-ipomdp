@@ -203,7 +203,7 @@ class TestLearningStack:
     @staticmethod
     def _config(**overrides):
         from ipomdp.models import ValueEstimator
-        from ipomdp.training import CodecBound, Representation, RunConfig, TrainerConfig
+        from ipomdp.training import CodecBound, DoublePartition, Representation, RunConfig, TrainerConfig
         values = dict(
             seed=3, episode_length=12, env_batch_size=4, warmup_episodes=4, buffer_capacity=32, batch_size=4,
             updates_per_collection=2, eval_episodes=4, latent_dim=16, hidden_dim=32, num_blocks=1,
@@ -215,7 +215,8 @@ class TestLearningStack:
             detached_planning_head=False, privileged_belief_loss=False, value_estimator=ValueEstimator.MAX,
             retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0, absorbing_value=False,
             decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0,
-            codec_bound=CodecBound.DISCOUNTED, target_prune=False)
+            codec_bound=CodecBound.DISCOUNTED, target_prune=False,
+            double_partition=DoublePartition.BATCH)
         values.update(overrides)
         return RunConfig(**values)
 
@@ -280,6 +281,36 @@ class TestLearningStack:
         first = TrainingRun(setup, config(), CPU)
         for p in first.reward_head.parameters():
             p.data.add_(0.5 * torch.randn_like(p, generator=torch.Generator().manual_seed(1)))
+        first.collect_and_train()
+        save_checkpoint(tmp_path / "latest.pt", first.state_dict())
+        resumed = TrainingRun(setup, config(seed=99), CPU)
+        resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
+        continued = [resumed.collect_and_train() for _ in range(2)] + [resumed.evaluate()]
+        assert repr(continued) == repr(expected[1:])
+
+    def test_slot_partition_assigns_each_stored_episode_to_one_head(self, tmp_path):
+        # trainer.py, section 3e; run.py, section 13: head A trains on even buffer slots, B on odd ones; a batch
+        # without slots, or slot without a value pair, raises; resume stays bit-exact.
+        from ipomdp.experiments import wumpus_setup
+        from ipomdp.models import ValueEstimator
+        from ipomdp.training import DoublePartition, Representation, TrainingRun, load_checkpoint, save_checkpoint
+        setup = wumpus_setup(CPU, DISCOUNT)
+        config = lambda **kw: self._config(representation=Representation.DECODER, value_estimator=ValueEstimator.DOUBLE,  # noqa: E731
+                                           double_partition=DoublePartition.SLOT, **kw)
+        with pytest.raises(ValueError, match="section 3e"):
+            TrainingRun(setup, self._config(double_partition=DoublePartition.SLOT), CPU)
+        reference = TrainingRun(setup, config(), CPU)
+        expected = [reference.collect_and_train() for _ in range(3)] + [reference.evaluate()]
+        batch = reference.buffer.sample(8)
+        rows = reference.trainer._head_a_rows(batch, 8)
+        assert torch.equal(rows, batch.index % 2 == 0)
+        batch_rows = TrainingRun(setup, self._config(representation=Representation.DECODER,
+                                                     value_estimator=ValueEstimator.DOUBLE), CPU).trainer._head_a_rows(batch, 8)
+        assert torch.equal(batch_rows, torch.arange(8) % 2 == 0)
+        from dataclasses import replace
+        with pytest.raises(ValueError, match="section 3e"):
+            reference.trainer.train_step(replace(batch, index=None))
+        first = TrainingRun(setup, config(), CPU)
         first.collect_and_train()
         save_checkpoint(tmp_path / "latest.pt", first.state_dict())
         resumed = TrainingRun(setup, config(seed=99), CPU)

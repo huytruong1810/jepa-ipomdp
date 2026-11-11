@@ -164,6 +164,9 @@
 #      Idle V-hat falls (no-op GRAB 431-635 against 626-660) but stays flat. Fails, as the frozen-latent
 #      screen predicted: without an accurate latent the corrected value exploits the model's errors.
 #      Kept as an option; useful only with a better representation.
+#    - cfg.double_partition (2026-11-10; trainer.py 3e; audit F2): batch (default) splits the pair's rows by batch
+#      position, so every stored episode trains both heads over training (measured corr(V_A, V_B) >= 0.9996); slot
+#      assigns each stored episode to one head by its buffer slot. slot needs a value pair (raises otherwise).
 #
 # 14. Whole-Buffer Retrain (2026-10-16; reports/2026-10-02_wumpus_diagnostics/objective_ab.py 2e-2g and
 #     retrain_play.py):
@@ -371,7 +374,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from enum import Enum
+from enum import StrEnum
 from typing import Protocol
 
 import numpy as np
@@ -385,7 +388,7 @@ from .episode_buffer import EpisodeBatch, EpisodeBuffer
 from .privileged import PrivilegedBeliefLoss, PrivilegedSpec
 from .rollout import Simulator, discounted_returns, play_episodes
 from .seeding import RunStream, stream_seed
-from .trainer import Representation, TrainerConfig, WorldModelTrainer
+from .trainer import DoublePartition, Representation, TrainerConfig, WorldModelTrainer
 
 
 
@@ -435,7 +438,7 @@ class DomainSetup:
     absorbing_observation: int | None = None
 
 
-class CodecBound(str, Enum):
+class CodecBound(StrEnum):
     """Range of the two-hot reward/value bins (section 22)."""
     DISCOUNTED = "discounted"     # +- max|r| / (1 - gamma) (Domain.value_bound; canonical Tiger)
     ABSORBING = "absorbing"       # +- Domain.absorbing_return_bound, value targets projected onto it
@@ -492,6 +495,7 @@ class RunConfig:
     q_equivalent_weight: float        # Q-equivalent observation term (section 21); 0 = off, needs observation_reward
     codec_bound: CodecBound           # two-hot range: discounted (default) | absorbing return bound (section 22)
     target_prune: bool                # value targets pruned like the planner, at observation_prune (section 23)
+    double_partition: DoublePartition # value pair split by batch position (default) | buffer slot (section 13)
 
 
 class TrainingRun:
@@ -574,7 +578,8 @@ class TrainingRun:
                                          setup.absorbing_observation if cfg.absorbing_value else None,      # section 19
                                          cfg.decision_aware_weight, cfg.q_equivalent_weight,                # sections 20, 21
                                          codec_bound if cfg.codec_bound is CodecBound.ABSORBING else None,  # section 22
-                                         self._target_prune(cfg))                                            # section 23
+                                         self._target_prune(cfg),                                            # section 23
+                                         cfg.double_partition)                                               # section 13
 
         # Polyak-averaged copies the agent acts with (section 4).
         self.acting_filter = frozen_copy(self.belief_filter)
