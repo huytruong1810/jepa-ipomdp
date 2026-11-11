@@ -6,7 +6,9 @@
 #   and retried only after its marker file runs/week/failed/<stage> is deleted by hand (fail loudly, no auto-retry).
 # - Before every stage (and inside long stages, via gate()) the queue waits until: no runs/week/PAUSE file (another
 #   project's agent may request a large-RAM window), MemAvailable >= 8000 MB (WSL has 16 GB total; ipomcp and the
-#   Blender agents share it), and GPU memory in use < 4000 MiB (no foreign GPU job).
+#   Blender agents share it), GPU memory in use < 4000 MiB (no foreign GPU job), and no ipomcp quiet-machine rerun job
+#   running (a python process with "final_20261108/" in its arguments other than the always-on machine_log.py; that
+#   campaign needs an otherwise idle machine).
 # - Detached with setsid nohup so a reaped Claude Code shell cannot kill it; each stage is resumable.
 cd /home/andyj1810/projects/jepa_ipomdp
 W=runs/week
@@ -19,8 +21,10 @@ gate() {
     local mem gpu
     mem=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
     gpu=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | head -1)
-    if [ ! -e $W/PAUSE ] && [ "$mem" -ge 8000 ] && [ "$gpu" -lt 4000 ]; then return 0; fi
-    [ $said = 0 ] && { log "gate waiting (PAUSE=$([ -e $W/PAUSE ] && echo y || echo n) mem=${mem}MB gpu=${gpu}MiB)"; said=1; }
+    local rfinal=n
+    pgrep -af "final_20261108/" | grep -v -e machine_log -e "bash -c" | grep -q python && rfinal=y
+    if [ ! -e $W/PAUSE ] && [ "$mem" -ge 8000 ] && [ "$gpu" -lt 4000 ] && [ $rfinal = n ]; then return 0; fi
+    [ $said = 0 ] && { log "gate waiting (PAUSE=$([ -e $W/PAUSE ] && echo y || echo n) mem=${mem}MB gpu=${gpu}MiB rfinal=$rfinal)"; said=1; }
     sleep 300
   done
 }
