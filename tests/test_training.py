@@ -11,7 +11,7 @@ from ipomdp.training import EpisodeBatch, EpisodeBuffer, Representation, Trainer
 
 CPU = torch.device("cpu")
 A, O, D, H, T = 3, 2, 16, 32, 6
-CONFIG = TrainerConfig(learning_rate=3e-4, weight_decay=1e-4, grad_clip_norm=1.0, value_target_momentum=0.99)
+CONFIG = TrainerConfig(learning_rate=3e-4, weight_decay=1e-4, grad_clip_norm=1.0, value_target_momentum=0.99, separate_value_clip=False)
 
 
 def _episodes(batch: int, seed: int, device: torch.device = CPU) -> EpisodeBatch:

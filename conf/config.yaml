@@ -87,6 +87,7 @@ trainer:
   weight_decay: 1.0e-4
   grad_clip_norm: 1.0
   value_target_momentum: 0.9  # EMA momentum of the target value head used in Bellman value targets
+  separate_value_clip: false  # true: value heads clipped on their own gradient norm (trainer.py, 7)
 
 agent:
   temperature: 1.0            # Initial MCTS visit-count sampling temperature

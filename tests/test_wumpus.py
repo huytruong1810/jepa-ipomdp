@@ -208,7 +208,7 @@ class TestLearningStack:
             seed=3, episode_length=12, env_batch_size=4, warmup_episodes=4, buffer_capacity=32, batch_size=4,
             updates_per_collection=2, eval_episodes=4, latent_dim=16, hidden_dim=32, num_blocks=1,
             representation=Representation.JEPA, observation_horizon=0, ema_momentum=0.99, acting_ema_momentum=0.9, num_bins=255,
-            trainer=TrainerConfig(learning_rate=3e-4, weight_decay=1e-4, grad_clip_norm=1.0, value_target_momentum=0.99),
+            trainer=TrainerConfig(learning_rate=3e-4, weight_decay=1e-4, grad_clip_norm=1.0, value_target_momentum=0.99, separate_value_clip=False),
             num_simulations=4, observation_prune=1e-3, c_puct=1.25, dirichlet_alpha=0.3, dirichlet_epsilon=0.25,
             temperature=1.0, temperature_min=0.1, temperature_decay=0.5, epsilon=0.0, epsilon_min=0.0, store_eval_episodes=False,
             time_aware_value=False, value_nstep=0, value_nstep_mix=0.5,
@@ -317,6 +317,31 @@ class TestLearningStack:
         resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
         continued = [resumed.collect_and_train() for _ in range(2)] + [resumed.evaluate()]
         assert repr(continued) == repr(expected[1:])
+
+    def test_separate_value_clip_splits_the_clip_groups(self, monkeypatch):
+        # trainer.py, section 7: two clip calls, value heads alone and everything else, together exactly the joint
+        # group; the default makes one call over the joint group.
+        from ipomdp.experiments import wumpus_setup
+        from ipomdp.models import ValueEstimator
+        from ipomdp.training import Representation, TrainerConfig, TrainingRun
+        setup = wumpus_setup(CPU, DISCOUNT)
+        calls = []
+        original = torch.nn.utils.clip_grad_norm_
+        monkeypatch.setattr(torch.nn.utils, "clip_grad_norm_", lambda params, norm: (calls.append(list(params)), original(calls[-1], norm))[1])
+        for separate in (False, True):
+            trainer_config = TrainerConfig(learning_rate=3e-4, weight_decay=1e-4, grad_clip_norm=1.0, value_target_momentum=0.99,
+                                           separate_value_clip=separate)
+            run = TrainingRun(setup, self._config(representation=Representation.DECODER, value_estimator=ValueEstimator.DOUBLE,
+                                                  trainer=trainer_config), CPU)
+            run.collect_and_train()                                    # warm-up collection: stores games, trains
+            calls.clear()
+            run.trainer.train_step(run.buffer.sample(4))
+            ids = lambda ps: {id(p) for p in ps}                         # noqa: E731
+            if not separate:
+                assert len(calls) == 1 and ids(calls[0]) == ids(run.trainer.parameters)
+            else:
+                assert len(calls) == 2 and ids(calls[1]) == ids(run.value_head.parameters())
+                assert ids(calls[0]) | ids(calls[1]) == ids(run.trainer.parameters) and not ids(calls[0]) & ids(calls[1])
 
     def test_target_prune_matches_the_planners_pruning(self):
         # training/run.py, section 23; trainer.py, 3h; search_model.py, 9: the value targets keep exactly the

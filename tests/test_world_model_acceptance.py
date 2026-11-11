@@ -68,7 +68,7 @@ def train_and_measure(representation: Representation = Representation.JEPA) -> d
     codec = TwoHotSymlog(255, pomdp.value_bound).to(device)
     trainer = WorldModelTrainer(
         belief_filter, world_model, value_head, reward_head, observation_head, codec, num_a, num_o, pomdp.discount,
-        TrainerConfig(learning_rate=3e-4, weight_decay=1e-4, grad_clip_norm=1.0, value_target_momentum=0.9), device)
+        TrainerConfig(learning_rate=3e-4, weight_decay=1e-4, grad_clip_norm=1.0, value_target_momentum=0.9, separate_value_clip=False), device)
 
     def probe_data(seed):
         episodes, _ = play_episodes(BatchedPOMDPEnv(pomdp, 1024, LENGTH, seed, device),

@@ -304,6 +304,16 @@
 #    - The forward pass runs under bfloat16 autocast on CUDA; losses are computed in float32.
 #      The value targets are computed with autocast disabled, in float32, exactly as the planner
 #      evaluates the same backup (planning/search_model.py, section 4).
+#
+# 7. Optional Separate Clip of the Value Heads (TrainerConfig.separate_value_clip, 2026-11-10; audit F5):
+#    - One clip norm over every parameter couples the heads: the value heads read detached latents and send nothing
+#      to the filter, yet on the Wumpus recipe's final networks they hold 72-81% of the joint squared gradient norm, and
+#      the clip (1.0, active on almost every batch) scales the filter's updates by 0.65-0.77 on average
+#      (reports/2026-11-09_audit/grad_share.py). The value loss thereby sets the filter's effective step size.
+#    - separate_value_clip = True clips the value heads' gradient on its own norm and everything else on another, as
+#      the detached planning head already is (section 3d). It raises the filter's effective step size, so it is a
+#      screened arm, not a fix. The optimiser and its parameter order are unchanged.
+#    - False (the default, canonical Tiger) is the single joint clip, bit for bit.
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -352,6 +362,7 @@ class TrainerConfig:
     weight_decay: float
     grad_clip_norm: float
     value_target_momentum: float
+    separate_value_clip: bool         # clip the value heads' gradient on its own norm (section 7); False = one joint norm
 
 
 class WorldModelTrainer:
@@ -483,6 +494,10 @@ class WorldModelTrainer:
         # The planning head is clipped on its own (section 3d): inside the joint clip its gradient norm
         # would rescale the filter's update, a coupling a detached head must not have.
         self.planning_parameters = list(planning_observation_head.parameters()) if planning_observation_head is not None else []
+        # Section 7: the value heads' own clip group (the optimiser's parameter order is unchanged).
+        self.value_parameters = list(value_head.parameters())
+        value_ids = {id(p) for p in self.value_parameters}
+        self.clipped_jointly = [p for p in self.parameters if id(p) not in value_ids]
         self.optimizer = torch.optim.AdamW(self.parameters + self.planning_parameters, lr=config.learning_rate,
                                            weight_decay=config.weight_decay)
         self.target_value_head = frozen_copy(value_head)
@@ -705,7 +720,11 @@ class WorldModelTrainer:
 
         self.optimizer.zero_grad(set_to_none=True)
         total.backward()
-        torch.nn.utils.clip_grad_norm_(self.parameters, self.config.grad_clip_norm)
+        if self.config.separate_value_clip:                                              # section 7
+            torch.nn.utils.clip_grad_norm_(self.clipped_jointly, self.config.grad_clip_norm)
+            torch.nn.utils.clip_grad_norm_(self.value_parameters, self.config.grad_clip_norm)
+        else:
+            torch.nn.utils.clip_grad_norm_(self.parameters, self.config.grad_clip_norm)
         if self.planning_parameters:
             torch.nn.utils.clip_grad_norm_(self.planning_parameters, self.config.grad_clip_norm)
         self.optimizer.step()
