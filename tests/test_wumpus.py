@@ -216,7 +216,8 @@ class TestLearningStack:
             retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0, absorbing_value=False,
             decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0,
             codec_bound=CodecBound.DISCOUNTED, target_prune=False,
-            double_partition=DoublePartition.BATCH, observation_head=ObservationHeadKind.JOINT)
+            double_partition=DoublePartition.BATCH, observation_head=ObservationHeadKind.JOINT,
+            kinematic_weight=0.0)
         values.update(overrides)
         return RunConfig(**values)
 
@@ -367,6 +368,38 @@ class TestLearningStack:
         resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
         continued = [resumed.collect_and_train() for _ in range(2)] + [resumed.evaluate()]
         assert repr(continued) == repr(expected[1:])
+
+    def test_kinematic_term_applies_the_three_rules(self):
+        # trainer.py, section 2k; run.py, section 25: on a hand-made history each rule fires once and the term equals
+        # the hand computation; Tiger raises; train_step reports it.
+        import torch.nn.functional as F
+        from ipomdp.experiments import tiger_setup, wumpus_setup
+        from ipomdp.training import EpisodeBatch, Representation, TrainingRun
+        setup = wumpus_setup(CPU, DISCOUNT)
+        with pytest.raises(ValueError, match="section 25"):
+            TrainingRun(tiger_setup(CPU), self._config(kinematic_weight=0.1), CPU)
+        run = TrainingRun(setup, self._config(kinematic_weight=1.0, representation=Representation.DECODER), CPU)
+        torch.manual_seed(0)
+        for p in run.observation_head.parameters():
+            p.data.add_(0.3 * torch.randn_like(p))
+        # FORWARD (bump), LEFT, RIGHT, FORWARD (moved), LEFT, LEFT
+        actions = torch.tensor([[0, 1, 2, 0, 1, 1]])
+        observations = torch.tensor([[8, 0, 0, 0, 0, 0]])
+        batch = EpisodeBatch(actions, observations, torch.full((1, 6), -1.0), torch.tensor([0]))
+        trainer = run.trainer
+        z = run.belief_filter.unroll(F.one_hot(actions, 5).float(), F.one_hot(observations, 33).float(),
+                                     F.one_hot(torch.tensor([0]), 33).float())[0]
+        head = run.observation_head
+        fwd = F.one_hot(torch.tensor([0]), 5).float()
+        logp = lambda zz, act: F.log_softmax(head(zz[None], F.one_hot(torch.tensor([act]), 5).float()), -1)[0]  # noqa: E731
+        bump = setup.kinematics.bump
+        rule1 = -torch.logsumexp(logp(z[1], 0)[bump], -1)
+        rule2 = sum((logp(z[1], a).exp() * (logp(z[1], a) - logp(z[3], a))).sum() for a in range(5)) / 5
+        rule3 = -torch.logsumexp(logp(z[6], 0)[~bump], -1)
+        assert torch.allclose(trainer._kinematic_loss(z[None], batch), rule1 + rule2 + rule3, atol=1e-5)
+        del fwd
+        metrics = trainer.train_step(batch)
+        assert "loss_kinematic" in metrics and metrics["loss_kinematic"] > 0.0
 
     def test_target_prune_matches_the_planners_pruning(self):
         # training/run.py, section 23; trainer.py, 3h; search_model.py, 9: the value targets keep exactly the

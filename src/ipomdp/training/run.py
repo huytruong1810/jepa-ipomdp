@@ -377,6 +377,12 @@
 #      percept's binary channels, glitter predicted after bump and scream. The planner, the trainer and every loss read
 #      its normalised log-probabilities exactly as the joint head's logits. A domain without factors (Tiger) raises.
 #    - joint (the default, canonical Tiger) builds the old head, bit for bit.
+#
+# 25. Kinematic-Consistency Term (2026-11-10; trainer.py 2k; Stage B of the 2026-11-09 audit plan):
+#    - cfg.kinematic_weight = lambda > 0 adds three rules the domain declares about its own actions (bump repeats,
+#      opposite turns undo, an about-turn after a move faces the cell left behind) as counterfactual supervision of the
+#      observation head at the latents a turn produces. Wumpus declares them (DomainSetup.kinematics); Tiger raises.
+#    - 0 (the default, canonical Tiger) computes nothing new.
 # ==============================================================================
 
 from collections.abc import Callable
@@ -395,7 +401,7 @@ from .episode_buffer import EpisodeBatch, EpisodeBuffer
 from .privileged import PrivilegedBeliefLoss, PrivilegedSpec
 from .rollout import Simulator, discounted_returns, play_episodes
 from .seeding import RunStream, stream_seed
-from .trainer import DoublePartition, Representation, TrainerConfig, WorldModelTrainer
+from .trainer import DoublePartition, KinematicRules, Representation, TrainerConfig, WorldModelTrainer
 
 
 
@@ -437,6 +443,8 @@ class DomainSetup:
             (planning/search_model.py, section 7), or None if the domain has none (Tiger).
         observation_factors: The percept's binary channels for the chain-factored observation head
             (models/heads.py, section 3b; section 24), or None if the percept is not factored (Tiger).
+        kinematics: The declared action semantics of the kinematic-consistency term (trainer.py 2k; section 25),
+            or None (Tiger).
     """
 
     domain: Domain
@@ -446,6 +454,7 @@ class DomainSetup:
     risk: RiskSpec | None = None
     absorbing_observation: int | None = None
     observation_factors: ObservationFactors | None = None
+    kinematics: KinematicRules | None = None
 
 
 class ObservationHeadKind(StrEnum):
@@ -513,10 +522,20 @@ class RunConfig:
     target_prune: bool                # value targets pruned like the planner, at observation_prune (section 23)
     double_partition: DoublePartition # value pair split by batch position (default) | buffer slot (section 13)
     observation_head: ObservationHeadKind  # joint (default) | chain-factored observation head (section 24)
+    kinematic_weight: float           # kinematic-consistency term (section 25); 0 = off
 
 
 class TrainingRun:
     """Builds and advances one experiment (module header)."""
+
+    @staticmethod
+    def _kinematics(setup: DomainSetup, cfg: RunConfig) -> KinematicRules | None:
+        """The domain's rules when the kinematic term is on (section 25); a domain without them raises."""
+        if cfg.kinematic_weight == 0.0:
+            return None
+        if setup.kinematics is None:
+            raise ValueError("kinematic_weight > 0 needs a domain with declared kinematics (section 25).")
+        return setup.kinematics
 
     @staticmethod
     def _observation_head(setup: DomainSetup, cfg: RunConfig) -> ObservationHead | ChainObservationHead:
@@ -608,7 +627,8 @@ class TrainingRun:
                                          cfg.decision_aware_weight, cfg.q_equivalent_weight,                # sections 20, 21
                                          codec_bound if cfg.codec_bound is CodecBound.ABSORBING else None,  # section 22
                                          self._target_prune(cfg),                                            # section 23
-                                         cfg.double_partition)                                               # section 13
+                                         cfg.double_partition,                                               # section 13
+                                         cfg.kinematic_weight, self._kinematics(setup, cfg))                 # section 25
 
         # Polyak-averaged copies the agent acts with (section 4).
         self.acting_filter = frozen_copy(self.belief_filter)

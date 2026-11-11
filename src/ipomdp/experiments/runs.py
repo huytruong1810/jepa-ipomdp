@@ -52,7 +52,7 @@ from ..interpretability import BeliefAnalysis, analyze_beliefs, build_probe_data
 from ..models import BeliefFilter, ObservationFactors, ValueEstimator
 from ..planning import BeliefTreeSearch, RiskSpec
 from ..telemetry import BeliefGeometryVisualizer
-from ..training import (CodecBound, Domain, DoublePartition, ObservationHeadKind, DomainSetup, EpisodeBatch, PrivilegedSpec, PrivilegedTargets, Representation, RunConfig,
+from ..training import (CodecBound, Domain, DoublePartition, KinematicRules, ObservationHeadKind, DomainSetup, EpisodeBatch, PrivilegedSpec, PrivilegedTargets, Representation, RunConfig,
                         TrainerConfig, TrainingRun, load_checkpoint, play_episodes, stream_seed)
 
 
@@ -83,7 +83,10 @@ def wumpus_setup(device: torch.device, discount: float) -> DomainSetup:
                                 GAME_OVER, DEATH_REWARD, STEP_COST),
                        GAME_OVER,
                        ObservationFactors((int(Percept.BUMP), int(Percept.SCREAM), int(Percept.GLITTER), int(Percept.STENCH),
-                                           int(Percept.BREEZE)), GAME_OVER))
+                                           int(Percept.BREEZE)), GAME_OVER),
+                       KinematicRules(int(WumpusAction.FORWARD), int(WumpusAction.TURN_LEFT), int(WumpusAction.TURN_RIGHT),
+                                      torch.tensor([(o & int(Percept.BUMP)) > 0 and o != GAME_OVER for o in range(GAME_OVER + 1)]),
+                                      GAME_OVER))
 
 
 # Domains selectable through conf/env/<name>.yaml (section 2).
@@ -116,7 +119,8 @@ def build_run_config(cfg: DictConfig) -> RunConfig:
         decision_aware_weight=m.decision_aware_weight, observation_reward=m.observation_reward,
         q_equivalent_weight=m.q_equivalent_weight, codec_bound=CodecBound(m.codec_bound),
         target_prune=m.target_prune, double_partition=DoublePartition(m.double_partition),
-        observation_head=ObservationHeadKind(m.observation_head))
+        observation_head=ObservationHeadKind(m.observation_head),
+        kinematic_weight=m.kinematic_weight)
 
 
 def build_training_run(cfg: DictConfig, device: torch.device) -> tuple[DomainSetup, TrainingRun]:

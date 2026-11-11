@@ -7,7 +7,7 @@ from .privileged import PrivilegedBeliefLoss, PrivilegedSpec, PrivilegedTargets
 from .rollout import Agent, Simulator, discounted_returns, play_episodes
 from .run import CodecBound, Domain, DomainSetup, ObservationHeadKind, RunConfig, TrainingRun
 from .seeding import RunStream, stream_seed
-from .trainer import DoublePartition, Representation, TrainerConfig, WorldModelTrainer
+from .trainer import DoublePartition, KinematicRules, Representation, TrainerConfig, WorldModelTrainer
 
 __all__ = [
     "CodecBound",
@@ -19,6 +19,7 @@ __all__ = [
     "Simulator",
     "EpisodeBatch",
     "EpisodeBuffer",
+    "KinematicRules",
     "ObservationHeadKind",
     "PrivilegedBeliefLoss",
     "PrivilegedSpec",

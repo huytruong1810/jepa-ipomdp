@@ -283,6 +283,22 @@
 #      towards the true value. Non-finite targets still raise (section 5); nothing else is clipped.
 #    - None (the default and canonical Tiger) leaves the targets untouched.
 #
+# 2k. Optional Kinematic-Consistency Term (kinematic_weight = lambda > 0, kinematics; model.kinematic_weight, 2026-11-10;
+#     Stage B of the 2026-11-09 audit plan):
+#    - The measured failure is the turned latent: after an imagined turn, the head misreads "the cell ahead is
+#      unvisited" 19-35% of the time and halves P(gold ahead) (feature_localise.py, Step D). The data hold few
+#      turn-then-step pairs, so nothing trains the head at the latents a turn produces for the actions not taken.
+#    - Three rules the domain DECLARES about its own actions (DomainSetup.kinematics; no state or belief access):
+#        (i)   FORWARD reported a bump at t: from z_{t+1}, FORWARD bumps again:  -log P(bump | z_{t+1}, FORWARD);
+#        (ii)  opposite turns at t, t+1 restore state and belief:  KL(sg P(. | z_t, a) || P(. | z_{t+2}, a)) for every a;
+#        (iii) FORWARD without a bump at t, then two equal turns: the hunter faces the cell it left, so
+#              -log P(no bump | z_{t+3}, FORWARD).
+#      Each rule is a mean over its matching steps (skipped when none match; never after the absorbing percept); the
+#      term is lambda times their sum. The rules supervise the head at (z, a) pairs the agent did not take, which is the
+#      point: they are counterfactual supervision derived from action semantics.
+#    - The gradient reaches the filter exactly when the observation term does (the decoder representation).
+#    - 0 (the default and canonical Tiger) computes nothing new. loss_mask with the term raises.
+#
 # 3h. Optional Planner-Consistent Pruning of the Targets (target_prune = delta > 0; model.target_prune, 2026-11-10):
 #    - The targets back up through PrunedModel(target model, delta) (planning/search_model.py, section 9): the same
 #      branches the tree search keeps, renormalised the same way, so the value is fitted to the backup the planner
@@ -338,6 +354,24 @@ def _masked_mean(values: Tensor, weights: Tensor) -> Tensor:
     return (values * weights).sum() / weights.sum()
 
 DECISION_AWARE_SUPPORT = 1e-3     # section 2h: branches with less model mass do not set the span
+
+
+@dataclass(frozen=True)
+class KinematicRules:
+    """
+    Declared action semantics of a domain for the kinematic-consistency term (section 2k); no state access.
+
+    Attributes:
+        forward, turn_left, turn_right: Action indices.
+        bump: (|O|,) bool, the observations that report a bump.
+        absorbing_observation: The percept after which no rule applies (the game is over).
+    """
+
+    forward: int
+    turn_left: int
+    turn_right: int
+    bump: Tensor
+    absorbing_observation: int
 
 
 class DoublePartition(StrEnum):
@@ -396,6 +430,8 @@ class WorldModelTrainer:
         target_bound: float | None = None,
         target_prune: float = 0.0,
         double_partition: DoublePartition | None = None,
+        kinematic_weight: float = 0.0,
+        kinematics: KinematicRules | None = None,
     ):
         """
         Args:
@@ -418,6 +454,7 @@ class WorldModelTrainer:
             target_bound: B of the projection of the value targets onto [-B, B] (section 3g), or None.
             target_prune: delta of the planner-consistent pruning of the targets' observation branches (section 3h); 0 = off.
             double_partition: How a ValuePair's rows are split between its heads (section 3e); None = BATCH.
+            kinematic_weight, kinematics: lambda and the domain's rules of the kinematic-consistency term (section 2k).
         """
         if nstep < 0 or not 0.0 <= nstep_mix <= 1.0 or (nstep > 0 and nstep_mix == 0.0):
             raise ValueError(f"need nstep >= 0 and nstep_mix in (0, 1] when nstep > 0; got {nstep}, {nstep_mix}.")
@@ -450,6 +487,9 @@ class WorldModelTrainer:
         self.double_partition = DoublePartition.BATCH if double_partition is None else double_partition
         if self.double_partition is DoublePartition.SLOT and not isinstance(value_head, ValuePair):
             raise ValueError("double_partition=slot needs a value pair (model.value_estimator double; section 3e).")
+        if kinematic_weight < 0.0 or (kinematic_weight > 0.0 and kinematics is None):
+            raise ValueError("the kinematic term needs weight >= 0 and, when on, the domain's rules (section 2k).")
+        self.kinematic_weight, self.kinematics = kinematic_weight, kinematics
         if q_equivalent_weight < 0.0:
             raise ValueError(f"need q_equivalent_weight >= 0, got {q_equivalent_weight} (section 2i).")
         if q_equivalent_weight > 0.0 and (not isinstance(reward_head, ObservationRewardHead) or jepa is not None
@@ -675,6 +715,12 @@ class WorldModelTrainer:
                 losses["observation"] = _masked_mean(F.cross_entropy(observation_logits, episodes.observations.reshape(-1),
                                                                      reduction="none"), flat_mask)
 
+            if self.kinematic_weight > 0.0:                                              # section 2k
+                if mask is not None:
+                    raise ValueError("loss_mask is not defined for the kinematic term (section 2k).")
+                source = latents if self.representation is Representation.DECODER else latents.detach()
+                losses["kinematic"] = self.kinematic_weight * self._kinematic_loss(source, episodes)
+
             if self.value_equivalent_weight > 0.0:                                       # section 2f
                 branches = self._data_branches(child_values, episodes)                  # V-bar(tau(z_t, a_t, o)), (BT, O)
                 realised = branches.gather(1, episodes.observations.reshape(-1, 1)).squeeze(1)   # V-bar(z_{t+1})
@@ -742,6 +788,49 @@ class WorldModelTrainer:
             "value_target_mean": targets_value.mean().item(),
             "value_abs_error": value_error.item(),
         }
+
+    def _kinematic_loss(self, latents: Tensor, episodes: EpisodeBatch) -> Tensor:
+        """Sum over the three rules of section 2k of their mean over matching steps (0 for a rule with none)."""
+        rules, head = self.kinematics, self.observation_head
+        a, o = episodes.actions, episodes.observations                                  # a_t, o_{t+1}: (B, T)
+        live = o != rules.absorbing_observation
+        bump = rules.bump.to(o.device)[o]
+        one_hot = lambda act, n: F.one_hot(torch.full((n,), act, device=latents.device), self.num_actions).float()  # noqa: E731
+        bump_mask = rules.bump.to(latents.device)
+
+        def log_bump(z: Tensor, bumped: bool) -> Tensor:                               # log P(bump) or log P(no bump)
+            logp = F.log_softmax(head(z, one_hot(rules.forward, len(z))).float(), -1)
+            chosen = bump_mask if bumped else ~bump_mask
+            return torch.logsumexp(logp.masked_fill(~chosen, -torch.inf), -1)
+
+        total = latents.new_zeros((), dtype=torch.float32)
+        # (i) FORWARD reported a bump at t: facing the same wall, FORWARD bumps again from z_{t+1}.
+        rule1 = (a == rules.forward) & bump & live
+        if rule1.any():
+            total = total - log_bump(latents[:, 1:][rule1], True).mean()
+        # (ii) opposite turns at t and t+1 restore the physical state and the belief: P(. | z_{t+2}, a) = P(. | z_t, a).
+        turns = {rules.turn_left: rules.turn_right, rules.turn_right: rules.turn_left}
+        opposite = torch.zeros_like(a[:, :-1], dtype=torch.bool)
+        for first, second in turns.items():
+            opposite |= (a[:, :-1] == first) & (a[:, 1:] == second)
+        rule2 = opposite & live[:, :-1] & live[:, 1:]
+        if rule2.any():
+            z0, z2 = latents[:, :-2][rule2], latents[:, 2:][rule2]
+            n = len(z0)
+            kl = 0.0
+            for act in range(self.num_actions):
+                target = F.log_softmax(head(z0.detach(), one_hot(act, n)).float(), -1).detach()
+                pred = F.log_softmax(head(z2, one_hot(act, n)).float(), -1)
+                kl = kl + (target.exp() * (target - pred)).sum(-1).mean()
+            total = total + kl / self.num_actions
+        # (iii) FORWARD without a bump, then two equal turns: the hunter faces the cell it came from, so no bump.
+        if a.shape[1] >= 3:
+            moved = (a[:, :-2] == rules.forward) & ~bump[:, :-2] & live[:, :-2]
+            about = (a[:, 1:-1] == a[:, 2:]) & ((a[:, 1:-1] == rules.turn_left) | (a[:, 1:-1] == rules.turn_right))
+            rule3 = moved & about & live[:, 1:-1] & live[:, 2:]
+            if rule3.any():
+                total = total - log_bump(latents[:, 3:][rule3], False).mean()
+        return total
 
     def _head_a_rows(self, episodes: EpisodeBatch, batch: int) -> Tensor:
         """(B,) bool: the episodes whose rows train head A of a ValuePair (section 3e)."""
