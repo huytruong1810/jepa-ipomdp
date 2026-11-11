@@ -173,6 +173,22 @@ Best-network return on the development games (training seeds 0 / 1 / 2, mean): d
 - Descriptive, not registered: at 100 simulations the deaths rise on 5 of 5 seeds (mean 2.0% -> 3.5%) while wins rise and unfinished games fall slightly. Deeper search over the learned model finds more of the steps whose risk the model under-rates, which matches the optimizer's-curse reading of the remedies.
 - Reading: the planner's budget is not what limits it. Doubling the search does not recover any of the +168 that the exact one-step model gives at 50 simulations.
 
+## C-h result (development screen, read 2026-11-11 13:30; logs `runs/wumpus/s0_screen/`, phantom `phantom_readout.log`): NO ARM PASSES, DEFAULTS KEPT
+
+Arm minus control per game, paired on the 512 analysis games of training seeds 0 / 1 / 2 (± one standard error); control plays 270.0 / 214.7 / 194.3 with deaths 1.0 / 1.8 / 7.2%.
+
+| Arm | Seed 0 | Seed 1 | Seed 2 | Mean | Deaths (seeds 0 / 1 / 2) | PHANTOM (0 / 1 / 2) | Verdict |
+|---|---|---|---|---|---|---|---|
+| CB | −115.5 ± 18.8 | +19.5 ± 14.1 | +42.1 ± 17.5 | −17.9 | 17.6 / 2.3 / 0.0% | 18.7 / 19.8 / 18.7% | FAIL (play, deaths, phantom) |
+| CBP | +5.7 ± 14.0 | +41.9 ± 15.2 | +9.8 ± 18.1 | +19.2 | 1.8 / 2.5 / 0.6% | 18.9 / 20.6 / 20.1% | FAIL (mean below +20, phantom) |
+| SLOT | +6.3 ± 12.9 | +15.8 ± 16.1 | +22.8 ± 18.4 | +15.0 | 1.8 / 3.5 / 2.3% | — | FAIL (mean below +20) |
+| VCLIP | −0.6 ± 13.5 | −133.3 ± 17.1 | +47.7 ± 16.6 | −28.7 | 1.8 / 1.6 / 1.6% | — | FAIL (play) |
+
+- The control's PHANTOM share is 18.4 / 20.3 / 19.9%. The bounded codec (range ±1110 instead of ±100100) leaves it unchanged: the imagined children valued above 999 lie inside the reachable range, so the share measures over-estimation of reachable values, not leakage onto unreachable bins.
+- SLOT does not decorrelate the value pair: corr(V_A, V_B) is 0.9996 / 0.9999 / 0.9994 (control 0.9999 / 0.9999 / 0.9998).
+- Reported, no verdict: the joint glitter ratio at the declined turned latents (control 0.45 / 0.39 / 0.33) is 0.38 / 0.33 / 0.38 (CB), 0.37 / 0.33 / 0.40 (CBP), 0.43 / 0.31 / 0.33 (SLOT) and 0.43 / 0.25 / 0.38 (VCLIP). The MLP "cell ahead unvisited" accuracy there (control 0.693 / 0.672 / 0.539) rises on 11 of the 12 arm-seeds (0.52–0.84).
+- Consequence: no Stage-0 fix enters R2. CBP and SLOT are positive on 3 of 3 seeds but below the registered mean; this is recorded and not re-tested.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 

@@ -531,6 +531,13 @@
 #      -> No arm passes: the defaults stay; the paper's text is corrected regardless (done 2026-11-10).
 #    - Batches carry index = the stored game's buffer row (EpisodeBatch.index), the identity the in-agent buffer uses;
 #      only double_partition=slot reads it, so every earlier arm and the control are unaffected.
+#    - RESULT (2026-11-11; runs/wumpus/s0_screen/, PROTOCOL.md "C-h result"): NO ARM PASSES; defaults kept.
+#      arm - control per game, seeds 0 / 1 / 2 (mean): CB -115.5 / +19.5 / +42.1 (-17.9; deaths 17.6% on seed 0);
+#      CBP +5.7 / +41.9 / +9.8 (+19.2, below the +20 bar); SLOT +6.3 / +15.8 / +22.8 (+15.0, below the bar);
+#      VCLIP -0.6 / -133.3 / +47.7 (-28.7). PHANTOM: control 18.4 / 20.3 / 19.9%, CB 18.7 / 19.8 / 18.7%, CBP 18.9 /
+#      20.6 / 20.1% -> FAIL; the >999 children lie inside the bounded range (+-1110), so F1's leakage is not what makes
+#      them. SLOT leaves corr(V_A, V_B) at 0.9994-0.9999. Glitter ratio at (c) not repaired (0.25-0.43 vs 0.33-0.45);
+#      MLP unvisited accuracy at (c) up on 11 of 12 arm-seeds (reported only).
 #
 # 2s. Stage B, architecture retrain screen (2026-11-11, written before any run; PROTOCOL.md C-j; the 2026-11-09 audit):
 #    - Question: does a history-token filter, a chain-factored observation head, or both with the kinematic-consistency
