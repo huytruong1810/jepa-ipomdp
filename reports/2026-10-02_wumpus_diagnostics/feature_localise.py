@@ -97,6 +97,11 @@
 #      safe cell" at states where the agent itself declines is rare in its data), plus a weaker, marginal
 #      representation deficit in "visited" tracking on the three weaker seeds. Consistent with the feedback-loop
 #      feedback-loop conjecture (idle -> no such data -> the model under-rates new cells -> idle). Decided per section 3.
+#
+# 6. History filter (2026-11-11; Stage B screen, PROTOCOL.md C-j): with --set model.filter=transformer the planner
+#    searches token states (planning/search_model.py, section 10). The rows' histories are converted to token states
+#    for every expansion, the turned STATES feed the next expansions, and the probes and the saved z_turn read the
+#    turned LATENTS (Expansion.next_latents). With the GRU both are the same tensor, so every earlier result stands.
 # ==============================================================================
 
 import copy
@@ -174,6 +179,7 @@ from ipomdp.agents import PlanningAgent, WumpusReferenceAgent  # noqa: E402
 from ipomdp.agents.wumpus_reference import _ZERO, _ahead, _first_actions  # noqa: E402
 from ipomdp.domain import WumpusSimulator  # noqa: E402
 from ipomdp.domain.wumpus import GAME_OVER, NUM_CELLS, Percept, WumpusAction, WumpusBeliefTracker, WumpusState  # noqa: E402
+from ipomdp.models.history_filter import CausalTransformerFilter  # noqa: E402
 from ipomdp.experiments.runs import load_trained_run  # noqa: E402
 from ipomdp.experiments.wumpus import WumpusAnalysisSettings  # noqa: E402
 from ipomdp.planning import BeliefTreeSearch  # noqa: E402
@@ -390,19 +396,32 @@ if networks_path is not None:
     z_root = history_latents()[games_idx, steps_idx]
     print(f"  networks {networks_path}: root latents recomputed from the histories", flush=True)
 base_mode = networks_path is None
-o_turn, z_turn, p_joint = [], [], []
+# Header 5 (2026-11-11): a history filter (model.filter=transformer) searches token states, not latents. The model is
+# then expanded from the token states of the rows' histories (root_in), the turned STATES feed the next expansions,
+# and the probes read the turned LATENTS (Expansion.next_latents). With the GRU, states and latents are the same tensor.
+token = isinstance(run.acting_filter, CausalTransformerFilter)
+if token:
+    hist_tokens = run.acting_filter.history_tokens(episodes.actions, episodes.observations, episodes.initial_observations)
+    root_in = torch.zeros(len(rows), 1 + 2 * run.acting_filter.max_len, dtype=torch.long, device=dev)
+    root_in[:, 0] = steps_idx + 1
+    for i, (g, t) in enumerate(zip(games_idx.tolist(), steps_idx.tolist())):
+        root_in[i, 1:1 + 2 * (t + 1)] = hist_tokens[g, :t + 1].reshape(-1)
+else:
+    root_in = z_root
+o_turn, z_turn, s_turn, p_joint = [], [], [], []
 for start in range(0, len(rows), CHUNK):
     batch = rows[start:start + CHUNK]
     with torch.no_grad():
-        e = model.expand(z_root[start:start + CHUNK])
+        e = model.expand(root_in[start:start + CHUNK])
     for i, r in enumerate(batch):
         (o_t, _), = exact_outcomes(r["layouts"], r["own"], r["turn"])[1].items()
         o_turn.append(o_t)
-        z_turn.append(e.next_states[i, r["turn"], o_t])
-z_turn = torch.stack(z_turn)
+        s_turn.append(e.next_states[i, r["turn"], o_t])
+        z_turn.append(e.next_states[i, r["turn"], o_t] if e.next_latents is None else e.next_latents[i, r["turn"], o_t])
+z_turn, s_turn = torch.stack(z_turn), torch.stack(s_turn)
 for start in range(0, len(rows), CHUNK):
     with torch.no_grad():
-        p_joint.append(model.expand(z_turn[start:start + CHUNK]).observation_probs[:, FWD].double().cpu().numpy())
+        p_joint.append(model.expand(s_turn[start:start + CHUNK]).observation_probs[:, FWD].double().cpu().numpy())
 p_joint = np.concatenate(p_joint)
 root_p, root_f, turn_p, turn_f = [], [], [], []
 for r in rows:
@@ -453,7 +472,7 @@ def arm_m() -> tuple[np.ndarray, np.ndarray]:
     q_mac, q_cho = [], []
     for start_ in range(0, len(rows), CHUNK):
         batch, turns = rows[start_:start_ + CHUNK], o_turn[start_:start_ + CHUNK]
-        r1, p1, _, z1 = expand_np(z_root[start_:start_ + CHUNK])
+        r1, p1, _, z1 = expand_np(root_in[start_:start_ + CHUNK])
         jobs, child_z = [], []
         for i, row in enumerate(batch):
             for a1 in (row["turn"], row["chosen"]):

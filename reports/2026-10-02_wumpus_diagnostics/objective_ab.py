@@ -532,6 +532,29 @@
 #    - Batches carry index = the stored game's buffer row (EpisodeBatch.index), the identity the in-agent buffer uses;
 #      only double_partition=slot reads it, so every earlier arm and the control are unaffected.
 #
+# 2s. Stage B, architecture retrain screen (2026-11-11, written before any run; PROTOCOL.md C-j; the 2026-11-09 audit):
+#    - Question: does a history-token filter, a chain-factored observation head, or both with the kinematic-consistency
+#      term, repair the turned-latent model (glitter under-predicted 2-3x, "cell ahead unvisited" misread 31-46% at the
+#      declined turned latents) and make the retrain recipe's networks play better than the same retrain with the GRU
+#      and the joint head?
+#    - Arms (as 2r: runs/sweeps/wumpus_retrain seeds 0-2, own .hydra config, --representation decoder --horizon 5
+#      --seed <s> --train-buffer <run> --pool-cache runs/wumpus/supervised_filter/pools.pt, 6400 updates, --save into
+#      runs/wumpus/b_screen/):
+#        TR    --set model.filter=transformer                                                  (history filter)
+#        CH    --set model.observation_head=chain                                              (chain head)
+#        TRCE  --set model.filter=transformer model.observation_head=chain model.kinematic_weight=0.1   (all of B)
+#      Paired control: runs/wumpus/ve_screen/control_seed<s>.pt (plays 270.0 / 214.7 / 194.3; joint glitter ratio at (c)
+#      0.45 / 0.39 / 0.33; MLP "unvisited" accuracy at (c) 0.693 / 0.672 / 0.539, runs/wumpus/coverage/fl_control_seed<s>.log).
+#    - Plays and localisation as 2r, each arm with its own --set (retrain_play.py, feature_localise.py header 6).
+#    - Pre-registered readout, per arm (three arms read; no correction, stated):
+#      * MECHANISM: joint glitter ratio at (c) >= control + 0.15 AND MLP unvisited accuracy at (c) >= control + 0.10, on
+#        2 of 3 seeds.
+#      * PLAY: arm - control > 0 on 2 of 3 seeds, deaths <= control + 2 points on every seed.
+#      * An arm passes when both pass. Reported: latent guard (cell / heading), wall-clock per update and per play.
+#      -> A passing arm enters the in-agent run R2 with the passing S0 fixes. No arm passes: Stage B is closed and
+#         reported as an architecture A/B negative.
+#    - The stage first runs a smoke (TRCE, 20 updates, then feature_localise.py on 8 games) and stops if it fails.
+#
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \
 #        --horizon 5 --seed 1 --pool-cache runs/wumpus/supervised_filter/pools.pt
