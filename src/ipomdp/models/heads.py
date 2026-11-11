@@ -283,8 +283,13 @@ class ChainObservationHead(nn.Module):
             self.register_buffer(f"prefix_of_{i}", completions % (1 << i), persistent=False)
 
     def forward(self, latent: Tensor, action: Tensor) -> Tensor:
-        """(N, D), one-hot (N, |A|) -> (N, |O|) normalised log-probabilities."""
-        e = self.trunk(torch.cat([latent, action], dim=-1))                        # (N, H)
+        """
+        (..., D), one-hot (..., |A|) -> (..., |O|) normalised log-probabilities. Any leading shape, as the joint
+        ObservationHead (callers pass (N, D) in search and (B, T, D) in the losses and diagnostics); the leading dims
+        are flattened for the chain and restored on the output.
+        """
+        lead = latent.shape[:-1]
+        e = self.trunk(torch.cat([latent, action], dim=-1)).reshape(-1, self.terminal.in_features)   # (N, H)
         n_rows = e.shape[0]
         log_joint = e.new_zeros(n_rows, 1 << self.num_bits)
         for i, net in enumerate(self.bits):
@@ -298,4 +303,4 @@ class ChainObservationHead(nn.Module):
         out = e.new_empty(n_rows, self.factors.num_observations)
         out[:, self.observation_index] = log_joint + nn.functional.logsigmoid(-t)[:, None]
         out[:, self.factors.terminal_index] = nn.functional.logsigmoid(t)
-        return out
+        return out.reshape(*lead, self.factors.num_observations)

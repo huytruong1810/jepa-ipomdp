@@ -189,6 +189,18 @@ Arm minus control per game, paired on the 512 analysis games of training seeds 0
 - Reported, no verdict: the joint glitter ratio at the declined turned latents (control 0.45 / 0.39 / 0.33) is 0.38 / 0.33 / 0.38 (CB), 0.37 / 0.33 / 0.40 (CBP), 0.43 / 0.31 / 0.33 (SLOT) and 0.43 / 0.25 / 0.38 (VCLIP). The MLP "cell ahead unvisited" accuracy there (control 0.693 / 0.672 / 0.539) rises on 11 of the 12 arm-seeds (0.52–0.84).
 - Consequence: no Stage-0 fix enters R2. CBP and SLOT are positive on 3 of 3 seeds but below the registered mean; this is recorded and not re-tested.
 
+## C-i result (development smoke, read 2026-11-11 14:50; logs `runs/wumpus/sc_smoke/seed<s>.log`): PASS BY THE REGISTERED RULE, WITH A CAVEAT
+
+| Seed | Rows (declined) | span x JSD AUC | JSD AUC | span AUC | Within non-wall rows: span x JSD / JSD / span | Within unvisited-target rows: span x JSD / JSD / span |
+|---|---|---|---|---|---|---|
+| 0 | 11752 (599) | **0.865** | 0.876 | 0.806 | 0.637 / 0.703 / 0.448 | 0.554 / 0.680 / 0.282 |
+| 1 | 17566 (993) | **0.664** | 0.610 | 0.593 | 0.538 / 0.583 / 0.436 | 0.471 / 0.589 / 0.330 |
+| 2 | 13492 (714) | **0.816** | 0.786 | 0.801 | 0.538 / 0.558 / 0.471 | 0.385 / 0.491 / 0.289 |
+
+- Registered verdict: AUC >= 0.65 on 3 of 3 seeds, so C-i PASSES.
+- Caveat (the within-row lines were added after seed 0's first read and are reported, not registered): most of the separation is "the turn faces a wall or not". A wall-facing turn makes FORWARD's outcome certain, so its span and JSD are 0. Among the non-wall rows the score is near chance (0.54-0.64). Among rows whose target cell is unvisited it is at or below chance (0.39-0.55): the value span there points the wrong way (0.28-0.33), and JSD alone stays weakly informative (0.49-0.68).
+- Consequence: augmentation C is no longer gated out. Its build is deferred until C-j is read, and the caveat goes with any claim made about it.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 

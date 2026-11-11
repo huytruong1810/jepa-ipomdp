@@ -187,6 +187,14 @@ class TestChainObservationHead:
         assert torch.allclose(torch.logsumexp(out, -1), torch.zeros(7), atol=1e-5)
         assert torch.allclose(torch.log_softmax(out, -1), out, atol=1e-5)       # a drop-in for logits
 
+    def test_any_leading_shape_equals_the_flat_call(self):
+        # The losses and diagnostics call the head on (B, T, D) latents, as they call the joint ObservationHead.
+        head = self._head()
+        z, a = torch.randn(3, 4, 8), torch.nn.functional.one_hot(torch.randint(0, 5, (3, 4)), 5).float()
+        out = head(z, a)
+        assert out.shape == (3, 4, 33)
+        assert torch.allclose(out, head(z.reshape(12, 8), a.reshape(12, 5)).view(3, 4, 33), atol=1e-6)
+
     def test_chain_rule_matches_the_bit_marginals(self):
         # P(bit 0 of the chain = bump = 1 | not terminal) is the sigmoid of its prefix-free logit.
         head = self._head()
