@@ -32,7 +32,11 @@ DESIGN DECISIONS & THEORETICAL FOUNDATIONS
 #    (JSD alone 0.876, span alone 0.806; 11752 rows, 599 declined; medians declined 286 vs other 0). The "other" medians
 #    are exactly 0: many other rows turn towards a wall, where FORWARD's outcome is certain. The within-non-wall and
 #    within-unvisited-target AUCs (section 3's reported lines, added after seed 0) decide whether the score targets more
-#    than "not a wall"; seed 0 is re-run for them when the machine is free. Seeds 1-2: pending (stage a1_sc_rows.sh).
+#    than "not a wall"; seed 0 was re-run for them. Seeds 1-2: stage a1_sc_rows.sh.
+# 5. RESULT (2026-11-11, seeds 0-2; PROTOCOL.md "C-i result"): span x JSD AUC 0.865 / 0.664 / 0.816 -> PASS (3 of 3).
+#    Within non-wall rows 0.637 / 0.538 / 0.538; within unvisited-target rows 0.554 / 0.471 / 0.385 (span alone 0.28-0.33,
+#    reversed; JSD alone 0.49-0.68). The registered pass rests mostly on "faces a wall or not"; among the decisions that
+#    matter (an unvisited cell ahead) the score does not single out the declined ones.
 # ==============================================================================
 """
 
