@@ -28,7 +28,11 @@ DESIGN DECISIONS & THEORETICAL FOUNDATIONS
 # 3. Pre-registered rule (manifest Part 4): AUC >= 0.65 on 2 of 3 seeds (0-2) -> build Augmentation C; otherwise C is
 #    closed and not built. Seeds 1-2 need their rows from target_rule_smoke.py (a GPU play, queued after the C-h
 #    screen); seed 0's rows exist (runs/wumpus/target/smoke_seed0.npz).
-# 4. RESULT: filled after the runs.
+# 4. RESULT (seed 0, 2026-11-10/11, CPU ~3 h; runs/wumpus/sc_smoke/seed0.log): span x JSD AUC 0.865 -> PASS on seed 0
+#    (JSD alone 0.876, span alone 0.806; 11752 rows, 599 declined; medians declined 286 vs other 0). The "other" medians
+#    are exactly 0: many other rows turn towards a wall, where FORWARD's outcome is certain. The within-non-wall and
+#    within-unvisited-target AUCs (section 3's reported lines, added after seed 0) decide whether the score targets more
+#    than "not a wall"; seed 0 is re-run for them when the machine is free. Seeds 1-2: pending (stage a1_sc_rows.sh).
 # ==============================================================================
 """
 
@@ -141,6 +145,16 @@ def main() -> None:
     for name, s in (("span x JSD", score), ("JSD", jsd), ("span", span)):
         print(f"  {name:11s}: AUC {auc(s, declined):.3f}; median declined {np.median(s[declined]):.4g}, "
               f"other {np.median(s[~declined]):.4g}", flush=True)
+    # Reported, not registered (added 2026-11-11 after seed 0): a turn that faces a wall makes FORWARD's outcome certain
+    # (span = JSD = 0), so part of the ranking is "faces a wall or not". The same AUCs within non-wall rows and within
+    # rows whose target cell is unvisited show what the score adds beyond that.
+    wall, unvisited = rows["wall"].astype(bool), rows["unvisited"].astype(bool)
+    for label, sub in (("non-wall", ~wall), ("target unvisited", unvisited)):
+        if declined[sub].any() and (~declined[sub]).any():
+            print(f"  within {label} rows ({sub.sum()}, declined {declined[sub].sum()}): span x JSD AUC "
+                  f"{auc(score[sub], declined[sub]):.3f}, JSD {auc(jsd[sub], declined[sub]):.3f}, span {auc(span[sub], declined[sub]):.3f}",
+                  flush=True)
+    np.savez(Path(sys.argv[2]).with_name(Path(sys.argv[2]).stem + "_sc_scores.npz"), jsd=jsd, span=span, score=score)
     verdict = "PASS" if auc(score, declined) >= 0.65 else "FAIL"
     print(f"VERDICT {run_dir.name}: span x JSD AUC {auc(score, declined):.3f} -> {verdict} (bar 0.65; rule: 2 of 3 seeds)")
 
