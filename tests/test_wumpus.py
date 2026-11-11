@@ -215,7 +215,7 @@ class TestLearningStack:
             detached_planning_head=False, privileged_belief_loss=False, value_estimator=ValueEstimator.MAX,
             retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0, absorbing_value=False,
             decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0,
-            codec_bound=CodecBound.DISCOUNTED)
+            codec_bound=CodecBound.DISCOUNTED, target_prune=False)
         values.update(overrides)
         return RunConfig(**values)
 
@@ -286,6 +286,40 @@ class TestLearningStack:
         resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
         continued = [resumed.collect_and_train() for _ in range(2)] + [resumed.evaluate()]
         assert repr(continued) == repr(expected[1:])
+
+    def test_target_prune_matches_the_planners_pruning(self):
+        # training/run.py, section 23; trainer.py, 3h; search_model.py, 9: the value targets keep exactly the
+        # branches the tree keeps, renormalised the same way, so the root Q values agree; delta = 0 raises.
+        from ipomdp.experiments import wumpus_setup
+        import numpy as np
+        from ipomdp.planning import BeliefTreeSearch, DecisionNode, MinMaxStats, PrunedModel
+        from ipomdp.training import TrainingRun
+        setup = wumpus_setup(CPU, DISCOUNT)
+        run = TrainingRun(setup, self._config(target_prune=True), CPU)
+        assert isinstance(run.trainer.target_search, PrunedModel) and run.trainer.target_search.threshold == 1e-3
+        assert not isinstance(TrainingRun(setup, self._config(), CPU).trainer.target_search, PrunedModel)
+        with pytest.raises(ValueError, match="section 23"):
+            TrainingRun(setup, self._config(target_prune=True, observation_prune=0.0), CPU)
+        torch.manual_seed(0)
+        for net in (run.observation_head, run.value_head):          # spread the predictions so pruning bites
+            for p in net.parameters():
+                p.data.add_(0.3 * torch.randn_like(p))
+        run.trainer.target_value_head.load_state_dict(run.value_head.state_dict())
+        z = torch.randn(5, 16)
+        e = run.trainer.target_search.expand(z)
+        raw = run.trainer.target_model.expand(z)
+        assert bool((raw.observation_probs < 1e-3).any())             # some branch is pruned
+        tree = BeliefTreeSearch(run.trainer.target_model, num_simulations=1, c_puct=1.25, dirichlet_alpha=0.3,
+                                dirichlet_epsilon=0.0, seed=0, observation_prune=1e-3)
+        nodes = [DecisionNode(z[i], 0.0) for i in range(5)]
+        tree._expand(nodes, [MinMaxStats() for _ in nodes])
+        for i, node in enumerate(nodes):
+            for a, edge in enumerate(node.edges):
+                assert np.allclose(e.observation_probs[i, a, edge.observations].double().numpy(), edge.observation_probs, atol=1e-6)
+                assert float(e.observation_probs[i, a].sum()) == pytest.approx(1.0, abs=1e-5)
+        q = e.rewards + DISCOUNT * (e.observation_probs * e.next_values).sum(-1)
+        assert torch.allclose(run.trainer.value_targets(z), q.max(-1).values, atol=1e-4)
+        assert np.allclose(q.max(-1).values.double().numpy(), [n.value() for n in nodes], atol=1e-3)
 
     @pytest.mark.parametrize("estimator", ["max", "double"])
     def test_absorbing_value_anchors_targets_and_planner(self, estimator):

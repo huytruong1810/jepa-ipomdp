@@ -277,6 +277,13 @@
 #      towards the true value. Non-finite targets still raise (section 5); nothing else is clipped.
 #    - None (the default and canonical Tiger) leaves the targets untouched.
 #
+# 3h. Optional Planner-Consistent Pruning of the Targets (target_prune = delta > 0; model.target_prune, 2026-11-10):
+#    - The targets back up through PrunedModel(target model, delta) (planning/search_model.py, section 9): the same
+#      branches the tree search keeps, renormalised the same way, so the value is fitted to the backup the planner
+#      computes. The trainer's other expansion users (sections 2f-2i read child values, not probabilities) are
+#      unaffected; the observation head's own loss is unchanged.
+#    - 0 (the default and canonical Tiger) wraps nothing.
+#
 # 4. No Imagination Losses:
 #    - An earlier version also trained V on latents imagined by a stochastic latent
 #      transition ("consistency"). Planning now imagines through the real filter
@@ -305,7 +312,7 @@ from ..models.ema import ema_update, frozen_copy
 from ..models.heads import (HorizonValueHead, MultiStepObservationPredictor, ObservationHead, ObservationRewardHead, RewardHead,
                             ValueEstimator, ValueHead, ValuePair)
 from ..models.world_model import BeliefFilter, RecurrentJEPA
-from ..planning.search_model import AbsorbingValueModel, LearnedSearchModel
+from ..planning.search_model import AbsorbingValueModel, LearnedSearchModel, PrunedModel
 from .episode_buffer import EpisodeBatch
 from .privileged import PrivilegedBeliefLoss
 
@@ -363,6 +370,7 @@ class WorldModelTrainer:
         decision_aware_weight: float = 0.0,
         q_equivalent_weight: float = 0.0,
         target_bound: float | None = None,
+        target_prune: float = 0.0,
     ):
         """
         Args:
@@ -383,6 +391,7 @@ class WorldModelTrainer:
             reward_head: R(z, a), or r(z, a, o') (ObservationRewardHead, trained on the realised o_{t+1}; section 2i).
             q_equivalent_weight: w of the Q-equivalent observation term (section 2i; scale value_equivalent_scale); 0 = off.
             target_bound: B of the projection of the value targets onto [-B, B] (section 3g), or None.
+            target_prune: delta of the planner-consistent pruning of the targets' observation branches (section 3h); 0 = off.
         """
         if nstep < 0 or not 0.0 <= nstep_mix <= 1.0 or (nstep > 0 and nstep_mix == 0.0):
             raise ValueError(f"need nstep >= 0 and nstep_mix in (0, 1] when nstep > 0; got {nstep}, {nstep_mix}.")
@@ -466,6 +475,8 @@ class WorldModelTrainer:
         self.absorbing_observation = absorbing_observation
         self.target_search = (self.target_model if absorbing_observation is None
                               else AbsorbingValueModel(self.target_model, absorbing_observation))      # section 3f
+        if target_prune > 0.0:                                                                    # section 3h
+            self.target_search = PrunedModel(self.target_search, target_prune)
 
     @torch.no_grad()
     def value_targets(self, latents: Tensor) -> Tensor:

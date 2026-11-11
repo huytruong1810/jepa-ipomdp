@@ -29,7 +29,7 @@ def _config(**overrides) -> RunConfig:
         detached_planning_head=False, privileged_belief_loss=False, value_estimator=ValueEstimator.MAX,
         retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0, absorbing_value=False,
             decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0,
-            codec_bound=CodecBound.DISCOUNTED)
+            codec_bound=CodecBound.DISCOUNTED, target_prune=False)
     values.update(overrides)
     return RunConfig(**values)
 

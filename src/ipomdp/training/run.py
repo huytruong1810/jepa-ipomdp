@@ -362,6 +362,11 @@
 #      value targets onto that range (trainer.py 3g): a backup through noisy heads can exceed the bound by a few
 #      units, which the codec would otherwise reject. A domain without the bound (FinitePOMDP, Tiger) raises.
 #    - discounted (the default, canonical Tiger) is the old codec, bit for bit.
+#
+# 23. Planner-Consistent Pruning of the Value Targets (2026-11-10; trainer.py 3h, planning/search_model.py 9; audit F3):
+#    - cfg.target_prune = True: the value targets drop the observation branches the planner drops (P < observation_prune)
+#      and renormalise the rest, so the value fits the backup the planner computes. Needs observation_prune > 0 (raises).
+#    - False (the default, canonical Tiger) wraps nothing.
 # ==============================================================================
 
 from collections.abc import Callable
@@ -486,10 +491,20 @@ class RunConfig:
     observation_reward: bool          # reward head r(z, a, o') (section 21)
     q_equivalent_weight: float        # Q-equivalent observation term (section 21); 0 = off, needs observation_reward
     codec_bound: CodecBound           # two-hot range: discounted (default) | absorbing return bound (section 22)
+    target_prune: bool                # value targets pruned like the planner, at observation_prune (section 23)
 
 
 class TrainingRun:
     """Builds and advances one experiment (module header)."""
+
+    @staticmethod
+    def _target_prune(cfg: RunConfig) -> float:
+        """delta of the targets' planner-consistent pruning (section 23); needs a pruning planner."""
+        if not cfg.target_prune:
+            return 0.0
+        if cfg.observation_prune <= 0.0:
+            raise ValueError("target_prune needs mcts.observation_prune > 0: the planner keeps every branch (section 23).")
+        return cfg.observation_prune
 
     @staticmethod
     def _codec_bound(domain: "Domain", bound: CodecBound) -> float:
@@ -558,7 +573,8 @@ class TrainingRun:
                                          domain.value_bound * (1.0 - domain.discount), cfg.self_predictive_weight,
                                          setup.absorbing_observation if cfg.absorbing_value else None,      # section 19
                                          cfg.decision_aware_weight, cfg.q_equivalent_weight,                # sections 20, 21
-                                         codec_bound if cfg.codec_bound is CodecBound.ABSORBING else None)  # section 22
+                                         codec_bound if cfg.codec_bound is CodecBound.ABSORBING else None,  # section 22
+                                         self._target_prune(cfg))                                            # section 23
 
         # Polyak-averaged copies the agent acts with (section 4).
         self.acting_filter = frozen_copy(self.belief_filter)

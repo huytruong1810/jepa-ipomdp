@@ -92,6 +92,16 @@
 #      the protocol and every wrapper read rewards (N, A) exactly as before. branch_rewards is read by the trainer's
 #      Q-equivalent term (training/trainer.py, section 2i) and is None for every other model.
 #    - Not combined with a finite horizon (raises).
+#
+# 9. Planner-Consistent Pruning (PrunedModel; model.target_prune, 2026-11-10; training/trainer.py, 3h):
+#    - The tree search drops observation branches with P(o | s, a) < delta and renormalises the rest (planning/mcts.py,
+#      section 6). The trainer's value targets summed every observation, so the value was fitted to a backup the
+#      planner never computes: branches the planner discards (often off the filter's manifold, where the value head
+#      is least reliable) entered every target. PrunedModel(inner, delta) applies the planner's rule inside expand:
+#      P'(o) = P(o) 1[P(o) >= delta] / sum_{o'} P(o') 1[P(o') >= delta]. The mass of the largest branch is >= 1/|O|
+#      > delta, so the sum is never 0. Rewards, successor states and values are unchanged, as in the tree (an
+#      observation-conditioned reward keeps its unpruned expectation, exactly as the tree's edge reward does).
+#    - Used only for the trainer's targets; the planners prune in the tree. delta = 0 is never wrapped.
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -324,6 +334,29 @@ class RiskMarginModel:
         p_r = ((rewards[:, a] - self.spec.step_cost) / self.spec.fatal_reward).clamp(0.0, 1.0)
         rewards[:, a] = rewards[:, a] + self.spec.fatal_reward * ((k * p_r).clamp(max=1.0) - p_r)
         return Expansion(rewards, probs, e.next_states, e.next_values, e.branch_rewards)
+
+
+class PrunedModel:
+    """A SearchModel whose observation branches below delta are dropped and the rest renormalised (section 9)."""
+
+    def __init__(self, inner: SearchModel, threshold: float):
+        if not 0.0 < threshold < 1.0 / inner.num_observations:
+            raise ValueError(f"the prune threshold must lie in (0, 1/|O|), got {threshold} (section 9).")
+        self.inner, self.threshold = inner, threshold
+        self.num_actions, self.num_observations, self.discount = inner.num_actions, inner.num_observations, inner.discount
+
+    def initial_states(self, batch_size: int, initial_observations: Tensor | None) -> Tensor:
+        return self.inner.initial_states(batch_size, initial_observations)
+
+    def update(self, states: Tensor, actions: Tensor, observations: Tensor) -> Tensor:
+        return self.inner.update(states, actions, observations)
+
+    @torch.no_grad()
+    def expand(self, states: Tensor) -> Expansion:
+        e = self.inner.expand(states)
+        kept = e.observation_probs * (e.observation_probs >= self.threshold)
+        probs = kept / kept.sum(-1, keepdim=True)
+        return Expansion(e.rewards, probs, e.next_states, e.next_values, e.branch_rewards)
 
 
 class AbsorbingValueModel:
