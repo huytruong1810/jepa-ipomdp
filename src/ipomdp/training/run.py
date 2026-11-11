@@ -383,6 +383,15 @@
 #      opposite turns undo, an about-turn after a move faces the cell left behind) as counterfactual supervision of the
 #      observation head at the latents a turn produces. Wumpus declares them (DomainSetup.kinematics); Tiger raises.
 #    - 0 (the default, canonical Tiger) computes nothing new.
+#
+# 26. History Filter (2026-11-11; models/history_filter.py, planning/search_model.py 10, trainer.py 2l; Stage B of the
+#     2026-11-09 audit plan):
+#    - cfg.filter = transformer replaces the GRU by a causal Transformer over the action-observation tokens
+#      (TRANSFORMER_LAYERS = 2 pre-norm blocks, TRANSFORMER_HEADS = 4, width latent_dim, max_len = episode_length + 1 +
+#      TRANSFORMER_SEARCH_DEPTH). The planners search TokenSearchModel (history-token states) over its acting copy;
+#      the trainer's targets expand token states of the stored prefixes. Decoder representation only; no horizon or
+#      n-step (raises).
+#    - gru (the default, canonical Tiger) is the old filter and search model, bit for bit.
 # ==============================================================================
 
 from collections.abc import Callable
@@ -396,7 +405,8 @@ import torch
 from ..agents import PlanningAgent, UniformRandomAgent
 from ..models import (BeliefFilter, ChainObservationHead, ObservationFactors, HorizonValueHead, LatentPredictor, MultiStepObservationPredictor, ObservationHead, ObservationRewardHead, RecurrentJEPA, RewardHead, TwoHotSymlog, ValueEstimator, ValueHead, ValuePair,
                       ema_update, frozen_copy)
-from ..planning import AbsorbingValueModel, BeliefTreeSearch, LearnedSearchModel, RiskMarginModel, RiskSpec
+from ..models.history_filter import CausalTransformerFilter
+from ..planning import AbsorbingValueModel, BeliefTreeSearch, LearnedSearchModel, RiskMarginModel, RiskSpec, TokenSearchModel
 from .episode_buffer import EpisodeBatch, EpisodeBuffer
 from .privileged import PrivilegedBeliefLoss, PrivilegedSpec
 from .rollout import Simulator, discounted_returns, play_episodes
@@ -455,6 +465,16 @@ class DomainSetup:
     absorbing_observation: int | None = None
     observation_factors: ObservationFactors | None = None
     kinematics: KinematicRules | None = None
+
+
+TRANSFORMER_LAYERS, TRANSFORMER_HEADS = 2, 4      # section 26
+TRANSFORMER_SEARCH_DEPTH = 32                     # tokens beyond a whole episode that a search may imagine (section 26)
+
+
+class FilterKind(StrEnum):
+    """The belief filter (section 26)."""
+    GRU = "gru"                   # recurrent filter z' = GRU([a, o'], z) (canonical Tiger)
+    TRANSFORMER = "transformer"   # causal Transformer over the history tokens (models/history_filter.py)
 
 
 class ObservationHeadKind(StrEnum):
@@ -523,10 +543,23 @@ class RunConfig:
     double_partition: DoublePartition # value pair split by batch position (default) | buffer slot (section 13)
     observation_head: ObservationHeadKind  # joint (default) | chain-factored observation head (section 24)
     kinematic_weight: float           # kinematic-consistency term (section 25); 0 = off
+    filter: FilterKind                # gru (default) | transformer history filter (section 26)
 
 
 class TrainingRun:
     """Builds and advances one experiment (module header)."""
+
+    @staticmethod
+    def _filter(cfg: RunConfig, num_a: int, num_o: int) -> BeliefFilter | CausalTransformerFilter:
+        """The belief filter of section 26."""
+        if cfg.filter is FilterKind.GRU:
+            return BeliefFilter(num_a, num_o, cfg.latent_dim, cfg.hidden_dim, cfg.num_blocks)
+        if (cfg.representation is not Representation.DECODER or cfg.self_predictive_weight > 0.0 or cfg.time_aware_value
+                or cfg.value_nstep > 0):
+            raise ValueError("filter=transformer needs the decoder representation, no self-predictive term, no horizon "
+                             "and no n-step (section 26).")
+        return CausalTransformerFilter(num_a, num_o, cfg.latent_dim, TRANSFORMER_LAYERS, TRANSFORMER_HEADS,
+                                       cfg.episode_length + 1 + TRANSFORMER_SEARCH_DEPTH)
 
     @staticmethod
     def _kinematics(setup: DomainSetup, cfg: RunConfig) -> KinematicRules | None:
@@ -590,7 +623,7 @@ class TrainingRun:
         torch.manual_seed(seed(RunStream.NETWORK_INIT))
         num_a, num_o = domain.num_actions, domain.num_observations
 
-        self.belief_filter = BeliefFilter(num_a, num_o, cfg.latent_dim, cfg.hidden_dim, cfg.num_blocks).to(device)
+        self.belief_filter = self._filter(cfg, num_a, num_o).to(device)                                       # section 26
         self.jepa = (RecurrentJEPA(self.belief_filter,
                                    LatentPredictor(cfg.latent_dim, num_a, cfg.hidden_dim, cfg.num_blocks),
                                    cfg.ema_momentum).to(device)
@@ -639,8 +672,11 @@ class TrainingRun:
                                                  if self.planning_observation_head is not None else None)
         planner_observation = (self.acting_observation_head if self.acting_planning_observation_head is None
                                else self.acting_planning_observation_head)
-        model = LearnedSearchModel(self.acting_filter, self.acting_reward_head, planner_observation,
-                                   self.acting_value_head, self.codec, num_a, num_o, domain.discount, horizon)
+        model = (TokenSearchModel(self.acting_filter, self.acting_reward_head, planner_observation, self.acting_value_head,
+                                  self.codec, num_a, num_o, domain.discount)
+                 if cfg.filter is FilterKind.TRANSFORMER                                                            # section 26
+                 else LearnedSearchModel(self.acting_filter, self.acting_reward_head, planner_observation,
+                                         self.acting_value_head, self.codec, num_a, num_o, domain.discount, horizon))
         if cfg.absorbing_value:                                                                           # section 19
             model = AbsorbingValueModel(model, setup.absorbing_observation)
         if cfg.risk_margin != 1.0:                                                                        # section 16

@@ -52,7 +52,7 @@ from ..interpretability import BeliefAnalysis, analyze_beliefs, build_probe_data
 from ..models import BeliefFilter, ObservationFactors, ValueEstimator
 from ..planning import BeliefTreeSearch, RiskSpec
 from ..telemetry import BeliefGeometryVisualizer
-from ..training import (CodecBound, Domain, DoublePartition, KinematicRules, ObservationHeadKind, DomainSetup, EpisodeBatch, PrivilegedSpec, PrivilegedTargets, Representation, RunConfig,
+from ..training import (CodecBound, Domain, DoublePartition, FilterKind, KinematicRules, ObservationHeadKind, DomainSetup, EpisodeBatch, PrivilegedSpec, PrivilegedTargets, Representation, RunConfig,
                         TrainerConfig, TrainingRun, load_checkpoint, play_episodes, stream_seed)
 
 
@@ -120,7 +120,7 @@ def build_run_config(cfg: DictConfig) -> RunConfig:
         q_equivalent_weight=m.q_equivalent_weight, codec_bound=CodecBound(m.codec_bound),
         target_prune=m.target_prune, double_partition=DoublePartition(m.double_partition),
         observation_head=ObservationHeadKind(m.observation_head),
-        kinematic_weight=m.kinematic_weight)
+        kinematic_weight=m.kinematic_weight, filter=FilterKind(m.filter))
 
 
 def build_training_run(cfg: DictConfig, device: torch.device) -> tuple[DomainSetup, TrainingRun]:

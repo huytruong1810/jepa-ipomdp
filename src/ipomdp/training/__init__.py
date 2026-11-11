@@ -5,7 +5,7 @@ from .checkpointing import (CheckpointSelection, check_checkpoint_selection, loa
 from .episode_buffer import EpisodeBatch, EpisodeBuffer
 from .privileged import PrivilegedBeliefLoss, PrivilegedSpec, PrivilegedTargets
 from .rollout import Agent, Simulator, discounted_returns, play_episodes
-from .run import CodecBound, Domain, DomainSetup, ObservationHeadKind, RunConfig, TrainingRun
+from .run import CodecBound, Domain, DomainSetup, FilterKind, ObservationHeadKind, RunConfig, TrainingRun
 from .seeding import RunStream, stream_seed
 from .trainer import DoublePartition, KinematicRules, Representation, TrainerConfig, WorldModelTrainer
 
@@ -19,6 +19,7 @@ __all__ = [
     "Simulator",
     "EpisodeBatch",
     "EpisodeBuffer",
+    "FilterKind",
     "KinematicRules",
     "ObservationHeadKind",
     "PrivilegedBeliefLoss",

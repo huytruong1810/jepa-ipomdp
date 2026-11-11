@@ -203,7 +203,7 @@ class TestLearningStack:
     @staticmethod
     def _config(**overrides):
         from ipomdp.models import ValueEstimator
-        from ipomdp.training import CodecBound, DoublePartition, ObservationHeadKind, Representation, RunConfig, TrainerConfig
+        from ipomdp.training import CodecBound, DoublePartition, FilterKind, ObservationHeadKind, Representation, RunConfig, TrainerConfig
         values = dict(
             seed=3, episode_length=12, env_batch_size=4, warmup_episodes=4, buffer_capacity=32, batch_size=4,
             updates_per_collection=2, eval_episodes=4, latent_dim=16, hidden_dim=32, num_blocks=1,
@@ -217,7 +217,7 @@ class TestLearningStack:
             decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0,
             codec_bound=CodecBound.DISCOUNTED, target_prune=False,
             double_partition=DoublePartition.BATCH, observation_head=ObservationHeadKind.JOINT,
-            kinematic_weight=0.0)
+            kinematic_weight=0.0, filter=FilterKind.GRU)
         values.update(overrides)
         return RunConfig(**values)
 
@@ -400,6 +400,39 @@ class TestLearningStack:
         del fwd
         metrics = trainer.train_step(batch)
         assert "loss_kinematic" in metrics and metrics["loss_kinematic"] > 0.0
+
+    @pytest.mark.parametrize("estimator", ["max", "double"])
+    def test_transformer_filter_trains_plans_and_resumes(self, tmp_path, estimator):
+        # training/run.py, section 26; trainer.py, 2l: the history filter serves the planners (token states) and the
+        # targets (token states of every stored prefix, equal to the latents' own expansion); JEPA raises; resume
+        # stays bit-exact.
+        from ipomdp.experiments import wumpus_setup
+        from ipomdp.models import ValueEstimator
+        from ipomdp.planning import TokenSearchModel
+        from ipomdp.training import FilterKind, Representation, TrainingRun, load_checkpoint, save_checkpoint
+        setup = wumpus_setup(CPU, DISCOUNT)
+        with pytest.raises(ValueError, match="section 26"):
+            TrainingRun(setup, self._config(filter=FilterKind.TRANSFORMER), CPU)              # JEPA
+        config = lambda **kw: self._config(filter=FilterKind.TRANSFORMER, representation=Representation.DECODER,  # noqa: E731
+                                           value_estimator=ValueEstimator(estimator), **kw)
+        reference = TrainingRun(setup, config(), CPU)
+        assert isinstance(reference.eval_agent.model, TokenSearchModel)
+        assert isinstance(reference.trainer.target_model, TokenSearchModel)
+        expected = [reference.collect_and_train() for _ in range(3)] + [reference.evaluate()]
+        batch = reference.buffer.sample(2)
+        states = reference.trainer._history_states(batch)
+        import torch.nn.functional as F
+        with torch.no_grad():
+            z = reference.belief_filter.unroll(F.one_hot(batch.actions, 5).float(), F.one_hot(batch.observations, 33).float(),
+                                               F.one_hot(batch.initial_observations, 33).float())
+            assert torch.allclose(reference.trainer.target_model.latents(states), z.reshape(-1, z.shape[-1]), atol=1e-5)
+        first = TrainingRun(setup, config(), CPU)
+        first.collect_and_train()
+        save_checkpoint(tmp_path / "latest.pt", first.state_dict())
+        resumed = TrainingRun(setup, config(seed=99), CPU)
+        resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
+        continued = [resumed.collect_and_train() for _ in range(2)] + [resumed.evaluate()]
+        assert repr(continued) == repr(expected[1:])
 
     def test_target_prune_matches_the_planners_pruning(self):
         # training/run.py, section 23; trainer.py, 3h; search_model.py, 9: the value targets keep exactly the

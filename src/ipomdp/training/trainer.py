@@ -299,6 +299,13 @@
 #    - The gradient reaches the filter exactly when the observation term does (the decoder representation).
 #    - 0 (the default and canonical Tiger) computes nothing new. loss_mask with the term raises.
 #
+# 2l. Optional History Filter (belief_filter a CausalTransformerFilter; model.filter=transformer, 2026-11-11):
+#    - The latents of every loss come from the filter's unroll exactly as with the GRU (same contract). The value
+#      targets need the CHILDREN of every stored prefix, which a history filter computes from the history, not from z:
+#      the trainer builds the token state of each prefix z_0..z_T (_history_states) and expands them through
+#      TokenSearchModel on the online filter (planning/search_model.py, section 10). The double target reads the
+#      children's latents (Expansion.next_latents). JEPA, a horizon and n-step grounding raise.
+#
 # 3h. Optional Planner-Consistent Pruning of the Targets (target_prune = delta > 0; model.target_prune, 2026-11-10):
 #    - The targets back up through PrunedModel(target model, delta) (planning/search_model.py, section 9): the same
 #      branches the tree search keeps, renormalised the same way, so the value is fitted to the backup the planner
@@ -344,7 +351,8 @@ from ..models.ema import ema_update, frozen_copy
 from ..models.heads import (HorizonValueHead, MultiStepObservationPredictor, ObservationHead, ObservationRewardHead, RewardHead,
                             ValueEstimator, ValueHead, ValuePair)
 from ..models.world_model import BeliefFilter, RecurrentJEPA
-from ..planning.search_model import AbsorbingValueModel, LearnedSearchModel, PrunedModel
+from ..models.history_filter import CausalTransformerFilter
+from ..planning.search_model import AbsorbingValueModel, LearnedSearchModel, PrunedModel, TokenSearchModel
 from .episode_buffer import EpisodeBatch
 from .privileged import PrivilegedBeliefLoss
 
@@ -542,9 +550,14 @@ class WorldModelTrainer:
                                            weight_decay=config.weight_decay)
         self.target_value_head = frozen_copy(value_head)
         planner_observation = observation_head if planning_observation_head is None else planning_observation_head
-        self.target_model = LearnedSearchModel(belief_filter, reward_head, planner_observation,
-                                               self.target_value_head, codec, num_actions, num_observations, discount,
-                                               horizon)
+        self.history = isinstance(belief_filter, CausalTransformerFilter)                         # section 2l
+        if self.history and (jepa is not None or horizon is not None or nstep > 0):
+            raise ValueError("the history filter needs the decoder representation, no horizon and no n-step (section 2l).")
+        self.target_model = (TokenSearchModel(belief_filter, reward_head, planner_observation, self.target_value_head, codec,
+                                              num_actions, num_observations, discount) if self.history
+                             else LearnedSearchModel(belief_filter, reward_head, planner_observation,
+                                                     self.target_value_head, codec, num_actions, num_observations, discount,
+                                                     horizon))
         self.absorbing_observation = absorbing_observation
         self.target_search = (self.target_model if absorbing_observation is None
                               else AbsorbingValueModel(self.target_model, absorbing_observation))      # section 3f
@@ -568,7 +581,7 @@ class WorldModelTrainer:
     def _value_targets_and_children(self, latents: Tensor) -> tuple[Tensor, Tensor, Tensor | None]:
         """value_targets plus the expansion's child values V-bar(tau(z, a, o)) and branch rewards, (N, A, O) (2f, 2i)."""
         with torch.autocast(self.device.type, enabled=False):
-            expansion = self.target_search.expand(latents.float())
+            expansion = self.target_search.expand(latents.float() if latents.is_floating_point() else latents)  # 2l
             q = expansion.rewards + self.discount * (expansion.observation_probs * expansion.next_values).sum(-1)
         return q.max(dim=-1).values, expansion.next_values, expansion.branch_rewards
 
@@ -589,12 +602,12 @@ class WorldModelTrainer:
     def _pair_value_targets_and_children(self, latents: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor | None]:
         """pair_value_targets plus the expansion's child values (the pair's combined value) and branch rewards, (N, A, O)."""
         with torch.autocast(self.device.type, enabled=False):
-            expansion = self.target_search.expand(latents.float())
+            expansion = self.target_search.expand(latents.float() if latents.is_floating_point() else latents)  # 2l
             backup = lambda v: expansion.rewards + self.discount * (expansion.observation_probs * v).sum(-1)  # noqa: E731
             if self.value_head.estimator is ValueEstimator.CLIPPED_DOUBLE:
                 target = backup(expansion.next_values).max(dim=-1).values          # next_values = min(A, B)
                 return target, target, expansion.next_values, expansion.branch_rewards
-            children = expansion.next_states.flatten(0, 2)
+            children = (expansion.next_states if expansion.next_latents is None else expansion.next_latents).flatten(0, 2)
             va, vb = (v.view_as(expansion.next_values) for v in self.target_value_head.head_values(children, self.twohot))
             if self.absorbing_observation is not None:                                       # section 3f
                 va, vb = va.clone(), vb.clone()
@@ -679,12 +692,14 @@ class WorldModelTrainer:
             all_latents = latents.reshape(batch * (steps + 1), -1)
             if isinstance(self.value_head, ValuePair):                                    # section 3e
                 head_a = self._head_a_rows(episodes, batch).repeat_interleave(steps + 1)       # section 3e
-                target_a, target_b, child_values, branch_rewards = self._pair_value_targets_and_children(all_latents.detach())
+                target_a, target_b, child_values, branch_rewards = self._pair_value_targets_and_children(
+                    self._history_states(episodes) if self.history else all_latents.detach())          # section 2l
                 targets_value = torch.where(head_a, target_a, target_b)
                 value_logits = torch.where(head_a.unsqueeze(-1), self.value_head.a(all_latents.detach()),
                                            self.value_head.b(all_latents.detach()))
             elif self.horizon is None:
-                targets_value, child_values, branch_rewards = self._value_targets_and_children(all_latents.detach())
+                targets_value, child_values, branch_rewards = self._value_targets_and_children(
+                    self._history_states(episodes) if self.history else all_latents.detach())          # section 2l
                 value_logits = self.value_head(all_latents.detach())
             else:
                 if steps != self.horizon:
@@ -788,6 +803,21 @@ class WorldModelTrainer:
             "value_target_mean": targets_value.mean().item(),
             "value_abs_error": value_error.item(),
         }
+
+    def _history_states(self, episodes: EpisodeBatch) -> Tensor:
+        """Token states (section 2l) of every prefix z_0..z_T of the batch, (B * (T + 1), 1 + 2 L_max) int64."""
+        f = self.belief_filter
+        tokens = f.history_tokens(episodes.actions, episodes.observations, episodes.initial_observations)   # (B, T+1, 2)
+        batch, length, _ = tokens.shape
+        if length >= f.max_len:
+            raise ValueError(f"episodes of {length - 1} steps need max_len > {length} (section 2l).")
+        flat = torch.zeros(batch, 2 * f.max_len, dtype=torch.long, device=tokens.device)
+        flat[:, :2 * length] = tokens.reshape(batch, -1)
+        keep = torch.arange(2 * f.max_len, device=tokens.device)[None] < 2 * torch.arange(1, length + 1, device=tokens.device)[:, None]
+        states = torch.empty(batch, length, 1 + 2 * f.max_len, dtype=torch.long, device=tokens.device)
+        states[:, :, 0] = torch.arange(1, length + 1, device=tokens.device)
+        states[:, :, 1:] = flat[:, None] * keep[None]
+        return states.reshape(batch * length, -1)
 
     def _kinematic_loss(self, latents: Tensor, episodes: EpisodeBatch) -> Tensor:
         """Sum over the three rules of section 2k of their mean over matching steps (0 for a rule with none)."""

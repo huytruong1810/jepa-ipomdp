@@ -122,6 +122,7 @@ model:
   double_partition: batch       # slot: each stored episode trains one head of the value pair (run.py, 13; trainer.py, 3e)
   observation_head: joint       # chain: chain-rule observation head over the percept's channels (run.py, 24; heads.py, 3b)
   kinematic_weight: 0.0         # lambda > 0: kinematic-consistency term from declared action semantics (run.py, 25; trainer.py, 2k)
+  filter: gru                   # transformer: causal Transformer over the history tokens, decoder only (run.py, 26)
   q_equivalent_weight: 0.0      # w > 0: Q-equivalent observation term, needs observation_reward, decoder only (run.py, 21; trainer.py, 2i)
 
 mcts:
