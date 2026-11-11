@@ -203,7 +203,7 @@ class TestLearningStack:
     @staticmethod
     def _config(**overrides):
         from ipomdp.models import ValueEstimator
-        from ipomdp.training import Representation, RunConfig, TrainerConfig
+        from ipomdp.training import CodecBound, Representation, RunConfig, TrainerConfig
         values = dict(
             seed=3, episode_length=12, env_batch_size=4, warmup_episodes=4, buffer_capacity=32, batch_size=4,
             updates_per_collection=2, eval_episodes=4, latent_dim=16, hidden_dim=32, num_blocks=1,
@@ -214,7 +214,8 @@ class TestLearningStack:
             time_aware_value=False, value_nstep=0, value_nstep_mix=0.5,
             detached_planning_head=False, privileged_belief_loss=False, value_estimator=ValueEstimator.MAX,
             retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0, absorbing_value=False,
-            decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0)
+            decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0,
+            codec_bound=CodecBound.DISCOUNTED)
         values.update(overrides)
         return RunConfig(**values)
 
@@ -250,6 +251,35 @@ class TestLearningStack:
         assert expected[0]["collect_trials_per_game"] == 0.0                                   # warm-up: no planner
         assert expected[2]["collect_trials_per_game"] > 0.0
         first = TrainingRun(setup, config(), CPU)
+        first.collect_and_train()
+        save_checkpoint(tmp_path / "latest.pt", first.state_dict())
+        resumed = TrainingRun(setup, config(seed=99), CPU)
+        resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
+        continued = [resumed.collect_and_train() for _ in range(2)] + [resumed.evaluate()]
+        assert repr(continued) == repr(expected[1:])
+
+    def test_absorbing_codec_bound_sizes_bins_projects_targets_and_resumes(self, tmp_path):
+        # training/run.py, section 22; trainer.py, section 3g: bins over +-1110 (every bin reachable), value targets
+        # projected onto the range, Tiger raises, and resume stays bit-exact.
+        from ipomdp.experiments import tiger_setup, wumpus_setup
+        from ipomdp.models import ValueEstimator
+        from ipomdp.training import CodecBound, Representation, TrainingRun, load_checkpoint, save_checkpoint
+        setup = wumpus_setup(CPU, DISCOUNT)
+        assert setup.domain.absorbing_return_bound == pytest.approx(1110.0)
+        config = lambda **kw: self._config(codec_bound=CodecBound.ABSORBING, representation=Representation.DECODER,  # noqa: E731
+                                           value_estimator=ValueEstimator.DOUBLE, **kw)
+        reference = TrainingRun(setup, config(), CPU)
+        bins = reference.codec.bins
+        assert float(bins.abs().max()) == pytest.approx(1110.0) and reference.trainer.target_bound == pytest.approx(1110.0)
+        assert TrainingRun(setup, self._config(), CPU).trainer.target_bound is None
+        with pytest.raises(ValueError, match="section 22"):
+            TrainingRun(tiger_setup(CPU), self._config(codec_bound=CodecBound.ABSORBING), CPU)
+        for p in reference.reward_head.parameters():                     # rewards near the bound: targets can exceed it
+            p.data.add_(0.5 * torch.randn_like(p, generator=torch.Generator().manual_seed(1)))
+        expected = [reference.collect_and_train() for _ in range(3)] + [reference.evaluate()]
+        first = TrainingRun(setup, config(), CPU)
+        for p in first.reward_head.parameters():
+            p.data.add_(0.5 * torch.randn_like(p, generator=torch.Generator().manual_seed(1)))
         first.collect_and_train()
         save_checkpoint(tmp_path / "latest.pt", first.state_dict())
         resumed = TrainingRun(setup, config(seed=99), CPU)

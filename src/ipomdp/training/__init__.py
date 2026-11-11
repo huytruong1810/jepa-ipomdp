@@ -5,11 +5,12 @@ from .checkpointing import (CheckpointSelection, check_checkpoint_selection, loa
 from .episode_buffer import EpisodeBatch, EpisodeBuffer
 from .privileged import PrivilegedBeliefLoss, PrivilegedSpec, PrivilegedTargets
 from .rollout import Agent, Simulator, discounted_returns, play_episodes
-from .run import Domain, DomainSetup, RunConfig, TrainingRun
+from .run import CodecBound, Domain, DomainSetup, RunConfig, TrainingRun
 from .seeding import RunStream, stream_seed
 from .trainer import Representation, TrainerConfig, WorldModelTrainer
 
 __all__ = [
+    "CodecBound",
     "Agent",
     "CheckpointSelection",
     "Domain",

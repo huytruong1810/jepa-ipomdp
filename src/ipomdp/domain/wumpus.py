@@ -245,6 +245,19 @@ class WumpusWorld:
         """max|r| / (1 - gamma), with max|r| = 1001 (dying pays the step cost too)."""
         return (abs(DEATH_REWARD) + abs(STEP_COST)) / (1.0 - self.discount)
 
+    @property
+    def absorbing_return_bound(self) -> float:
+        """
+        Bound on |discounted return| of the absorbing game under every policy, over an infinite horizon:
+        max(GOLD, |DEATH| + |SHOOT| + |STEP| / (1 - gamma)) = 1110 at gamma = 0.99. Gold and death each pay at
+        most once (the game then absorbs at reward 0), the arrow is shot at most once, and every live step costs
+        |STEP|. The window (env.max_steps) does not cap it: the latent carries no clock, so the value head
+        bootstraps past the window and estimates the infinite-horizon return. Sizes the two-hot bins under
+        model.codec_bound=absorbing (training/run.py, section 22); value_bound (1001 / (1 - gamma) = 100100)
+        leaves 100 of 255 bins unreachable.
+        """
+        return max(GOLD_REWARD, abs(DEATH_REWARD) + abs(SHOOT_COST) + abs(STEP_COST) / (1.0 - self.discount))
+
     def initial_state(self, layout: Tensor) -> WumpusState:
         """The hunter at the start cell facing North with its arrow, the wumpus alive."""
         zeros = torch.zeros_like(layout)

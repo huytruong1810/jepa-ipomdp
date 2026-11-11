@@ -270,6 +270,13 @@
 #      the value-/Q-equivalent and decision-aware terms, the privileged term) raise instead of ignoring it.
 #    - With loss_mask None (the default and every online run) the code path is the unmasked one, unchanged.
 #
+# 3g. Optional Projection of the Value Targets (target_bound = B; model.codec_bound=absorbing, 2026-11-10):
+#    - With the codec sized by the absorbing game's return bound (training/run.py, section 22), the Bellman target
+#      R + gamma sum_o P V-bar can exceed B by a few units (each term is within B, their sum need not be). The
+#      targets are projected onto [-B, B], the set every true return lies in: the projection can only move a target
+#      towards the true value. Non-finite targets still raise (section 5); nothing else is clipped.
+#    - None (the default and canonical Tiger) leaves the targets untouched.
+#
 # 4. No Imagination Losses:
 #    - An earlier version also trained V on latents imagined by a stochastic latent
 #      transition ("consistency"). Planning now imagines through the real filter
@@ -355,6 +362,7 @@ class WorldModelTrainer:
         absorbing_observation: int | None = None,
         decision_aware_weight: float = 0.0,
         q_equivalent_weight: float = 0.0,
+        target_bound: float | None = None,
     ):
         """
         Args:
@@ -374,6 +382,7 @@ class WorldModelTrainer:
             decision_aware_weight: beta of the decision-aware weighting of the observation term (section 2h); 0 = off.
             reward_head: R(z, a), or r(z, a, o') (ObservationRewardHead, trained on the realised o_{t+1}; section 2i).
             q_equivalent_weight: w of the Q-equivalent observation term (section 2i; scale value_equivalent_scale); 0 = off.
+            target_bound: B of the projection of the value targets onto [-B, B] (section 3g), or None.
         """
         if nstep < 0 or not 0.0 <= nstep_mix <= 1.0 or (nstep > 0 and nstep_mix == 0.0):
             raise ValueError(f"need nstep >= 0 and nstep_mix in (0, 1] when nstep > 0; got {nstep}, {nstep_mix}.")
@@ -400,6 +409,9 @@ class WorldModelTrainer:
             raise ValueError(f"need decision_aware_weight in [0, 1], got {decision_aware_weight} (section 2h).")
         if decision_aware_weight > 0.0 and horizon is not None:
             raise ValueError("decision-aware weighting needs the expansion's child values: no time-aware value (section 2h).")
+        if target_bound is not None and target_bound != codec.max_abs_value:
+            raise ValueError(f"target_bound {target_bound} must equal the codec range {codec.max_abs_value} (section 3g).")
+        self.target_bound = target_bound
         if q_equivalent_weight < 0.0:
             raise ValueError(f"need q_equivalent_weight >= 0, got {q_equivalent_weight} (section 2i).")
         if q_equivalent_weight > 0.0 and (not isinstance(reward_head, ObservationRewardHead) or jepa is not None
@@ -600,6 +612,8 @@ class WorldModelTrainer:
                 value_logits = self.value_head(all_latents.detach()[live], steps_left[live])
             if self.nstep > 0:
                 targets_value, nstep_metrics = self._mix_nstep(latents.detach(), episodes, targets_value)
+            if self.target_bound is not None:                                            # section 3g
+                targets_value = targets_value.clamp(-self.target_bound, self.target_bound)
             value_loss = self.twohot.loss(value_logits, targets_value)
             losses["value"] = value_loss.mean() if mask is None else _masked_mean(value_loss, latent_mask)
 

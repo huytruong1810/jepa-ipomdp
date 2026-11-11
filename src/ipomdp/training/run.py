@@ -350,10 +350,23 @@
 #      gamma V-bar(tau)] - (r_t + gamma V-bar(z_{t+1}))) / max|R|)^2, gradients through P into the filter (decoder only).
 #      Screened offline first (reports/2026-10-02_wumpus_diagnostics/objective_ab.py 2p).
 #    - False / 0 (the defaults, canonical Tiger) build and compute nothing new.
+#
+# 22. Two-Hot Range of the Absorbing Game (2026-11-10; trainer.py 3g; the 2026-11-09 audit, finding F1):
+#    - The codec's bins span +- Domain.value_bound = max|r| / (1 - gamma), a bound on any discounted return of a
+#      non-absorbing POMDP. Wumpus absorbs after gold or death, so its returns lie in [-1110, +1000] while its
+#      value_bound is 100100: 100 of 255 symlog bins are unreachable, the spacing near +-1000 is ~90, and softmax
+#      leakage onto the unreachable bins adds one-sided phantom value (measured on the recipe's final networks,
+#      seeds 0-2: mean +0.4 to +0.9, p99 6 to 15, max ~100 on the planner's imagined children; the decision margin
+#      between idling and stepping is ~7).
+#    - cfg.codec_bound = absorbing sizes the bins by Domain.absorbing_return_bound (Wumpus 1110) and projects the
+#      value targets onto that range (trainer.py 3g): a backup through noisy heads can exceed the bound by a few
+#      units, which the codec would otherwise reject. A domain without the bound (FinitePOMDP, Tiger) raises.
+#    - discounted (the default, canonical Tiger) is the old codec, bit for bit.
 # ==============================================================================
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from enum import Enum
 from typing import Protocol
 
 import numpy as np
@@ -388,6 +401,9 @@ class Domain(Protocol):
     def value_bound(self) -> float: ...
 
     @property
+    def absorbing_return_bound(self) -> float | None: ...
+
+    @property
     def has_initial_observation(self) -> bool: ...
 
 
@@ -412,6 +428,12 @@ class DomainSetup:
     privileged: PrivilegedSpec | None = None
     risk: RiskSpec | None = None
     absorbing_observation: int | None = None
+
+
+class CodecBound(str, Enum):
+    """Range of the two-hot reward/value bins (section 22)."""
+    DISCOUNTED = "discounted"     # +- max|r| / (1 - gamma) (Domain.value_bound; canonical Tiger)
+    ABSORBING = "absorbing"       # +- Domain.absorbing_return_bound, value targets projected onto it
 
 
 @dataclass(frozen=True)
@@ -463,10 +485,20 @@ class RunConfig:
     decision_aware_weight: float      # decision-aware weighting of the observation term (section 20); 0 = off
     observation_reward: bool          # reward head r(z, a, o') (section 21)
     q_equivalent_weight: float        # Q-equivalent observation term (section 21); 0 = off, needs observation_reward
+    codec_bound: CodecBound           # two-hot range: discounted (default) | absorbing return bound (section 22)
 
 
 class TrainingRun:
     """Builds and advances one experiment (module header)."""
+
+    @staticmethod
+    def _codec_bound(domain: "Domain", bound: CodecBound) -> float:
+        """The two-hot range of section 22; a domain without an absorbing return bound raises."""
+        if bound is CodecBound.DISCOUNTED:
+            return domain.value_bound
+        if domain.absorbing_return_bound is None:
+            raise ValueError("codec_bound=absorbing needs a domain with an absorbing return bound (section 22).")
+        return domain.absorbing_return_bound
 
     def __init__(self, setup: DomainSetup, cfg: RunConfig, device: torch.device):
         self.setup, self.cfg, self.device = setup, cfg, device
@@ -506,7 +538,8 @@ class TrainingRun:
                             if cfg.observation_reward
                             else RewardHead(cfg.latent_dim, num_a, cfg.hidden_dim, cfg.num_blocks, cfg.num_bins)).to(device)
         self.observation_head = ObservationHead(cfg.latent_dim, num_a, num_o, cfg.hidden_dim, cfg.num_blocks).to(device)
-        self.codec = TwoHotSymlog(cfg.num_bins, domain.value_bound).to(device)
+        codec_bound = self._codec_bound(domain, cfg.codec_bound)                                           # section 22
+        self.codec = TwoHotSymlog(cfg.num_bins, codec_bound).to(device)
         self.multistep_predictor = (MultiStepObservationPredictor(cfg.latent_dim, num_a, num_o, cfg.hidden_dim,
                                                                   cfg.num_blocks, cfg.observation_horizon).to(device)
                                     if cfg.observation_horizon > 0 else None)
@@ -524,7 +557,8 @@ class TrainingRun:
                                          self.planning_observation_head, self.privileged, cfg.value_equivalent_weight,
                                          domain.value_bound * (1.0 - domain.discount), cfg.self_predictive_weight,
                                          setup.absorbing_observation if cfg.absorbing_value else None,      # section 19
-                                         cfg.decision_aware_weight, cfg.q_equivalent_weight)                # sections 20, 21
+                                         cfg.decision_aware_weight, cfg.q_equivalent_weight,                # sections 20, 21
+                                         codec_bound if cfg.codec_bound is CodecBound.ABSORBING else None)  # section 22
 
         # Polyak-averaged copies the agent acts with (section 4).
         self.acting_filter = frozen_copy(self.belief_filter)

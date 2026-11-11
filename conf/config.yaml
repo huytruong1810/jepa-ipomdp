@@ -116,6 +116,7 @@ model:
   absorbing_value: false        # true: V = 0 behind the absorbing percept in the value targets and the planner (run.py, 19)
   decision_aware_weight: 0.0    # beta in (0, 1]: span^2-weighted observation cross-entropy (run.py, 20; trainer.py, 2h)
   observation_reward: false     # true: reward head r(z, a, o'), the planner backs up sum_o P(o) r (run.py, 21; heads.py, 2d)
+  codec_bound: discounted       # absorbing: two-hot bins over the absorbing game's return bound, targets projected (run.py, 22)
   q_equivalent_weight: 0.0      # w > 0: Q-equivalent observation term, needs observation_reward, decoder only (run.py, 21; trainer.py, 2i)
 
 mcts:

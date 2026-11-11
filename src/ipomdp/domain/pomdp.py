@@ -138,6 +138,11 @@ class FinitePOMDP:
         return False
 
     @property
+    def absorbing_return_bound(self) -> None:
+        """None: a FinitePOMDP has no absorbing game, so model.codec_bound=absorbing raises (training/run.py, 22)."""
+        return None
+
+    @property
     def value_bound(self) -> float:
         """
         Bound on |r| and on |V^pi(b)| for every policy and belief: max|R| / (1 - gamma).

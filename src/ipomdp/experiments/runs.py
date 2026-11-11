@@ -52,7 +52,7 @@ from ..interpretability import BeliefAnalysis, analyze_beliefs, build_probe_data
 from ..models import BeliefFilter, ValueEstimator
 from ..planning import BeliefTreeSearch, RiskSpec
 from ..telemetry import BeliefGeometryVisualizer
-from ..training import (Domain, DomainSetup, EpisodeBatch, PrivilegedSpec, PrivilegedTargets, Representation, RunConfig,
+from ..training import (CodecBound, Domain, DomainSetup, EpisodeBatch, PrivilegedSpec, PrivilegedTargets, Representation, RunConfig,
                         TrainerConfig, TrainingRun, load_checkpoint, play_episodes, stream_seed)
 
 
@@ -112,7 +112,7 @@ def build_run_config(cfg: DictConfig) -> RunConfig:
         value_equivalent_weight=m.value_equivalent_weight, risk_margin=s.risk_margin, trial_prob=a.trial_prob,
         self_predictive_weight=m.self_predictive_weight, absorbing_value=m.absorbing_value,
         decision_aware_weight=m.decision_aware_weight, observation_reward=m.observation_reward,
-        q_equivalent_weight=m.q_equivalent_weight)
+        q_equivalent_weight=m.q_equivalent_weight, codec_bound=CodecBound(m.codec_bound))
 
 
 def build_training_run(cfg: DictConfig, device: torch.device) -> tuple[DomainSetup, TrainingRun]:
