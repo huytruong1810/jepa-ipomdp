@@ -370,6 +370,13 @@
 #    - cfg.target_prune = True: the value targets drop the observation branches the planner drops (P < observation_prune)
 #      and renormalise the rest, so the value fits the backup the planner computes. Needs observation_prune > 0 (raises).
 #    - False (the default, canonical Tiger) wraps nothing.
+#
+# 24. Chain-Factored Observation Head (2026-11-10; models/heads.py 3b; Stage B of the 2026-11-09 audit plan):
+#    - cfg.observation_head = chain builds ChainObservationHead from DomainSetup.observation_factors for the
+#      observation head (and the detached planning head, when on): P(o | z, a) by the exact chain rule over the
+#      percept's binary channels, glitter predicted after bump and scream. The planner, the trainer and every loss read
+#      its normalised log-probabilities exactly as the joint head's logits. A domain without factors (Tiger) raises.
+#    - joint (the default, canonical Tiger) builds the old head, bit for bit.
 # ==============================================================================
 
 from collections.abc import Callable
@@ -381,7 +388,7 @@ import numpy as np
 import torch
 
 from ..agents import PlanningAgent, UniformRandomAgent
-from ..models import (BeliefFilter, HorizonValueHead, LatentPredictor, MultiStepObservationPredictor, ObservationHead, ObservationRewardHead, RecurrentJEPA, RewardHead, TwoHotSymlog, ValueEstimator, ValueHead, ValuePair,
+from ..models import (BeliefFilter, ChainObservationHead, ObservationFactors, HorizonValueHead, LatentPredictor, MultiStepObservationPredictor, ObservationHead, ObservationRewardHead, RecurrentJEPA, RewardHead, TwoHotSymlog, ValueEstimator, ValueHead, ValuePair,
                       ema_update, frozen_copy)
 from ..planning import AbsorbingValueModel, BeliefTreeSearch, LearnedSearchModel, RiskMarginModel, RiskSpec
 from .episode_buffer import EpisodeBatch, EpisodeBuffer
@@ -428,6 +435,8 @@ class DomainSetup:
         risk: The domain's fatal outcome, for the risk margin and the trials (sections 16, 17), or None.
         absorbing_observation: The percept that marks the absorbing end of a game, worth V = 0
             (planning/search_model.py, section 7), or None if the domain has none (Tiger).
+        observation_factors: The percept's binary channels for the chain-factored observation head
+            (models/heads.py, section 3b; section 24), or None if the percept is not factored (Tiger).
     """
 
     domain: Domain
@@ -436,6 +445,13 @@ class DomainSetup:
     privileged: PrivilegedSpec | None = None
     risk: RiskSpec | None = None
     absorbing_observation: int | None = None
+    observation_factors: ObservationFactors | None = None
+
+
+class ObservationHeadKind(StrEnum):
+    """The planning model's observation head (section 24)."""
+    JOINT = "joint"     # one softmax over every observation (ObservationHead; canonical Tiger)
+    CHAIN = "chain"     # chain rule over the percept's binary channels (ChainObservationHead)
 
 
 class CodecBound(StrEnum):
@@ -496,10 +512,23 @@ class RunConfig:
     codec_bound: CodecBound           # two-hot range: discounted (default) | absorbing return bound (section 22)
     target_prune: bool                # value targets pruned like the planner, at observation_prune (section 23)
     double_partition: DoublePartition # value pair split by batch position (default) | buffer slot (section 13)
+    observation_head: ObservationHeadKind  # joint (default) | chain-factored observation head (section 24)
 
 
 class TrainingRun:
     """Builds and advances one experiment (module header)."""
+
+    @staticmethod
+    def _observation_head(setup: DomainSetup, cfg: RunConfig) -> ObservationHead | ChainObservationHead:
+        """The observation head of section 24; chain needs the domain's observation factors."""
+        num_a, num_o = setup.domain.num_actions, setup.domain.num_observations
+        if cfg.observation_head is ObservationHeadKind.JOINT:
+            return ObservationHead(cfg.latent_dim, num_a, num_o, cfg.hidden_dim, cfg.num_blocks)
+        if setup.observation_factors is None:
+            raise ValueError("observation_head=chain needs a domain with observation factors (section 24).")
+        if setup.observation_factors.num_observations != num_o:
+            raise ValueError(f"the factors describe {setup.observation_factors.num_observations} observations, the domain {num_o}.")
+        return ChainObservationHead(cfg.latent_dim, num_a, cfg.hidden_dim, cfg.num_blocks, setup.observation_factors)
 
     @staticmethod
     def _target_prune(cfg: RunConfig) -> float:
@@ -556,13 +585,13 @@ class TrainingRun:
         self.reward_head = (ObservationRewardHead(cfg.latent_dim, num_a, num_o, cfg.hidden_dim, cfg.num_blocks, cfg.num_bins)
                             if cfg.observation_reward
                             else RewardHead(cfg.latent_dim, num_a, cfg.hidden_dim, cfg.num_blocks, cfg.num_bins)).to(device)
-        self.observation_head = ObservationHead(cfg.latent_dim, num_a, num_o, cfg.hidden_dim, cfg.num_blocks).to(device)
+        self.observation_head = self._observation_head(setup, cfg).to(device)                                # section 24
         codec_bound = self._codec_bound(domain, cfg.codec_bound)                                           # section 22
         self.codec = TwoHotSymlog(cfg.num_bins, codec_bound).to(device)
         self.multistep_predictor = (MultiStepObservationPredictor(cfg.latent_dim, num_a, num_o, cfg.hidden_dim,
                                                                   cfg.num_blocks, cfg.observation_horizon).to(device)
                                     if cfg.observation_horizon > 0 else None)
-        self.planning_observation_head = (ObservationHead(cfg.latent_dim, num_a, num_o, cfg.hidden_dim, cfg.num_blocks).to(device)
+        self.planning_observation_head = (self._observation_head(setup, cfg).to(device)
                                           if cfg.detached_planning_head else None)                 # section 11
         self.privileged = (PrivilegedBeliefLoss(setup.privileged, cfg.buffer_capacity, cfg.episode_length, cfg.latent_dim,
                                                 cfg.hidden_dim, cfg.num_blocks).to(device)

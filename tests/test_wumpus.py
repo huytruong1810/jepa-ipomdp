@@ -203,7 +203,7 @@ class TestLearningStack:
     @staticmethod
     def _config(**overrides):
         from ipomdp.models import ValueEstimator
-        from ipomdp.training import CodecBound, DoublePartition, Representation, RunConfig, TrainerConfig
+        from ipomdp.training import CodecBound, DoublePartition, ObservationHeadKind, Representation, RunConfig, TrainerConfig
         values = dict(
             seed=3, episode_length=12, env_batch_size=4, warmup_episodes=4, buffer_capacity=32, batch_size=4,
             updates_per_collection=2, eval_episodes=4, latent_dim=16, hidden_dim=32, num_blocks=1,
@@ -216,7 +216,7 @@ class TestLearningStack:
             retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0, absorbing_value=False,
             decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0,
             codec_bound=CodecBound.DISCOUNTED, target_prune=False,
-            double_partition=DoublePartition.BATCH)
+            double_partition=DoublePartition.BATCH, observation_head=ObservationHeadKind.JOINT)
         values.update(overrides)
         return RunConfig(**values)
 
@@ -342,6 +342,31 @@ class TestLearningStack:
             else:
                 assert len(calls) == 2 and ids(calls[1]) == ids(run.value_head.parameters())
                 assert ids(calls[0]) | ids(calls[1]) == ids(run.trainer.parameters) and not ids(calls[0]) & ids(calls[1])
+
+    def test_chain_observation_head_trains_plans_and_resumes(self, tmp_path):
+        # training/run.py, section 24: the chain head (and its acting copy) serve the planner and the losses; Tiger
+        # raises; resume stays bit-exact.
+        from ipomdp.experiments import tiger_setup, wumpus_setup
+        from ipomdp.models import ChainObservationHead
+        from ipomdp.training import ObservationHeadKind, Representation, TrainingRun, load_checkpoint, save_checkpoint
+        setup = wumpus_setup(CPU, DISCOUNT)
+        config = lambda **kw: self._config(observation_head=ObservationHeadKind.CHAIN,  # noqa: E731
+                                           representation=Representation.DECODER, **kw)
+        with pytest.raises(ValueError, match="section 24"):
+            TrainingRun(tiger_setup(CPU), self._config(observation_head=ObservationHeadKind.CHAIN), CPU)
+        reference = TrainingRun(setup, config(), CPU)
+        assert isinstance(reference.observation_head, ChainObservationHead)
+        assert isinstance(reference.acting_observation_head, ChainObservationHead)
+        e = reference.eval_agent.model.expand(torch.randn(4, 16))
+        assert torch.allclose(e.observation_probs.sum(-1), torch.ones(4, setup.domain.num_actions), atol=1e-5)
+        expected = [reference.collect_and_train() for _ in range(3)] + [reference.evaluate()]
+        first = TrainingRun(setup, config(), CPU)
+        first.collect_and_train()
+        save_checkpoint(tmp_path / "latest.pt", first.state_dict())
+        resumed = TrainingRun(setup, config(seed=99), CPU)
+        resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
+        continued = [resumed.collect_and_train() for _ in range(2)] + [resumed.evaluate()]
+        assert repr(continued) == repr(expected[1:])
 
     def test_target_prune_matches_the_planners_pruning(self):
         # training/run.py, section 23; trainer.py, 3h; search_model.py, 9: the value targets keep exactly the

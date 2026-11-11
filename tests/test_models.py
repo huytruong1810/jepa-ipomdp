@@ -169,3 +169,43 @@ class TestHeads:
         latent = torch.randn(4, D)
         head = ObservationHead(D, A, O, H, 1)
         assert head(latent, F.one_hot(torch.tensor([0, 1, 2, 0]), A).float()).shape == (4, O)
+
+
+class TestChainObservationHead:
+    """models/heads.py, section 3b."""
+
+    @staticmethod
+    def _head():
+        from ipomdp.models import ChainObservationHead, ObservationFactors
+        torch.manual_seed(0)
+        return ChainObservationHead(8, 5, 16, 1, ObservationFactors((8, 16, 4, 1, 2), 32))
+
+    def test_is_a_normalised_distribution_over_every_observation(self):
+        head = self._head()
+        out = head(torch.randn(7, 8), torch.nn.functional.one_hot(torch.randint(0, 5, (7,)), 5).float())
+        assert out.shape == (7, 33)
+        assert torch.allclose(torch.logsumexp(out, -1), torch.zeros(7), atol=1e-5)
+        assert torch.allclose(torch.log_softmax(out, -1), out, atol=1e-5)       # a drop-in for logits
+
+    def test_chain_rule_matches_the_bit_marginals(self):
+        # P(bit 0 of the chain = bump = 1 | not terminal) is the sigmoid of its prefix-free logit.
+        head = self._head()
+        z, a = torch.randn(3, 8), torch.nn.functional.one_hot(torch.tensor([0, 1, 2]), 5).float()
+        p = head(z, a).exp()
+        bump = sum(p[:, o] for o in range(32) if o & 8) / p[:, :32].sum(-1)
+        e = head.trunk(torch.cat([z, a], -1))
+        logit = head.bits[0](torch.cat([e, torch.zeros(3, 5)], -1)).squeeze(-1)
+        assert torch.allclose(bump, torch.sigmoid(logit), atol=1e-5)
+
+    def test_cross_entropy_reaches_every_part(self):
+        head = self._head()
+        out = head(torch.randn(64, 8), torch.nn.functional.one_hot(torch.randint(0, 5, (64,)), 5).float())
+        torch.nn.functional.cross_entropy(out, torch.randint(0, 33, (64,))).backward()
+        for name, p in head.named_parameters():      # residual blocks are identity at init (zero w3): skip their insides
+            if name.startswith(("bits.", "terminal.", "trunk.0.")):
+                assert p.grad is not None and p.grad.abs().sum() > 0, name
+
+    def test_rejects_a_non_permutation(self):
+        from ipomdp.models import ObservationFactors
+        with pytest.raises(ValueError):
+            ObservationFactors((1, 2, 2, 8, 16), 32)

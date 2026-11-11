@@ -78,7 +78,22 @@
 #      Predicting future percepts under arbitrary future actions requires exactly that
 #      information. It is a self-supervised, non-privileged signal: actions and observations only.
 #    - It is not a planning model: the planner never reads it. With k = 0 it is not built at all.
-# ==============================================================================
+#
+# 3b. Chain-Factored Observation Head (optional, model.observation_head=chain; 2026-11-10, Stage B of the
+#     2026-11-09 audit plan):
+#    - A domain whose percept is a set of binary channels plus an absorbing marker (Wumpus: stench, breeze, glitter,
+#      bump, scream, and GAME_OVER) can factor P(o | z, a) by the chain rule instead of one 33-way softmax:
+#         P(o_abs) = p_T,   P(b_1..b_n) = (1 - p_T) prod_i P(b_i | z, a, b_<i).
+#      This is the exact joint, not an independence assumption (independent bits would misstate, e.g., that a bump
+#      excludes a new cell's percepts). The order is the domain's (ObservationFactors.chain); Wumpus puts bump and
+#      scream first, so glitter is predicted with the knowledge of whether the hunter moved.
+#    - Why: the measured failure is the glitter of a newly entered cell, under-predicted 2-3x at the declined turned
+#      latents. In the joint softmax that mass is spread over the 8 of 32 cells that contain glitter, each learned
+#      separately; the chain gives glitter one logit per prefix, shared across the stench/breeze combinations.
+#    - Implementation: a trunk e = MLP(z, a) (the joint head's residual stack, hidden output); per bit i a small MLP
+#      on [e, prefix bits b_<i (padded to n)] gives one logit, evaluated at the 2^i distinct prefixes (31 evaluations
+#      for n = 5); the terminal logit is a linear read of e. forward returns NORMALISED log-probabilities (N, |O|), a
+#      drop-in for the joint head's logits: softmax and cross_entropy of them are exact.
 
 from enum import StrEnum
 
@@ -223,4 +238,64 @@ class MultiStepObservationPredictor(nn.Module):
             hidden = self.cell(actions[:, j - 1:j - 1 + valid].reshape(batch * valid, -1),
                                hidden[:, :valid].reshape(batch * valid, dim)).view(batch, valid, dim)
             out.append(self.readout(hidden))
+        return out
+
+
+class ObservationFactors:
+    """
+    A percept made of binary channels plus an absorbing marker (section 3b).
+
+    Attributes:
+        chain: The channels' bit values in the observation index, in the chain-rule order.
+        terminal_index: The observation index of the absorbing marker.
+        num_observations: 2^len(chain) + 1.
+    """
+
+    def __init__(self, chain: tuple[int, ...], terminal_index: int):
+        if sorted(chain) != [1 << i for i in range(len(chain))]:
+            raise ValueError(f"chain must be a permutation of the bit values 1, 2, 4, ...; got {chain}.")
+        if terminal_index != 1 << len(chain):
+            raise ValueError(f"the terminal index must follow the bit combinations ({1 << len(chain)}), got {terminal_index}.")
+        self.chain, self.terminal_index, self.num_observations = tuple(chain), terminal_index, terminal_index + 1
+
+
+class ChainObservationHead(nn.Module):
+    """P(o | z, a) as the exact chain-rule product over binary percept channels (section 3b); normalised log-probs."""
+
+    def __init__(self, latent_dim: int, num_actions: int, hidden_dim: int, num_blocks: int, factors: ObservationFactors):
+        super().__init__()
+        n = len(factors.chain)
+        self.factors, self.num_bits = factors, n
+        self.trunk = build_residual_stack(latent_dim + num_actions, hidden_dim, hidden_dim, num_blocks)
+        self.terminal = nn.Linear(hidden_dim, 1)
+        self.bits = nn.ModuleList(nn.Sequential(nn.Linear(hidden_dim + n, hidden_dim), nn.SiLU(), nn.Linear(hidden_dim, 1))
+                                  for _ in range(n))
+        completions = torch.arange(1 << n)                                         # chain-order bit patterns
+        chain_bits = ((completions[:, None] >> torch.arange(n)) & 1).float()       # (2^n, n), b_i = bit i of c
+        index = (chain_bits * torch.tensor(factors.chain, dtype=torch.float32)).sum(-1).long()
+        self.register_buffer("chain_bits", chain_bits, persistent=False)
+        self.register_buffer("observation_index", index, persistent=False)          # completion -> observation index
+        for i in range(n):                                                          # the 2^i prefixes of bit i, padded
+            prefixes = torch.zeros(1 << i, n)
+            prefixes[:, :i] = ((torch.arange(1 << i)[:, None] >> torch.arange(i)) & 1).float()
+            self.register_buffer(f"prefixes_{i}", prefixes, persistent=False)
+            # completion c reads its bit-i logit at prefix (c mod 2^i)
+            self.register_buffer(f"prefix_of_{i}", completions % (1 << i), persistent=False)
+
+    def forward(self, latent: Tensor, action: Tensor) -> Tensor:
+        """(N, D), one-hot (N, |A|) -> (N, |O|) normalised log-probabilities."""
+        e = self.trunk(torch.cat([latent, action], dim=-1))                        # (N, H)
+        n_rows = e.shape[0]
+        log_joint = e.new_zeros(n_rows, 1 << self.num_bits)
+        for i, net in enumerate(self.bits):
+            prefixes = getattr(self, f"prefixes_{i}").to(e.dtype)                   # (2^i, n)
+            inputs = torch.cat([e[:, None].expand(-1, prefixes.shape[0], -1),
+                                prefixes[None].expand(n_rows, -1, -1)], dim=-1)
+            logit = net(inputs).squeeze(-1)[:, getattr(self, f"prefix_of_{i}")]       # (N, 2^n)
+            sign = 2.0 * self.chain_bits[:, i].to(e.dtype) - 1.0                     # +1: bit set, -1: clear
+            log_joint = log_joint + nn.functional.logsigmoid(sign * logit)
+        t = self.terminal(e).squeeze(-1)
+        out = e.new_empty(n_rows, self.factors.num_observations)
+        out[:, self.observation_index] = log_joint + nn.functional.logsigmoid(-t)[:, None]
+        out[:, self.factors.terminal_index] = nn.functional.logsigmoid(t)
         return out

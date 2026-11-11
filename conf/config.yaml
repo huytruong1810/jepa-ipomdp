@@ -120,6 +120,7 @@ model:
   codec_bound: discounted       # absorbing: two-hot bins over the absorbing game's return bound, targets projected (run.py, 22)
   target_prune: false           # true: value targets drop the observation branches the planner prunes (run.py, 23)
   double_partition: batch       # slot: each stored episode trains one head of the value pair (run.py, 13; trainer.py, 3e)
+  observation_head: joint       # chain: chain-rule observation head over the percept's channels (run.py, 24; heads.py, 3b)
   q_equivalent_weight: 0.0      # w > 0: Q-equivalent observation term, needs observation_reward, decoder only (run.py, 21; trainer.py, 2i)
 
 mcts:

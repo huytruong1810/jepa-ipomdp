@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 from ipomdp.experiments import tiger_setup
 from ipomdp.models import ValueEstimator, ValueHead, ValuePair, ema_update
-from ipomdp.training import (CheckpointSelection, CodecBound, DoublePartition, Representation, RunConfig, RunStream, TrainerConfig, TrainingRun,
+from ipomdp.training import (CheckpointSelection, CodecBound, DoublePartition, ObservationHeadKind, Representation, RunConfig, RunStream, TrainerConfig, TrainingRun,
                              check_checkpoint_selection, load_checkpoint, save_checkpoint, selects_best, stream_seed)
 
 CPU = torch.device("cpu")
@@ -30,7 +30,7 @@ def _config(**overrides) -> RunConfig:
         retrain_every=0, retrain_updates=0, retrain_weight_decay=None, value_equivalent_weight=0.0, risk_margin=1.0, trial_prob=0.0, self_predictive_weight=0.0, absorbing_value=False,
             decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0,
             codec_bound=CodecBound.DISCOUNTED, target_prune=False,
-            double_partition=DoublePartition.BATCH)
+            double_partition=DoublePartition.BATCH, observation_head=ObservationHeadKind.JOINT)
     values.update(overrides)
     return RunConfig(**values)
 

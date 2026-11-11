@@ -47,12 +47,12 @@ import torch
 from ..agents import PlanningAgent, UniformRandomAgent
 from ..domain import (BatchedPOMDPEnv, FinitePOMDP, WumpusBeliefTracker, WumpusSimulator, WumpusWorld,
                       action_value_functions, build_tiger_pomdp, game_outcomes, solve_infinite_horizon)
-from ..domain.wumpus import DEATH_REWARD, GAME_OVER, NUM_CELLS, STEP_COST, WumpusAction
+from ..domain.wumpus import DEATH_REWARD, GAME_OVER, NUM_CELLS, STEP_COST, Percept, WumpusAction
 from ..interpretability import BeliefAnalysis, analyze_beliefs, build_probe_dataset, build_wumpus_dataset, plot_latent_pca
-from ..models import BeliefFilter, ValueEstimator
+from ..models import BeliefFilter, ObservationFactors, ValueEstimator
 from ..planning import BeliefTreeSearch, RiskSpec
 from ..telemetry import BeliefGeometryVisualizer
-from ..training import (CodecBound, Domain, DoublePartition, DomainSetup, EpisodeBatch, PrivilegedSpec, PrivilegedTargets, Representation, RunConfig,
+from ..training import (CodecBound, Domain, DoublePartition, ObservationHeadKind, DomainSetup, EpisodeBatch, PrivilegedSpec, PrivilegedTargets, Representation, RunConfig,
                         TrainerConfig, TrainingRun, load_checkpoint, play_episodes, stream_seed)
 
 
@@ -81,7 +81,9 @@ def wumpus_setup(device: torch.device, discount: float) -> DomainSetup:
                        PrivilegedSpec((NUM_CELLS, 4), 3 * NUM_CELLS + 1, privileged_targets),
                        RiskSpec(int(WumpusAction.FORWARD), (int(WumpusAction.TURN_LEFT), int(WumpusAction.TURN_RIGHT)),
                                 GAME_OVER, DEATH_REWARD, STEP_COST),
-                       GAME_OVER)
+                       GAME_OVER,
+                       ObservationFactors((int(Percept.BUMP), int(Percept.SCREAM), int(Percept.GLITTER), int(Percept.STENCH),
+                                           int(Percept.BREEZE)), GAME_OVER))
 
 
 # Domains selectable through conf/env/<name>.yaml (section 2).
@@ -113,7 +115,8 @@ def build_run_config(cfg: DictConfig) -> RunConfig:
         self_predictive_weight=m.self_predictive_weight, absorbing_value=m.absorbing_value,
         decision_aware_weight=m.decision_aware_weight, observation_reward=m.observation_reward,
         q_equivalent_weight=m.q_equivalent_weight, codec_bound=CodecBound(m.codec_bound),
-        target_prune=m.target_prune, double_partition=DoublePartition(m.double_partition))
+        target_prune=m.target_prune, double_partition=DoublePartition(m.double_partition),
+        observation_head=ObservationHeadKind(m.observation_head))
 
 
 def build_training_run(cfg: DictConfig, device: torch.device) -> tuple[DomainSetup, TrainingRun]:
