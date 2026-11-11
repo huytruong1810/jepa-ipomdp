@@ -497,6 +497,41 @@
 #      at the declined states: with the agent's own value and its own data, the objective cannot supply information that
 #      the data do not show (the declined turn-then-step outcomes are rare in the buffer; C10 (V), coverage_games.py).
 #
+# 2r. Stage-0 audit fixes, retrain screen (2026-11-10, written before any run; PROTOCOL.md C-h; the 2026-11-09 audit):
+#    - Question: do the audit's estimation fixes make the retrain recipe's networks play better than the same retrain
+#      without them? Each arm targets one measured defect of the value estimate:
+#        F1  the two-hot range +-100100 leaves 100 of 255 bins unreachable; leakage onto them adds phantom value to the
+#            planner's imagined children (mean +0.4 to +0.9, p99 6-15, max ~100; idle-vs-step margin ~7);
+#        F3  the targets back up through observation branches the planner prunes;
+#        F2  the double value's heads split by batch position, so both see every episode (corr(V_A, V_B) >= 0.9996);
+#        F5  the value heads hold 72-81% of the joint clipped gradient norm and shrink the filter's steps to 0.65-0.77
+#            (reports/2026-11-09_audit/grad_share.py).
+#    - Arms (runs/sweeps/wumpus_retrain seeds 0-2, each run's own .hydra config, --representation decoder --horizon 5
+#      --seed <s> --train-buffer <run> --pool-cache runs/wumpus/supervised_filter/pools.pt, 6400 updates, --save into
+#      runs/wumpus/s0_screen/):
+#        CB    --set model.codec_bound=absorbing                                   (F1)
+#        CBP   --set model.codec_bound=absorbing --set model.target_prune=true     (F1 + F3)
+#        SLOT  --set model.double_partition=slot                                   (F2)
+#        VCLIP --set trainer.separate_value_clip=true                              (F5)
+#      Paired control: runs/wumpus/ve_screen/control_seed<s>.pt (same seed and buffer, every option off; plays 270.0 /
+#      214.7 / 194.3, glitter ratio 0.45 / 0.39 / 0.33, cell / heading 88 / 93, 87 / 91, 82 / 86), as in 2p. The options
+#      draw nothing new at initialisation, so each arm starts from the control's exact networks.
+#    - Plays: retrain_play.py <run> CB_seed<s>.pt CBP_seed<s>.pt --set model.codec_bound=absorbing, and retrain_play.py
+#      <run> SLOT_seed<s>.pt VCLIP_seed<s>.pt (512 analysis games; best.pt must reproduce report.json); pairing with the
+#      control from the stored <arm>.returns.npy on the CPU. feature_localise.py <run> cuda --networks <arm> (with the
+#      codec --set for CB, CBP). Phantom value: reports/2026-11-09_audit/s0_phantom.py on every arm and the control.
+#    - Pre-registered readout, per arm (four arms read; no correction, stated):
+#      * PLAY: arm - control > 0 on 3 of 3 seeds and mean of the three >= +20; deaths <= control + 2 points each.
+#      * PHANTOM (CB, CBP only): share of the planner's imagined children (P >= 1e-3, 2000 buffer latents) with a
+#        decoded value above 999 (no game pays more) < 1% on 3 of 3 seeds and below the control's share.
+#      * Reported, no verdict: corr(V_A, V_B) and mean |V_A - V_B| (SLOT), joint glitter ratio at the declined turned
+#        latents and cell / heading probes (latent guard: not more than 5 points below the control's), deaths and
+#        unfinished rates, OR-style attribution CBP - CB (F3's own effect).
+#      -> An arm passing PLAY becomes an S0 candidate for the R2 in-agent run (combined with the others that pass).
+#      -> No arm passes: the defaults stay; the paper's text is corrected regardless (done 2026-11-10).
+#    - Batches carry index = the stored game's buffer row (EpisodeBatch.index), the identity the in-agent buffer uses;
+#      only double_partition=slot reads it, so every earlier arm and the control are unaffected.
+#
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \
 #        --horizon 5 --seed 1 --pool-cache runs/wumpus/supervised_filter/pools.pt
@@ -776,7 +811,8 @@ def main() -> None:
         rows = fit_rows[torch.randint(0, available, (cfg.training.batch_size,), device=device, generator=generator)]
         metrics = run.trainer.train_step(EpisodeBatch(data["actions"][rows], data["observations"][rows],
                                                       data["rewards"][rows], data["initial"][rows],
-                                                      loss_mask=data["mask"][rows] if "mask" in data else None))
+                                                      loss_mask=data["mask"][rows] if "mask" in data else None,
+                                                      index=rows))                     # 2r: the stored game's row
         run._update_acting()
         if update in args.reset_at:                                        # section 2g
             reset_cfg = cfg.copy()
@@ -789,7 +825,8 @@ def main() -> None:
                                               generator=generator)]
                 run.trainer.train_step(EpisodeBatch(data["actions"][rows], data["observations"][rows],
                                                     data["rewards"][rows], data["initial"][rows],
-                                                    loss_mask=data["mask"][rows] if "mask" in data else None))
+                                                    loss_mask=data["mask"][rows] if "mask" in data else None,
+                                                    index=rows))
                 run._update_acting()
             print(f"reset after update {update}: {args.catch_up} catch-up updates on {available} games", flush=True)
         if update in args.score_at:
