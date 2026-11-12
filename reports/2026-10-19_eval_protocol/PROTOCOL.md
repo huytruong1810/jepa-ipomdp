@@ -201,6 +201,23 @@ Arm minus control per game, paired on the 512 analysis games of training seeds 0
 - Caveat (the within-row lines were added after seed 0's first read and are reported, not registered): most of the separation is "the turn faces a wall or not". A wall-facing turn makes FORWARD's outcome certain, so its span and JSD are 0. Among the non-wall rows the score is near chance (0.54-0.64). Among rows whose target cell is unvisited it is at or below chance (0.39-0.55): the value span there points the wrong way (0.28-0.33), and JSD alone stays weakly informative (0.49-0.68).
 - Consequence: augmentation C is no longer gated out. Its build is deferred until C-j is read, and the caveat goes with any claim made about it.
 
+## C-j result (development screen, read 2026-11-12 01:00; logs `runs/wumpus/b_screen/`): NO ARM PASSES, STAGE B CLOSED
+
+Arm minus control per game, paired on the 512 analysis games of training seeds 0 / 1 / 2 (± one standard error). The control plays 270.0 / 214.7 / 194.3, with deaths 1.0 / 1.8 / 7.2%, a joint glitter ratio at the declined turned latents of 0.45 / 0.39 / 0.33, and an MLP "cell ahead unvisited" accuracy there of 0.693 / 0.672 / 0.539.
+
+| Arm | Play: seed 0 / 1 / 2 | Deaths | Glitter ratio | Unvisited acc. | Verdict |
+|---|---|---|---|---|---|
+| TR | −487.6 ± 30.7 / −408.1 ± 28.1 / −425.0 ± 32.3 | 55.1 / 53.9 / 56.1% | 0.20 / 0.23 / 0.25 | 0.279 / 0.174 / 0.216 | FAIL (both) |
+| CH | −22.8 ± 15.8 / +41.0 ± 14.4 / −28.9 ± 20.3 | 3.5 / 1.8 / 18.4% | 0.30 / 0.42 / 0.46 | 0.714 / 0.714 / 0.692 | FAIL (both) |
+| TRCE | −548.1 ± 33.3 / −392.8 ± 28.5 / −454.2 ± 31.0 | 61.7 / 53.3 / 59.6% | 0.21 / 0.27 / 0.29 | 0.322 / 0.398 / 0.269 | FAIL (both) |
+
+- CH meets the unvisited bar only on seed 2, never meets the glitter bar, and raises deaths by 11 points on seed 2.
+- The Transformer arms do not fail through the search path. Token-state latents equal the filter's unroll to 1e-6 on stored games, and the acting and online copies agree. They fail because, with the recipe's optimiser, the history filter learns a weaker latent in 6400 updates:
+  - MLP cell / heading 0.69 / 0.65–0.69, against the control's 0.88 / 0.93, 0.87 / 0.91 and 0.82 / 0.86;
+  - the head flags certain death 0.16–0.34 of the time (control 0.39–0.68), so the planner steps into risks it does not see (deaths above 50%).
+  - Training also takes about 1.4 times as long (about 1800 s vs 1356 s for CH on seed 0).
+- Consequence: no Stage-B arm enters R2. This is an architecture A/B negative under the recipe's optimisation settings. The Transformer received no tuning of its own (learning rate, warm-up, depth), and that limits the claim.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 

@@ -561,6 +561,14 @@
 #      -> A passing arm enters the in-agent run R2 with the passing S0 fixes. No arm passes: Stage B is closed and
 #         reported as an architecture A/B negative.
 #    - The stage first runs a smoke (TRCE, 20 updates, then feature_localise.py on 8 games) and stops if it fails.
+#    - RESULT (2026-11-12; runs/wumpus/b_screen/, PROTOCOL.md "C-j result"): NO ARM PASSES; Stage B closed.
+#      arm - control per game, seeds 0 / 1 / 2: TR -487.6 / -408.1 / -425.0 (deaths 54-56%); CH -22.8 / +41.0 / -28.9
+#      (deaths +11 points on seed 2); TRCE -548.1 / -392.8 / -454.2 (deaths 53-62%). Glitter ratio at (c): TR 0.20-0.25,
+#      CH 0.30 / 0.42 / 0.46, TRCE 0.21-0.29 (control 0.45 / 0.39 / 0.33); unvisited accuracy at (c): TR 0.17-0.28,
+#      CH 0.71 / 0.71 / 0.69, TRCE 0.27-0.40 (control 0.69 / 0.67 / 0.54). Token-state search latents equal unroll to
+#      1e-6 (checked on stored games), so the Transformer arms fail on the latent itself: MLP cell / heading 0.69 /
+#      0.65-0.69 vs control 0.82-0.88 / 0.86-0.93, certain death flagged 0.16-0.34 vs 0.39-0.68. No Transformer-specific
+#      tuning (lr, warm-up, depth) was tried; the negative is for the recipe's optimisation settings.
 #
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \
