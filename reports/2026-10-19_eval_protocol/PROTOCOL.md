@@ -80,6 +80,10 @@ Every Wumpus screen, threshold and design choice up to 2026-10-18 was read on tr
     - IN-LATENT if the probe's recall (prediction at least 0.5) at the head-missed states is at least 0.7 on 2 of 3 seeds. The information is there and the head fails to use it, so the next fix targets the head's training signal.
     - NOT-IN-LATENT if that recall is at most 0.4 on 2 of 3 seeds. The next fix targets the representation.
     - MIXED otherwise.
+- **C-m (dead-reckoned ego map; registered 2026-11-13, before any run of its arms).** Development screen on seeds 0-2. Arms: EGO1 (`model.ego_map_weight=1.0`) and EGO01 (`model.ego_map_weight=0.1`). Each is compared with the existing control retrains (`runs/wumpus/ve_screen/control_seed<s>.pt`). The term trains a readout of the hunter's own cell, heading and visited cells into the filter. The domain computes these targets from the agent's own actions and BUMP bits (no layout or belief). Defined in `objective_ab.py` header 2t.
+  - **MISS RATE** is the share of live analysis-game states with a provably deadly cell ahead (exact danger at least 0.999) at which the observation head's max(P_O, P_R) is below 0.5. It comes from `risk_localise.py` on the arm and on the control, in the same stage.
+  - **Decision rule, per arm:** MECHANISM passes if the arm's MISS RATE is at most the control's minus 0.10 on 2 of 3 seeds. PLAY passes if arm minus control is positive on 2 of 3 seeds and deaths rise by no more than 2 points on any seed. An arm passes only if both pass. Two arms are read and no correction is applied.
+  - **Consequence:** a passing arm enters R2. If none passes, the ego map is closed.
 - Later method claims (for example, a new objective against this recipe) must be added to this file **before** their held-out runs start. Each states its comparison, its interval and its decision rule.
 
 ## Confirmatory results (read once, 2026-10-20 22:20)

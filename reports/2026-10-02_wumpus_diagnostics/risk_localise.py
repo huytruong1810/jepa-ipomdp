@@ -59,6 +59,9 @@
 #    - Implication: (i) coverage data must not be safety-filtered (the own arm, coverage_games.py section 5); (ii)
 #      independently of coverage, the planner needs robustness to the risk head's error where it chooses
 #      (pessimism / an uncertainty margin on P(GAME_OVER)), the same coupling as C6.
+# 5. Overrides (2026-11-13): --set k=v (repeatable) hosts the saved sets in a fresh run of the run's config with the
+#    overrides applied (saved_networks.host_run), for sets trained with options that add networks (e.g.
+#    model.ego_map_weight, PROTOCOL.md C-m). Without --set nothing changes.
 # ==============================================================================
 
 import sys
@@ -76,15 +79,25 @@ from ipomdp.experiments.wumpus import WumpusAnalysisSettings
 from ipomdp.planning import BeliefTreeSearch
 from ipomdp.training import discounted_returns, play_episodes, stream_seed
 
-run_dir, saved_sets = Path(sys.argv[1]), [Path(a) for a in sys.argv[2:] if a.endswith(".pt")]
-rest = [a for a in sys.argv[2:] if not a.endswith(".pt")]
+sys.path.insert(0, str(Path(__file__).parent))
+from saved_networks import host_run  # noqa: E402  (same diagnostics directory)
+
+args = sys.argv[1:]
+overrides = []                                                   # header 5: --set k=v, as retrain_play.py header 7
+while "--set" in args:
+    i = args.index("--set")
+    overrides.append(args[i + 1])
+    del args[i:i + 2]
+run_dir, saved_sets = Path(args[0]), [Path(a) for a in args[1:] if a.endswith(".pt")]
+rest = [a for a in args[1:] if not a.endswith(".pt")]
 if not saved_sets or len(rest) > 1:
     raise ValueError("usage: <run dir> <saved .pt> [<saved .pt> ...] [<games> (smoke only)]")
 dev = torch.device("cuda")
 settings = WumpusAnalysisSettings()
 n = int(rest[0]) if rest else settings.episodes
 trained = load_trained_run(run_dir, dev)
-world, run, cfg = trained.setup.domain, trained.run, trained.cfg
+world, cfg = trained.setup.domain, trained.cfg
+run = host_run(trained, overrides, dev)                          # header 5
 model = run.eval_agent.model
 FWD = int(WumpusAction.FORWARD)
 

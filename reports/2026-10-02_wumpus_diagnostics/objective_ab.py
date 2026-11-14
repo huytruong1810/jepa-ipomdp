@@ -570,6 +570,29 @@
 #      0.65-0.69 vs control 0.82-0.88 / 0.86-0.93, certain death flagged 0.16-0.34 vs 0.39-0.68. No Transformer-specific
 #      tuning (lr, warm-up, depth) was tried; the negative is for the recipe's optimisation settings.
 #
+# 2t. Dead-reckoned ego map, retrain screen (2026-11-13, written before any run; PROTOCOL.md C-m):
+#    - Question: the agent dies by stepping into cells it had proven deadly, where its percept warned and the certainty
+#      rests on which neighbours it has visited (PROTOCOL.md C-k, C-l); the observation head misses 24-67% of the
+#      provably deadly states on the control. Does training the filter to read out its own dead-reckoned cell, heading
+#      and visited cells (domain/wumpus.py section 7; actions and BUMP bits only) let the head see those states, and
+#      does the agent then play better?
+#    - Arms (as 2r: runs/sweeps/wumpus_retrain seeds 0-2, own .hydra config, --representation decoder --horizon 5
+#      --seed <s> --train-buffer <run> --pool-cache runs/wumpus/supervised_filter/pools.pt, 6400 updates, --save into
+#      runs/wumpus/ego_screen/):
+#        EGO1   --set model.ego_map_weight=1.0
+#        EGO01  --set model.ego_map_weight=0.1
+#      Paired control: runs/wumpus/ve_screen/control_seed<s>.pt (plays 270.0 / 214.7 / 194.3; deaths 1.0 / 1.8 / 7.2%).
+#    - Plays: retrain_play.py <run> EGO1_seed<s>.pt EGO01_seed<s>.pt --set model.ego_map_weight=1.0 (the readout only
+#      changes the network layout; it is not used in play). risk_localise.py on the control (no --set) and on both arms
+#      (--set model.ego_map_weight=1.0); feature_localise.py on each arm (--set as above).
+#    - Pre-registered readout, per arm (two arms read; no correction, stated):
+#      * MECHANISM: MISS RATE (live analysis states with exact danger ahead >= 0.999 where max(P_O, P_R) < 0.5, from the
+#        risk rows) <= control's MISS RATE - 0.10 on 2 of 3 seeds.
+#      * PLAY: arm - control > 0 on 2 of 3 seeds, deaths <= control + 2 points on every seed.
+#      * An arm passes when both pass. Reported: deaths at provably deadly cells, MLP cell / heading and "unvisited"
+#        accuracy at (c), joint glitter ratio, the ego-map loss in the training log.
+#      -> A passing arm enters the in-agent run R2. No arm passes: the ego map is closed.
+#
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \
 #        --horizon 5 --seed 1 --pool-cache runs/wumpus/supervised_filter/pools.pt
