@@ -162,8 +162,8 @@ for saved in saved_sets:
     rec = Recorder(planner)
     episodes, _ = play_episodes(WumpusSimulator(world, n, cfg.env.max_steps, stream_seed(settings.seed, 1), dev), rec)
     returns = discounted_returns(episodes.rewards, world.discount).double().cpu().numpy()
-    reference = np.load(saved.with_suffix(".returns.npy"))
-    if n == settings.episodes and np.abs(returns - reference).max() > 1e-6:
+    # The replay check needs retrain_play.py's returns, which exist for full 512-game reads only (a smoke has none).
+    if n == settings.episodes and np.abs(returns - np.load(saved.with_suffix(".returns.npy"))).max() > 1e-6:
         raise RuntimeError(f"{saved}: the replay differs from retrain_play.py's returns.")
     rows = {k: torch.stack([r[k] for r in rec.rows], 1).cpu() for k in rec.rows[0]}   # (G, T) / (G, T, A)
     fatal = torch.zeros_like(rows["live"])
