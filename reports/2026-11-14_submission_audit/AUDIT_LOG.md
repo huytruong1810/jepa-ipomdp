@@ -60,6 +60,6 @@ All other Tiger, held-out, ablation and localisation numbers (170 of 176 ledger 
 | # | Status | Finding | Change |
 |---|---|---|---|
 | E1 | OPEN | The slow acceptance suite last ran on 2026-10-19. | rerun at the audit's final commit |
-| E2 | OPEN | `README.md` describes the September state (Tiger only). | rewrite |
+| E2 | FIXED | `README.md` described the September state (Tiger only). | rewritten: both domains, the audited numbers with their intervals, current commands and layout |
 | E3 | FIXED | Several paper numbers existed only in logs that git does not track. | copied to `logs/`; `ledger.py` recomputes the rest from raw artifacts |
 | E4 | FIXED | `reports/2026-11-03_paper_figures/localisation.py` hard-codes its 35 values. | `localisation.py` and `ladder.py` read the raw per-game files and logs; figures regenerated |
