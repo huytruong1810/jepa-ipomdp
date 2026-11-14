@@ -71,6 +71,9 @@ Every Wumpus screen, threshold and design choice up to 2026-10-18 was read on tr
 - **C-j (Stage B architecture screen; registered 2026-11-11, before any run of its arms).** Development screen on seeds 0-2. Arms: TR (`model.filter=transformer`), CH (`model.observation_head=chain`) and TRCE (both, plus `model.kinematic_weight=0.1`), each against the existing control retrains. Defined in `objective_ab.py` header 2s.
   - **Decision rule, per arm:** MECHANISM passes if the glitter ratio at the declined turned latents is at least the control's + 0.15 and the "cell ahead unvisited" accuracy there is at least the control's + 0.10, on 2 of 3 seeds. PLAY passes if arm minus control is positive on 2 of 3 seeds and deaths rise by no more than 2 points on any seed. An arm passes only if both pass. Three arms are read and no correction is applied.
   - **Consequence:** passing arms enter R2. If none passes, Stage B is closed and reported as a negative result.
+- **C-k (smoke M-A, the gate of chance-constrained search; registered 2026-11-13, before any run).** Development smoke on seeds 0-2. For each stored network set, a dedicated failure head p(death | z, a) is trained by binary cross-entropy on that set's frozen acting latents and its own training games. The sets are the coverage control (`runs/wumpus/coverage/control_seed<s>.pt`), the union of cover and own games (`union_seed<s>.pt`) and random restore (`runs/wumpus/branch/random_seed<s>.pt`). The head is read at the set's own fatal chosen FORWARDs on the 512 analysis games, against the exact danger of the cell ahead. Defined in `reports/2026-11-09_augmentations/failure_head_smoke.py`.
+  - **Decision rule (union set):** CALIBRATION passes if, on 2 of 3 seeds, the median of head / exact danger over the fatal chosen FORWARDs is at least 0.25. The observation head's own P(GAME_OVER) reaches 0.02-0.05 there. The head must also not be inflated: on every seed, its mean over risky live states divided by the mean exact danger there must be at most 1.5. Control and random restore are reported only.
+  - **Consequence:** if CALIBRATION passes, the constrained search is built and CC-play on the union networks is registered here before it runs (deaths at most control + 2 points, and at least half of the union arm's idling cure kept). Otherwise augmentation A is closed and not built.
 - Later method claims (for example, a new objective against this recipe) must be added to this file **before** their held-out runs start. Each states its comparison, its interval and its decision rule.
 
 ## Confirmatory results (read once, 2026-10-20 22:20)
@@ -217,6 +220,22 @@ Arm minus control per game, paired on the 512 analysis games of training seeds 0
   - the head flags certain death 0.16–0.34 of the time (control 0.39–0.68), so the planner steps into risks it does not see (deaths above 50%).
   - Training also takes about 1.4 times as long (about 1800 s vs 1356 s for CH on seed 0).
 - Consequence: no Stage-B arm enters R2. This is an architecture A/B negative under the recipe's optimisation settings. The Transformer received no tuning of its own (learning rate, warm-up, depth), and that limits the claim.
+
+## C-k result (development smoke, read 2026-11-13 23:00; logs `runs/wumpus/failure_head/<set>_seed<s>.log`): FAIL, AUGMENTATION A CLOSED
+
+Failure head / exact danger at the set's fatal chosen FORWARDs on the 512 analysis games. The stored column is the observation and reward heads' max(P_O, P_R), as in `risk_localise.py`. Calibration is mean(head) / mean(danger) over risky live states.
+
+| Set | Seed | Fatal FORWARDs | Exact danger (median) | Head / danger: median (mean) | Stored: median | Calibration |
+|---|---|---|---|---|---|---|
+| union | 0 | 84 | 0.556 | **0.000** (0.022) | 0.026 | 0.861 |
+| union | 1 | 27 | 1.000 | **0.000** (0.000) | 0.033 | 0.709 |
+| union | 2 | 80 | 1.000 | **0.000** (0.013) | 0.014 | 0.638 |
+| control | 0 / 1 / 2 | 23 / 16 / 28 | 0.522 / 1.000 / 0.950 | 0.000 / 0.000 / 0.000 | 0.122 / 0.012 / 0.020 | 0.980 / 1.184 / 0.942 |
+| random restore | 0 / 1 / 2 | 0 / 22 / 22 | — / 0.458 / 1.000 | — / 0.002 / 0.009 | — / 0.034 / 0.023 | 0.802 / 0.924 / 0.470 |
+
+- Verdict: the median is below 0.25 on 3 of 3 union seeds, so CALIBRATION fails. The inflation guard holds: at most 1.5 on every seed.
+- Reading: averaged over risky states the dedicated head is about calibrated (0.64-1.18), but at the steps the planner dies on it rates the risk at about 0. On several seeds the exact danger there is 1: the cell ahead is provably deadly, and the latent does not carry that. The dedicated head is no better than the stored heads. The AUC for fatal vs survived among chosen risky FORWARDs is 0.07-0.78 (stored 0.09-0.81).
+- Consequence: a constraint on any head read from this latent cannot remove these deaths, so the chance-constrained search is not built and CC-play is not run.
 
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
