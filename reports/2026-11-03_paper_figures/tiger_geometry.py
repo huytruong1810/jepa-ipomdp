@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 # Paper figure: geometry of the learned Tiger latent over the 10 training seeds of runs/sweeps/polyak (the default
 # configuration, the agent of Table tab:tiger), from each seed's analysis/report.json "geometry" block
-# (interpretability/analysis.py section 2: PCA of the acting latents on the agent's own histories, |Spearman| of each
+# (interpretability/analysis.py section 2: PCA of the acting latents on held-out histories of a uniformly random policy, |Spearman| of each
 # top component with the exact posterior log-odds (the side) and with |log-odds| (the confidence), minimality ratio).
 # - Left: explained-variance ratio of the first five components, one dot per seed plus the mean as a bar. Two
 #   components carry almost all of the variance; a Bayes filter for Tiger needs one number (the log-odds), so the

@@ -3,10 +3,11 @@
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS
 # ----------------------------------------------------------------------------------------------------------------------
 # Paper figure: the Wumpus World held-out ladder (Table tab:wumpus as a picture), two panels sharing one agent axis.
-# - Left: mean discounted return per game with the hierarchical-bootstrap 95% interval over seeds and games
-#   (experiments/aggregate.py section 6), read from runs/sweeps/wumpus_retrain_heldout/aggregate_analysis_heldout.json,
-#   the confirmatory held-out readout (PROTOCOL.md C-a/C-b). Random and the heuristic act on the same games but are not
-#   trained, so their interval is over games only; we still draw it (it is narrow) to keep one mark per agent.
+# - Left: mean discounted return per game with the 95% interval of Table tab:wumpus, computed here from the raw
+#   per-game files of the confirmatory held-out analysis (PROTOCOL.md C-a/C-c): for the two trained agents the
+#   Student-t interval on the 5 per-seed means (the seed is the unit of replication); for the agents that are not
+#   trained (random, heuristic, exact-belief planner: one play of the 512 games) the bootstrap over the games
+#   (experiments/aggregate.py section 7, crossed_bootstrap, which for a row shared by every seed is game-level).
 # - Right: the outcome of each game (won / died / unfinished within the window) as a 100% stacked bar. The point of the
 #   figure is that the learned planner dies as rarely as the exact-belief planner and loses its return to unfinished
 #   games; a stacked bar shows that composition directly. Segments carry direct percentage labels (the aqua slot is
@@ -14,53 +15,74 @@
 # - Two panels instead of one chart with two y-scales (return and percentage are different measures).
 # - Colours: the dataviz reference categorical slots 1-3 (blue, orange, aqua), validated with validate_palette.js in
 #   light mode (CVD worst adjacent dE 9.2); the agent dots are neutral ink, ours in slot 1 blue.
-# - Vector PDF for the paper (fonts embedded as Type 42), CPU only, no randomness: the numbers are read from the json.
+# - Vector PDF for the paper (fonts embedded as Type 42), CPU only; the bootstrap stream is fixed (aggregate.py).
 # Run: uv run reports/2026-11-03_paper_figures/ladder.py  ->  reports/2026-11-03_paper_figures/ladder.pdf
 # ======================================================================================================================
-import json
 from pathlib import Path
 
 import matplotlib
+import numpy as np
 
 matplotlib.use("pdf")
 import matplotlib.pyplot as plt
 
-ROOT = Path(__file__).resolve().parents[2]
-H = json.loads((ROOT / "runs/sweeps/wumpus_retrain_heldout/aggregate_analysis_heldout.json").read_text())["hierarchical"]
+from ipomdp.experiments import crossed_bootstrap, game_metric_rows, seed_statistic
 
-# (label, json key or None). Rows from the bottom up so the best agent is on top.
+ROOT = Path(__file__).resolve().parents[2]
+SEEDS = range(5, 10)
+TRAINED = {"learned_planner", "recurrent_dqn"}
+
+# (label, agent key). Rows from the bottom up so the best agent is on top.
 AGENTS = [("Random", "random"), ("Recurrent model-free", "recurrent_dqn"), ("Learned planner (ours)", "learned_planner"),
           ("Exact-belief planner", "exact_planner"), ("Exact-belief heuristic", "reference_risk0.4")]
-# Outcome rates of random and the heuristic are not in the hierarchical block: they are untrained references that play
-# the same held-out games for every training seed, so any seed's report holds them (seed 5's is read).
-_REF = json.loads((ROOT / "runs/sweeps/wumpus_retrain_heldout/seed5/analysis_heldout/report.json").read_text())["returns"]
-FIXED_RATES = {k: tuple(_REF[k][m] for m in ("win_rate", "death_rate", "unfinished_rate"))
-               for k in ("random", "reference_risk0.4")}
+
+
+def _npz(path):
+    with np.load(ROOT / path) as rows:
+        return dict(rows)
+
+
+def load():
+    """Agent key -> {"mean", "ci95", "rates"} from the raw per-game files (module header)."""
+    games = [_npz(f"runs/sweeps/wumpus_retrain_heldout/seed{s}/analysis_heldout/games.npz") for s in SEEDS]
+    exact = _npz("runs/references/wumpus_exact_planner/seed20261019/games.npz")
+    baseline = [_npz(f"runs/baselines/r2d2_heldout/seed{s}/analysis_heldout/games.npz") for s in SEEDS]
+    rows = game_metric_rows(games, exact, baseline)          # checks that every file holds the same games
+    merged = [{**g, **{k: v for k, v in exact.items() if k.startswith("exact_planner.")},
+               **{k: v for k, v in b.items() if k.startswith("recurrent_dqn.")}} for g, b in zip(games, baseline)]
+    out = {}
+    for _, key in AGENTS:
+        table = rows[f"return/{key}"]
+        if key in TRAINED:
+            stat = seed_statistic([float(v) for v in table.mean(axis=1)])
+            interval = (stat.mean - stat.ci95, stat.mean + stat.ci95)
+        else:
+            interval = crossed_bootstrap(table).ci95
+        won = np.mean([g[f"{key}.won"].mean() for g in merged])
+        died = np.mean([g[f"{key}.died"].mean() for g in merged])
+        out[key] = {"mean": float(table.mean()), "ci95": interval, "rates": (won, died, 1.0 - won - died)}
+    return out
+
 
 WON, DIED, UNFIN = "#2a78d6", "#eb6834", "#1baf7a"
 INK, MUTED, GRID = "#1f1f1e", "#6b6a64", "#e4e3de"
-
-
-def rates(key):
-    if key in FIXED_RATES:
-        return FIXED_RATES[key]
-    return tuple(H[f"{m}/{key}"]["mean"] for m in ("win_rate", "death_rate", "unfinished_rate"))
 
 
 def main():
     plt.rcParams.update({"font.family": "serif", "font.size": 8, "pdf.fonttype": 42, "axes.edgecolor": MUTED,
                          "axes.labelcolor": INK, "xtick.color": MUTED, "ytick.color": INK})
     fig, (ax_r, ax_o) = plt.subplots(1, 2, figsize=(5.5, 1.9), sharey=True, gridspec_kw={"width_ratios": [1.15, 1]})
+    data = load()
     ys = range(len(AGENTS))
     for y, (label, key) in zip(ys, AGENTS):
-        r = H[f"return/{key}"]
+        r = data[key]
         lo, hi = r["ci95"]
         colour = WON if key == "learned_planner" else INK
         ax_r.plot([lo, hi], [y, y], color=colour, lw=2, solid_capstyle="round")
         ax_r.plot(r["mean"], y, "o", ms=5, color=colour, mec="white", mew=1.2, zorder=3)
         ax_r.text(hi + 25, y, f"{r['mean']:.0f}", va="center", ha="left", color=INK, fontsize=7)
         left = 0.0
-        for value, colour_o in zip(rates(key), (WON, DIED, UNFIN)):
+        for value, colour_o in zip(r["rates"], (WON, DIED, UNFIN)):
             ax_o.barh(y, value * 100, left=left, height=0.62, color=colour_o, edgecolor="white", linewidth=1.0)
             if value >= 0.08:
                 ax_o.text(left + value * 50, y, f"{value * 100:.0f}", va="center", ha="center", color="white",

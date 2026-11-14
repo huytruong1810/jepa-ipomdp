@@ -70,6 +70,34 @@
 #    - The model-free baseline (baselines/recurrent_dqn.py; PROTOCOL.md C-c) is trained per
 #      training seed: aggregate_games(..., baseline=[rows per seed]) merges seed k's baseline rows
 #      into seed k's games (same pairing check) and adds BASELINE_GAME_METRICS.
+#
+# 7. The Evaluation Games Are Crossed With the Seeds (2026-11-14):
+#    - Every seed of a sweep is analysed on the SAME games (section 3), so a (seeds, games) table is a
+#      crossed design, y[s, g] = mu + a_s + b_g + e_sg (seed effect, game effect, interaction), not
+#      games nested in seeds. Its grand mean has variance var(a)/S + var(b)/G + var(e)/(S G).
+#    - hierarchical_bootstrap draws the games independently for every drawn seed. That treats the
+#      shared game effect b_g as if it were interaction noise and counts it as var(b)/(S G): it is
+#      understated by the factor S. The extreme case is an agent that is played once per analysis
+#      seed (the exact-belief planner, the heuristic, the random hunter). Its row is identical for
+#      every seed, each resample averages S independent redraws of the same games, and the interval
+#      is sqrt(S) too narrow: at S = 5 the exact-belief planner's held-out return reads
+#      494 [476, 511] where the game-level interval is [455, 533].
+#    - crossed_bootstrap draws the seeds and ONE set of games per resample, shared by every drawn
+#      seed (the two-way bootstrap for crossed random effects; Owen 2007, "The pigeonhole
+#      bootstrap"). For a row that is identical across seeds it is exactly the game-level bootstrap.
+#      For trained agents it holds the seed and the game factor and is mildly conservative in the
+#      interaction term. For paired gaps the game effect largely cancels in the per-game difference,
+#      so the two bootstraps differ less there than for returns.
+#    - Both bootstraps take percentile intervals over S seed clusters. At S = 5 the percentile
+#      interval of the seed part is narrower than the Student-t interval of section 2 by about
+#      sqrt((S - 1) / S) * 1.96 / t_{0.975, S-1} = 0.63, so it under-covers. The interval of
+#      section 2 on the per-seed means (for a gap: the per-seed means of the paired per-game
+#      differences) is therefore the small-sample interval for the seed factor; it conditions on
+#      the games. A readout that cites a bootstrap interval for a claim about the method should
+#      print that seed-level interval and the per-seed values beside it.
+#    - hierarchical_bootstrap itself is unchanged: registered readouts (PROTOCOL.md) cite it and
+#      must reproduce bit for bit. game_metric_rows exposes the merged (seeds, games) tables, so a
+#      readout can apply any of the three intervals to the same rows.
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -211,6 +239,28 @@ def hierarchical_bootstrap(per_seed: np.ndarray, chunk: int = 500) -> Hierarchic
     return HierarchicalStatistic(seeds, games, float(per_seed.mean()), (float(low), float(high)))
 
 
+def crossed_bootstrap(per_seed: np.ndarray, chunk: int = 500) -> HierarchicalStatistic:
+    """
+    Section 7: per_seed (seeds, games) per-game values (or paired per-game differences) of seeds that
+    all played the SAME games, column g being the same game for every seed. Each resample draws
+    seeds with replacement and one set of games with replacement, used for every drawn seed; the
+    statistic is the grand mean. For rows that are identical across seeds (an agent played once per
+    analysis seed) this is the game-level bootstrap.
+    """
+    seeds, games = per_seed.shape
+    if seeds < 2:
+        raise ValueError(f"A crossed bootstrap over seeds needs at least 2 seeds, got {seeds}.")
+    rng = np.random.default_rng(BOOTSTRAP_SEED)
+    means = []
+    for start in range(0, BOOTSTRAP_RESAMPLES, chunk):
+        size = min(chunk, BOOTSTRAP_RESAMPLES - start)
+        seed_draw = rng.integers(0, seeds, size=(size, seeds))
+        game_draw = rng.integers(0, games, size=(size, games))
+        means.append(per_seed[seed_draw[:, :, None], game_draw[:, None, :]].mean(axis=(1, 2)))
+    low, high = np.quantile(np.concatenate(means), [0.025, 0.975])
+    return HierarchicalStatistic(seeds, games, float(per_seed.mean()), (float(low), float(high)))
+
+
 # Added when the exact-planner reference rows are given (section 6); "exact_planner.*" come from its games.npz.
 EXACT_PLANNER_GAME_METRICS = {
     "return/exact_planner": lambda g: g["exact_planner.return"],
@@ -238,13 +288,17 @@ def _check_pairing(seed_games: dict[str, np.ndarray], other: dict[str, np.ndarra
                          "(another analysis seed or game count).")
 
 
-def aggregate_games(games: list[dict[str, np.ndarray]],
-                    exact_planner: dict[str, np.ndarray] | None = None,
-                    baseline: list[dict[str, np.ndarray]] | None = None) -> dict[str, HierarchicalStatistic]:
+def game_metric_rows(games: list[dict[str, np.ndarray]],
+                     exact_planner: dict[str, np.ndarray] | None = None,
+                     baseline: list[dict[str, np.ndarray]] | None = None) -> dict[str, np.ndarray]:
     """
-    Section 6: one games.npz (as a dict of arrays) per seed of a Wumpus sweep; optionally the
+    Sections 6 and 7: one games.npz (as a dict of arrays) per seed of a Wumpus sweep; optionally the
     exact planner's games.npz of the same analysis seed and one baseline games.npz per seed (in
     the sweep's seed order). Both are paired game by game, which is checked here.
+
+    Returns:
+        Metric name -> (seeds, games) float64 table of per-game values; column g is the same game
+        for every seed.
     """
     lengths = {len(seed_games["learned_planner.return"]) for seed_games in games}
     if len(lengths) != 1:
@@ -264,8 +318,14 @@ def aggregate_games(games: list[dict[str, np.ndarray]],
         games = [{**seed_games, **{k: v for k, v in rows.items() if k.startswith("recurrent_dqn.")}}
                  for seed_games, rows in zip(games, baseline)]
         metrics.update(BASELINE_GAME_METRICS)
-    return {name: hierarchical_bootstrap(np.stack([metric(seed_games) for seed_games in games]))
-            for name, metric in metrics.items()}
+    return {name: np.stack([metric(seed_games) for seed_games in games]) for name, metric in metrics.items()}
+
+
+def aggregate_games(games: list[dict[str, np.ndarray]],
+                    exact_planner: dict[str, np.ndarray] | None = None,
+                    baseline: list[dict[str, np.ndarray]] | None = None) -> dict[str, HierarchicalStatistic]:
+    """Section 6: the hierarchical bootstrap of every table of game_metric_rows (same arguments)."""
+    return {name: hierarchical_bootstrap(rows) for name, rows in game_metric_rows(games, exact_planner, baseline).items()}
 
 
 def _lookup(report: dict, path: tuple[str, ...]) -> float:

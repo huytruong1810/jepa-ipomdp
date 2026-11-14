@@ -11,8 +11,9 @@ import torch
 import numpy as np
 
 from ipomdp.experiments import (TIGER_GAPS, TIGER_METRICS, WUMPUS_GAME_METRICS, WUMPUS_GAPS, WUMPUS_METRICS, aggregate_games,
-                                aggregate_reports, build_run_config, build_training_run, hierarchical_bootstrap,
-                                interquartile_mean, load_trained_run, seed_statistic)
+                                aggregate_reports, build_run_config, build_training_run, crossed_bootstrap,
+                                game_metric_rows, hierarchical_bootstrap, interquartile_mean, load_trained_run,
+                                seed_statistic)
 from ipomdp.training import save_checkpoint
 
 CPU = torch.device("cpu")
@@ -137,6 +138,52 @@ class TestRobustStatistics:
             covered += stat.ci95[0] <= 100.0 <= stat.ci95[1]
         # Binomial(40, 0.95) has sd 1.4; the percentile bootstrap at 5 seeds under-covers a little.
         assert covered >= 40 * 0.95 - 5 * 1.4 * 1.5
+
+    def test_a_row_shared_by_every_seed_gets_the_game_level_interval(self):
+        # aggregate.py, section 7: an agent played once per analysis seed has the same row for every
+        # seed. Its uncertainty is that of 512 games, 2 * 1.96 * sd / sqrt(512) wide; the nested
+        # bootstrap averages 5 independent redraws of those games and is sqrt(5) too narrow.
+        rng = np.random.default_rng(3)
+        row = rng.choice([999.0, -40.0, -1001.0], size=512, p=[0.6, 0.38, 0.02])
+        table = np.tile(row, (5, 1))
+        game_level = 2 * 1.96 * row.std(ddof=1) / np.sqrt(row.size)
+        crossed, nested = crossed_bootstrap(table), hierarchical_bootstrap(table)
+        assert crossed.mean == nested.mean == pytest.approx(row.mean())
+        assert crossed.ci95[1] - crossed.ci95[0] == pytest.approx(game_level, rel=0.05)
+        assert nested.ci95[1] - nested.ci95[0] == pytest.approx(game_level / np.sqrt(5), rel=0.05)
+
+    def test_crossed_interval_covers_when_the_seeds_share_their_games(self):
+        # Seed effect sd 30, a game effect sd 300 SHARED by the 5 seeds, interaction sd 300: the
+        # grand mean has sd sqrt(30^2 / 5 + 300^2 / 512 + 300^2 / 2560) = 19.8. The crossed bootstrap
+        # must cover the true mean about as often as its nominal level allows at 5 seeds, and more
+        # often than the nested one, which misses most of the shared game effect.
+        rng = np.random.default_rng(4)
+        covered = {"crossed": 0, "nested": 0}
+        for _ in range(60):
+            table = (100.0 + 30.0 * rng.standard_normal((5, 1)) + 300.0 * rng.standard_normal((1, 512))
+                     + 300.0 * rng.standard_normal((5, 512)))
+            for name, bootstrap in (("crossed", crossed_bootstrap), ("nested", hierarchical_bootstrap)):
+                low, high = bootstrap(table, chunk=1000).ci95
+                covered[name] += low <= 100.0 <= high
+        assert covered["crossed"] >= 60 * 0.95 - 5 * 1.7          # Binomial(60, 0.95) has sd 1.7
+        assert covered["crossed"] > covered["nested"]
+
+    def test_game_metric_rows_are_the_tables_behind_aggregate_games(self):
+        rng = np.random.default_rng(5)
+        games = []
+        for _ in range(3):
+            row = {}
+            for agent in ("learned_planner", "random", "reference_risk0.4"):
+                returns = rng.choice([999.0, -40.0, -1001.0], size=16)
+                row.update({f"{agent}.return": returns, f"{agent}.won": returns > 0, f"{agent}.died": returns < -500})
+            games.append(row)
+        rows, statistics = game_metric_rows(games), aggregate_games(games)
+        assert rows.keys() == statistics.keys()
+        for name, table in rows.items():
+            assert table.shape == (3, 16)
+            assert hierarchical_bootstrap(table) == statistics[name]
+        np.testing.assert_array_equal(rows["gap/learned_planner - random"][1],
+                                      games[1]["learned_planner.return"] - games[1]["random.return"])
 
     def test_identical_agents_have_a_zero_paired_gap(self):
         rng = np.random.default_rng(1)

@@ -1,0 +1,210 @@
+# The paper's numbers (main.tex as of the audit). id: a key computed by ledger.py; paper: the printed value;
+# decimals: the printed precision; where: its place in the paper. Update `paper` whenever the text changes.
+
+- {id: tiger.seeds, paper: 10, decimals: 0, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.learned.return, paper: 18.49, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.learned.return_ci, paper: 0.06, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.learned.gap, paper: 0.02, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.learned.gap_ci, paper: 0.06, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.optimal.return, paper: 18.48, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.optimal.value_b0, paper: 19.36, decimals: 2, where: "tab:tiger caption"}
+- {id: tiger.mlp_agent.l1, paper: 0.004, decimals: 3, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.decoded_mlp.return, paper: 18.27, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.decoded_mlp.return_ci, paper: 0.24, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.decoded_mlp.gap, paper: -0.2, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.decoded_mlp.gap_ci, paper: 0.24, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.suboptimal_pct, paper: 0.14, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.linear_agent.l1, paper: 0.016, decimals: 3, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.decoded_linear.gap, paper: -4.7, decimals: 1, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.bounds.value_bound_mean, paper: 0.24, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.bounds.value_error_mean, paper: 0.05, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.bounds.regret_bound_mean, paper: 0.48, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.bounds.regret_mean, paper: 0.001, decimals: 3, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.bounds.value_bound_max, paper: 24, decimals: 0, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.bounds.regret_bound_max, paper: 48, decimals: 0, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.decoder.gap, paper: 0.0, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.decoder.gap_ci, paper: 0.07, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.decoder_minus_jepa, paper: -0.02, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.decoder_minus_jepa_ci, paper: 0.11, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.geometry.pc12_pct.min, paper: 86, decimals: 0, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.geometry.pc12_pct.max, paper: 92, decimals: 0, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.geometry.side_pc2.min, paper: 0.81, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.geometry.side_pc2.max, paper: 0.82, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.geometry.confidence_pc1.min, paper: 0.75, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.geometry.confidence_pc1.max, paper: 0.76, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.geometry.unexplained_pct.min, paper: 24, decimals: 0, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.geometry.unexplained_pct.max, paper: 34, decimals: 0, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: heldout.random.return.mean, paper: -420, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.random.won_pct, paper: 12.3, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.random.died_pct, paper: 58.4, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.random.unfinished_pct, paper: 29.3, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.baseline.return.mean, paper: 60, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.baseline.won_pct, paper: 11.4, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.baseline.died_pct, paper: 0.0, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.baseline.unfinished_pct, paper: 88.6, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.ours.return.mean, paper: 196, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.ours.won_pct, paper: 28.6, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.ours.died_pct, paper: 2.0, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.ours.unfinished_pct, paper: 69.3, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.exact_planner.return.mean, paper: 494, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.exact_planner.won_pct, paper: 62.3, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.exact_planner.died_pct, paper: 1.6, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.exact_planner.unfinished_pct, paper: 36.1, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.heuristic.return.mean, paper: 580, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.heuristic.won_pct, paper: 71.3, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.heuristic.died_pct, paper: 2.0, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.heuristic.unfinished_pct, paper: 26.8, decimals: 1, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.ours_minus_baseline.mean, paper: 135, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.ours_minus_baseline.lo, paper: 78, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.ours_minus_baseline.hi, paper: 191, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.ours_minus_exact_planner.mean, paper: -298, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.ours_minus_exact_planner.lo, paper: -340, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.ours_minus_exact_planner.hi, paper: -259, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.probe.cell_random_pct, paper: 76, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.probe.heading_random_pct, paper: 83, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.probe.cell_agent_pct, paper: 88, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.probe.heading_agent_pct, paper: 92, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.probe.pit_error, paper: 0.059, decimals: 3, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.probe.pit_constant, paper: 0.083, decimals: 3, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.untrained_probe.cell_pct, paper: 46, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.untrained_probe.heading_pct, paper: 43, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.untrained_probe.pit_error, paper: 0.073, decimals: 3, where: "Results, Wumpus World paragraph / tab:wumpus"}
+- {id: heldout.abl_max.return, paper: 162, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.ours_minus_abl_max.mean, paper: 34, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.ours_minus_abl_max.lo, paper: -26, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.ours_minus_abl_max.hi, paper: 94, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.abl_max.cell_random_pct, paper: 74, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.abl_max.heading_random_pct, paper: 83, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.abl_noretrain.return, paper: 156, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.ours_minus_abl_noretrain.mean, paper: 40, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.ours_minus_abl_noretrain.lo, paper: 3, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.ours_minus_abl_noretrain.hi, paper: 88, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.abl_noretrain.cell_random_pct, paper: 57, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.abl_noretrain.heading_random_pct, paper: 57, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.abl_jepa.return, paper: 142, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.ours_minus_abl_jepa.mean, paper: 53, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.ours_minus_abl_jepa.lo, paper: -1, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.ours_minus_abl_jepa.hi, paper: 120, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.abl_jepa.cell_random_pct, paper: 60, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.abl_jepa.heading_random_pct, paper: 64, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: heldout.abl_jepa.cell_agent_pct, paper: 91, decimals: 0, where: "Results, Ablation paragraph / tab:ablation"}
+- {id: dev.exact_model.return, paper: 408, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.learned.return, paper: 200, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.exact_model_minus_learned, paper: 208, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.exact_model_minus_learned_ci, paper: 51, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.exact_model.died_pct_max, paper: 0, decimals: 1, where: "Results, Localisation paragraph"}
+- {id: dev.learned.unfinished_pct, paper: 67, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.exact_model.unfinished_pct, paper: 50, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.exact_p_minus_learned, paper: 157, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.exact_model.return, paper: 363, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.exact_model_minus_ours.mean, paper: 168, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.exact_model_minus_ours.lo, paper: 139, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.exact_model_minus_ours.hi, paper: 195, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.exact_model.seeds_positive, paper: 5, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.exact_model.died_pct, paper: 0, decimals: 1, where: "Results, Localisation paragraph"}
+- {id: heldout.mixture_minus_ours.mean, paper: 89, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.mixture_minus_ours.lo, paper: 52, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.mixture_minus_ours.hi, paper: 124, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.sims100_minus_ours.mean, paper: -8, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.sims100_minus_ours.lo, paper: -23, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.sims100_minus_ours.hi, paper: 6, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.sims100.died_pct, paper: 3.5, decimals: 1, where: "Results, Localisation paragraph"}
+- {id: heldout.sims100.seeds_deaths_up, paper: 5, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.sims10_minus_ours.mean, paper: -22, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.sims10_minus_ours.lo, paper: -43, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: heldout.sims10_minus_ours.hi, paper: -3, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.declined.glitter_ratio.min, paper: 0.22, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.declined.glitter_ratio.max, paper: 0.44, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.M.min, paper: 8, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.M.max, paper: 14, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EP.min, paper: 42, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EP.max, paper: 62, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EPR.min, paper: 48, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EPR.max, paper: 81, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.declined.visited_misread_pct.min, paper: 19, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.declined.visited_misread_pct.max, paper: 35, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.remedy.VE25.seed0, paper: -57, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.VE25.seed1, paper: 2, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.VE25.seed2, paper: 27, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.DA50.seed0, paper: -61, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.DA50.seed1, paper: 78, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.DA50.seed2, paper: 50, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.QE5.seed0, paper: -91, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.QE5.seed1, paper: 42, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.QE5.seed2, paper: 40, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.VE25.deaths_seed0, paper: 3.7, decimals: 1, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.DA50.deaths_seed0, paper: 4.9, decimals: 1, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.QE5.deaths_seed0, paper: 6.4, decimals: 1, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.DA50.glitter_change.seeds_lower, paper: 1, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.cover.mean, paper: -194, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.cover.lo, paper: -345, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.cover.hi, paper: -43, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.cover.glitter_change.min, paper: 0.14, decimals: 2, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.cover.glitter_change.max, paper: 0.32, decimals: 2, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.cover.deaths_mean, paper: 28, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.own.mean, paper: 65, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.own.lo, paper: -62, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.own.hi, paper: 192, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.own.glitter_change.min, paper: 0.01, decimals: 2, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.own.glitter_change.max, paper: 0.24, decimals: 2, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.own.deaths_mean, paper: -2.8, decimals: 1, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.union.mean, paper: -12, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.union.lo, paper: -162, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.union.hi, paper: 138, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.union.glitter_change.min, paper: 0.11, decimals: 2, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.union.glitter_change.max, paper: 0.26, decimals: 2, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.union.deaths_mean, paper: 6.7, decimals: 1, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.branch.mean, paper: -48, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.branch.lo, paper: -165, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.branch.hi, paper: 68, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.branch.glitter_change.min, paper: -0.07, decimals: 2, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.branch.glitter_change.max, paper: 0.18, decimals: 2, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.branch.deaths_mean, paper: 2.3, decimals: 1, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.random.mean, paper: 40, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.random.lo, paper: -154, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.random.hi, paper: 234, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.random.glitter_change.min, paper: 0.04, decimals: 2, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.random.glitter_change.max, paper: 0.59, decimals: 2, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.random.deaths_mean, paper: -0.6, decimals: 1, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.cover.glitter_change.seeds_repaired, paper: 4, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.branch.glitter_change.seeds_repaired, paper: 1, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.random.glitter_change.seeds_repaired, paper: 4, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.random.seeds_positive, paper: 4, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: dev.remedy.random.deaths_max, paper: 15, decimals: 0, where: "tab:remedies / Repairing the observation model"}
+- {id: heldout.random.return.crossed_lo, paper: -471, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.random.return.crossed_hi, paper: -369, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.heuristic.return.crossed_lo, paper: 540, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.heuristic.return.crossed_hi, paper: 618, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.exact_planner.return.crossed_lo, paper: 454, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.exact_planner.return.crossed_hi, paper: 533, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.ours.return.t_lo, paper: 138, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.ours.return.t_hi, paper: 254, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.baseline.return.t_lo, paper: 21, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.baseline.return.t_hi, paper: 100, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.ours_minus_baseline.t_lo, paper: 48, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.ours_minus_baseline.t_hi, paper: 222, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.ours_minus_exact_planner.t_lo, paper: -356, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.ours_minus_exact_planner.t_hi, paper: -240, decimals: 0, where: "tab:wumpus / Wumpus World paragraph"}
+- {id: heldout.ours_minus_abl_max.t_lo, paper: -59, decimals: 0, where: "Ablation"}
+- {id: heldout.ours_minus_abl_max.t_hi, paper: 127, decimals: 0, where: "Ablation"}
+- {id: heldout.ours_minus_abl_noretrain.t_lo, paper: -24, decimals: 0, where: "Ablation"}
+- {id: heldout.ours_minus_abl_noretrain.t_hi, paper: 104, decimals: 0, where: "Ablation"}
+- {id: heldout.ours_minus_abl_jepa.t_lo, paper: -42, decimals: 0, where: "Ablation"}
+- {id: heldout.ours_minus_abl_jepa.t_hi, paper: 148, decimals: 0, where: "Ablation"}
+- {id: heldout.exact_model_minus_ours.t_lo, paper: 131, decimals: 0, where: "Localisation"}
+- {id: heldout.exact_model_minus_ours.t_hi, paper: 204, decimals: 0, where: "Localisation"}
+- {id: heldout.mixture_minus_ours.t_lo, paper: 35, decimals: 0, where: "Localisation"}
+- {id: heldout.mixture_minus_ours.t_hi, paper: 142, decimals: 0, where: "Localisation"}
+- {id: heldout.sims100_minus_ours.t_lo, paper: -23, decimals: 0, where: "Localisation"}
+- {id: heldout.sims100_minus_ours.t_hi, paper: 7, decimals: 0, where: "Localisation"}
+- {id: heldout.sims10_minus_ours.t_lo, paper: -46, decimals: 0, where: "Localisation"}
+- {id: heldout.sims10_minus_ours.t_hi, paper: 2, decimals: 0, where: "Localisation"}
+- {id: tiger.bounds.value_bound_max_over_seeds, paper: 43, decimals: 0, where: "Results, Tiger paragraph"}
+- {id: tiger.bounds.regret_bound_max_over_seeds, paper: 86, decimals: 0, where: "Results, Tiger paragraph"}
+- {id: tiger.bounds.policy_loss_bound_mean, paper: 9.5, decimals: 1, where: "Results, Tiger paragraph"}
+- {id: tiger.mlp_random.l1, paper: 0.004, decimals: 3, where: "Results, Tiger paragraph"}
+- {id: dev.remedy.VE100.seed0, paper: -64, decimals: 0, where: "Repairing the observation model"}
+- {id: dev.remedy.VE100.seed1, paper: 31, decimals: 0, where: "Repairing the observation model"}
+- {id: dev.remedy.VE100.seed2, paper: 12, decimals: 0, where: "Repairing the observation model"}
+- {id: dev.remedy.DA50.glitter_change.min, paper: -0.1, decimals: 2, where: "Repairing the observation model"}
+- {id: dev.remedy.QE5.glitter_change.max, paper: 0.09, decimals: 2, where: "Repairing the observation model"}

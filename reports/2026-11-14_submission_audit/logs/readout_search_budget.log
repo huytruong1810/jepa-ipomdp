@@ -1,0 +1,14 @@
+seed 5: N50  246.5 | N10  227.5 (d  -19.0; won 0.305 died 0.004 unfinished 0.691) | N100  235.0 (d  -11.5; won 0.318 died 0.006 unfinished 0.676)
+seed 6: N50  229.8 | N10  206.5 (d  -23.3; won 0.295 died 0.025 unfinished 0.680) | N100  203.3 (d  -26.5; won 0.320 died 0.057 unfinished 0.623)
+seed 7: N50  204.6 | N10  200.0 (d   -4.6; won 0.279 died 0.014 unfinished 0.707) | N100  198.8 (d   -5.8; won 0.316 died 0.045 unfinished 0.639)
+seed 8: N50  132.7 | N10  122.0 (d  -10.6; won 0.193 died 0.004 unfinished 0.803) | N100  138.0 (d   +5.3; won 0.229 died 0.029 unfinished 0.742)
+seed 9: N50  164.6 | N10  110.1 (d  -54.5; won 0.189 died 0.031 unfinished 0.779) | N100  162.6 (d   -2.0; won 0.258 died 0.037 unfinished 0.705)
+
+hierarchical bootstrap over 5 seeds, then games:
+  N10            173.2 [  129.0,   216.4]
+  N50            195.6 [  155.3,   234.8]
+  N100           187.5 [  153.2,   221.4]
+  N100 - N50      -8.1 [  -23.2,     6.2]
+  N10 - N50      -22.4 [  -43.2,    -3.4]
+
+C-g reading: N100 - N50 upper end +6.2 vs bar +84: SEARCH IS NOT THE LEVER (predicted)

@@ -268,3 +268,29 @@ Any change after the first held-out read is logged here with its date and reason
 
 - No change to any claim. Operational note: held-out training seed 7 was aborted at collection 19 on 2026-10-19 by the VRAM guardrail (a diagnostic job beside it, not a property of the recipe). Before any held-out read it was moved to `runs/wumpus/heldout_seed7_aborted_20261019` and retrained from scratch with the identical command (training is deterministic per seed).
 - Operational note (2026-11-02): C-e arm 2 (`abl_noretrain`) training seed 5 was aborted at collection 20 on 2026-11-01 22:31 by the VRAM guardrail (an unrelated process on the GPU took ~12 GB during the run; not a property of the arm). Before any read of the arm it was moved to `runs/wumpus/abl_noretrain_aborted_20261101` and the arm restarts from scratch with the identical command (training is deterministic per seed).
+
+## Deviations and post hoc analyses (submission audit, 2026-11-14)
+Found by the audit in `reports/2026-11-14_submission_audit/` (`AUDIT_LOG.md`; every number below is recomputed from the per-game files by `ledger.py`, table in `statistics.md`). Nothing above this section was edited.
+
+- **The interval the paper cites (deviation from "Statistics", item 3).** The registered interval is the hierarchical bootstrap. Two defects make it too narrow, so the paper now gives the Student-t 95% interval on the per-seed means (for a gap: on the per-seed means of the paired per-game differences) as its main interval and the registered one beside it, marked as such.
+  1. It is a percentile bootstrap over 5 seed clusters. Its seed part is narrower than the Student-t interval by about sqrt(4/5) x 1.96 / 2.78 = 0.63.
+  2. Every seed is analysed on the same 512 games, a crossed design, but the games are redrawn independently for every drawn seed. For an agent played once per analysis seed (exact-belief planner, heuristic, random) the row is the same for every seed and the interval is sqrt(5) too narrow. `aggregate.py` section 7 adds `crossed_bootstrap` (seeds and one set of games per resample); `hierarchical_bootstrap` is unchanged, so every readout above reproduces.
+
+  | Quantity | Registered (nested) | Student-t over seeds | Crossed bootstrap |
+  |---|---|---|---|
+  | C-a return | 195.6 [155.3, 234.8] | [137.5, 253.8] | [146.8, 244.0] |
+  | C-a exact-belief planner | 493.9 [476.3, 511.0] | (one play) | [453.9, 532.7] |
+  | C-a gap to the exact-belief planner | -298.2 [-340.4, -259.3] | [-356.4, -240.1] | [-349.0, -248.7] |
+  | C-c recipe minus R2D2-lite | +135.2 [78.4, 190.7] | [48.2, 222.3] | [74.7, 198.6] |
+  | C-e arm 1, recipe minus max backup | +33.5 [-25.5, 94.4] | [-59.4, 126.5] | [-28.3, 98.4] |
+  | C-e arm 2, recipe minus no retrain | +40.0 [2.6, 87.7] | [-23.6, 103.7] | [-3.1, 91.9] |
+  | C-e arm 3, recipe minus JEPA | +53.2 [-1.0, 120.0] | [-41.8, 148.1] | [-6.1, 124.0] |
+  | C-g N100 minus N50 | -8.1 [-23.2, 6.2] | [-22.9, 6.8] | [-26.7, 9.5] |
+  | C-g N10 minus N50 | -22.4 [-43.2, -3.4] | [-46.4, 1.6] | [-46.3, 0.4] |
+  | Exact one-step model minus learned (post hoc) | +167.6 [139.3, 195.4] | [131.1, 204.1] | [131.6, 202.7] |
+  | Even mixture minus learned (post hoc) | +88.7 [52.4, 124.2] | [35.3, 142.1] | [48.5, 128.0] |
+
+  Consequences for verdicts. C-e arm 2 keeps its registered verdict (CONTRIBUTES, by the registered rule on the registered interval), but the other two intervals include zero, and the paper claims no effect of whole-buffer retraining on the return; its effect on the random-history probes holds on every seed (cell 56-59% against 68-79%, heading 54-60% against 72-87%). C-g: the N10 difference is negative on every seed, and only the registered interval excludes zero. Every other reading is the same under the three intervals.
+- **What the C-e arms change (clarification).** Arm 3 (`abl_jepa`) keeps `model.observation_horizon=5`, and the multi-step observation term trains the filter in either representation, so the arm replaces only the one-step observation term by latent self-prediction. Arm 2 (`abl_noretrain`) also takes 6,400 optimiser updates where the recipe takes 19,200, so it does not separate re-initialisation from the additional updates.
+- **Reads of the held-out set.** Training seeds 5-9 with analysis seed 20261019 have been read for C-a, C-b, C-c, C-d, the three C-e arms and C-g, and, without registration, for the exact one-step model and the even mixture (`exact_model_play.py` section 6). No correction for these reads is applied; the paper says which were registered.
+- **The evaluation games are fresh draws, not unseen layouts.** The 512 games of an analysis seed are drawn from the same 16,380 layouts as training; an agent's buffer of 8,960 games covers about 42% of the layouts in expectation (1 - exp(-8960 / 16380)).

@@ -12,26 +12,49 @@
 #   "turn, then step in" to the chosen action, with the learned model (M), the exact observation probabilities
 #   substituted after the turn (EP), and both exact components (EPR) (q_localise_diag.py section 4). The three
 #   substitutions are ordered (more of the model made exact), so they take an ordinal one-hue ramp, light to dark.
-# - Values are copied from the cited script headers (the readouts of record; the raw logs are not tracked), with the
-#   row each comes from. No randomness; CPU only; vector PDF with Type 42 fonts.
+# - Values are read from the raw artifacts: per-game returns in each seed's exact_play_{learned,EPR}.npz (development)
+#   and games.npz / exact_play_EPR.npz (held-out), and the "all (N states)" line of runs/wumpus/q_localise_seed<s>.log
+#   (the summary of that seed's q_localise.npz). No randomness; CPU only; vector PDF with Type 42 fonts.
 # - Colours: learned = neutral grey, exact = dataviz slot-1 blue; the ramp is the blue ramp steps 250 / 450 / 650.
 # Run: uv run reports/2026-11-03_paper_figures/localisation.py  ->  reports/2026-11-03_paper_figures/localisation.pdf
 # ======================================================================================================================
+import re
 from pathlib import Path
 
 import matplotlib
+import numpy as np
 
 matplotlib.use("pdf")
 import matplotlib.pyplot as plt
 
-# exact_model_play.py section 4 (development, learned vs EPR) and section 6 (held-out, recipe networks, alpha 0 vs 1).
-PLAY = [  # (seed, learned, exact one-step model)
-    (0, 236.7, 460.4), (1, 156.8, 321.7), (2, 233.1, 400.3), (3, 174.7, 433.7), (4, 199.7, 423.8),
-    (5, 246.5, 430.6), (6, 229.8, 433.0), (7, 204.6, 340.8), (8, 132.7, 271.0), (9, 164.6, 340.8),
-]
-# q_localise_diag.py section 4: shares of Q(turn, then step) > Q(chosen) at the declined decisions, M / EP / EPR.
-SHARES = [(0, 10.0, 43.0, 69.4), (1, 14.4, 41.5, 47.9), (2, 10.9, 46.3, 64.1), (3, 11.2, 62.2, 80.9),
-          (4, 7.6, 57.7, 68.3)]
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def _play():
+    """(seed, learned, exact one-step model) mean returns: development seeds 0-4, then held-out seeds 5-9."""
+    rows = []
+    for seed in range(5):
+        folder = ROOT / f"runs/sweeps/wumpus_retrain/seed{seed}/analysis"
+        rows.append((seed, float(np.load(folder / "exact_play_learned.npz")["returns"].mean()),
+                     float(np.load(folder / "exact_play_EPR.npz")["returns"].mean())))
+    for seed in range(5, 10):
+        folder = ROOT / f"runs/sweeps/wumpus_retrain_heldout/seed{seed}/analysis_heldout"
+        rows.append((seed, float(np.load(folder / "games.npz")["learned_planner.return"].mean()),
+                     float(np.load(folder / "exact_play_EPR.npz")["returns"].mean())))
+    return rows
+
+
+def _shares():
+    """(seed, M, EP, EPR) percentages of Q(turn, then step) > Q(chosen) at the declined decisions, seeds 0-4."""
+    rows = []
+    for seed in range(5):
+        text = (ROOT / f"runs/wumpus/q_localise_seed{seed}.log").read_text()
+        found = re.search(r"all \(\d+ states\): Q_mac > Q2\(chosen\): M ([\d.]+) .*?EP ([\d.]+) .*?EPR ([\d.]+)", text)
+        rows.append((seed, *(100.0 * float(value) for value in found.groups())))
+    return rows
+
+
+PLAY, SHARES = _play(), _shares()
 
 BLUE, GREY = "#2a78d6", "#8d8c86"
 RAMP = ("#86b6ef", "#2a78d6", "#104281")
