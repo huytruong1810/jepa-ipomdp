@@ -305,6 +305,13 @@ def wumpus_development(ledger: Ledger) -> None:
         ledger.put(f"dev.declined.{name}.min", min(values), fsrc)
         ledger.put(f"dev.declined.{name}.max", max(values), fsrc)
 
+    # Retrain-to-retrain spread: each control retrain against the agent whose buffer it was retrained on.
+    for name, folder, seeds in (("data", "coverage", DEV), ("objective", "ve_screen", range(3))):
+        spread = [(load_npy(RUNS / "wumpus" / folder / f"control_seed{s}.returns.npy") - learned[s]).mean() for s in seeds]
+        csrc = f"runs/wumpus/{folder}/control_seed*.returns.npy vs exact_play_learned.npz"
+        ledger.put(f"dev.control_minus_agent.{name}.min", min(spread), csrc)
+        ledger.put(f"dev.control_minus_agent.{name}.max", max(spread), csrc)
+
     # Retrain screens: arm minus its control, paired per game (seeds as stored).
     screens = {  # arm -> (directory of the arm's returns, directory and stem of its control, seeds, feature json of the control)
         "VE25": ("ve_screen", "ve_screen/control", range(3), "ctl"), "VE100": ("ve_screen", "ve_screen/control", range(3), "ctl"),

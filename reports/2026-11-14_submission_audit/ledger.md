@@ -211,3 +211,5 @@
 | dev.remedy.QE5.glitter_change.max | 0.09 | 0.0877 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{QE5,ctl}_seed*.json | OK |
 | dev.remedy.own.glitter_change.seeds_repaired | 2 | 2.00 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{own,control}_seed*.json | OK |
 | dev.remedy.union.glitter_change.seeds_repaired | 4 | 4.00 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{union,control}_seed*.json | OK |
+| dev.control_minus_agent.data.min | -92 | -92.12 | Repairing the observation model | runs/wumpus/coverage/control_seed*.returns.npy vs exact_play_learned.npz | OK |
+| dev.control_minus_agent.data.max | 107 | 106.82 | Repairing the observation model | runs/wumpus/coverage/control_seed*.returns.npy vs exact_play_learned.npz | OK |

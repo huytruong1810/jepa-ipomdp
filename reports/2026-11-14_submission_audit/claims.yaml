@@ -210,3 +210,5 @@
 - {id: dev.remedy.QE5.glitter_change.max, paper: 0.09, decimals: 2, where: "Repairing the observation model"}
 - {id: dev.remedy.own.glitter_change.seeds_repaired, paper: 2, decimals: 0, where: "Repairing the observation model"}
 - {id: dev.remedy.union.glitter_change.seeds_repaired, paper: 4, decimals: 0, where: "Repairing the observation model"}
+- {id: dev.control_minus_agent.data.min, paper: -92, decimals: 0, where: "Repairing the observation model"}
+- {id: dev.control_minus_agent.data.max, paper: 107, decimals: 0, where: "Repairing the observation model"}
