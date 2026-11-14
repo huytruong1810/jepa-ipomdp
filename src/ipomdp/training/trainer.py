@@ -306,6 +306,14 @@
 #      TokenSearchModel on the online filter (planning/search_model.py, section 10). The double target reads the
 #      children's latents (Expansion.next_latents). JEPA, a horizon and n-step grounding raise.
 #
+# 2m. Optional Dead-Reckoned Ego Map (ego_map, ego_map_weight = lambda > 0; model.ego_map_weight, 2026-11-13):
+#    - A readout of every latent z_0..z_T is trained on the hunter's own cell and heading (cross-entropy) and on the
+#      cells it has visited (binary cross-entropy), targets the domain dead-reckons from the episode's actions and
+#      BUMP bits (domain/wumpus.py section 7; training/run.py section 27). The loss times lambda reaches the filter, as
+#      the privileged term's does (section 2e, whose readout and per-slot cache it reuses); the targets are not
+#      privileged.
+#    - 0 (the default and canonical Tiger) builds and computes nothing. loss_mask with the term raises.
+#
 # 3h. Optional Planner-Consistent Pruning of the Targets (target_prune = delta > 0; model.target_prune, 2026-11-10):
 #    - The targets back up through PrunedModel(target model, delta) (planning/search_model.py, section 9): the same
 #      branches the tree search keeps, renormalised the same way, so the value is fitted to the backup the planner
@@ -440,6 +448,8 @@ class WorldModelTrainer:
         double_partition: DoublePartition | None = None,
         kinematic_weight: float = 0.0,
         kinematics: KinematicRules | None = None,
+        ego_map: PrivilegedBeliefLoss | None = None,
+        ego_map_weight: float = 0.0,
     ):
         """
         Args:
@@ -463,6 +473,7 @@ class WorldModelTrainer:
             target_prune: delta of the planner-consistent pruning of the targets' observation branches (section 3h); 0 = off.
             double_partition: How a ValuePair's rows are split between its heads (section 3e); None = BATCH.
             kinematic_weight, kinematics: lambda and the domain's rules of the kinematic-consistency term (section 2k).
+            ego_map, ego_map_weight: the dead-reckoned ego-map readout and its lambda (section 2m); None / 0 = off.
         """
         if nstep < 0 or not 0.0 <= nstep_mix <= 1.0 or (nstep > 0 and nstep_mix == 0.0):
             raise ValueError(f"need nstep >= 0 and nstep_mix in (0, 1] when nstep > 0; got {nstep}, {nstep_mix}.")
@@ -498,6 +509,9 @@ class WorldModelTrainer:
         if kinematic_weight < 0.0 or (kinematic_weight > 0.0 and kinematics is None):
             raise ValueError("the kinematic term needs weight >= 0 and, when on, the domain's rules (section 2k).")
         self.kinematic_weight, self.kinematics = kinematic_weight, kinematics
+        if (ego_map_weight > 0.0) != (ego_map is not None) or ego_map_weight < 0.0:
+            raise ValueError("the ego-map term needs a readout exactly when its weight is positive (section 2m).")
+        self.ego_map, self.ego_map_weight = ego_map, ego_map_weight
         if q_equivalent_weight < 0.0:
             raise ValueError(f"need q_equivalent_weight >= 0, got {q_equivalent_weight} (section 2i).")
         if q_equivalent_weight > 0.0 and (not isinstance(reward_head, ObservationRewardHead) or jepa is not None
@@ -538,6 +552,7 @@ class WorldModelTrainer:
             *observation_head.parameters(),
             *(multistep_predictor.parameters() if multistep_predictor is not None else ()),
             *(privileged.parameters() if privileged is not None else ()),
+            *(ego_map.parameters() if ego_map is not None else ()),                     # section 2m
         ]
         # The planning head is clipped on its own (section 3d): inside the joint clip its gradient norm
         # would rescale the filter's update, a coupling a detached head must not have.
@@ -658,7 +673,7 @@ class WorldModelTrainer:
             if mask.shape != (batch, steps) or mask.dtype != torch.bool or not bool(mask.any()):
                 raise ValueError(f"loss_mask must be a non-empty bool tensor of shape {(batch, steps)}.")
             if (self.horizon is not None or self.nstep > 0 or self.planning_observation_head is not None
-                    or self.privileged is not None or self.decision_aware_weight > 0.0
+                    or self.privileged is not None or self.ego_map is not None or self.decision_aware_weight > 0.0
                     or self.value_equivalent_weight > 0.0 or self.q_equivalent_weight > 0.0):
                 raise ValueError("loss_mask is defined for the reward, observation, multi-step, JEPA and value terms only "
                                  "(section 2j).")
@@ -772,6 +787,8 @@ class WorldModelTrainer:
 
             if self.privileged is not None:                                              # section 2e
                 losses["privileged_belief"] = self.privileged(latents, episodes)
+            if self.ego_map is not None:                                                 # section 2m
+                losses["ego_map"] = self.ego_map_weight * self.ego_map(latents, episodes)
 
             total = sum(losses.values())
 

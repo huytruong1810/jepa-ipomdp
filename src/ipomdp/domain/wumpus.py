@@ -80,6 +80,19 @@
 #    - They are a function of the observed history only (the exact Bayes filter), never of the hidden
 #      layout, but they use the known model, so a learner trained on them is privileged
 #      (training/privileged.py).
+#
+# 7. Dead-Reckoning Targets (ego_map_targets; model.ego_map_weight, 2026-11-13; PROTOCOL.md C-m):
+#    - The hunter's own cell, heading and the set of cells it has visited are a deterministic function of its own
+#      actions and of the BUMP bit: it starts at START_CELL facing START_HEADING, a turn changes the heading, and
+#      FORWARD moves one cell ahead unless the next percept reports BUMP. This is declared knowledge about the agent's
+#      own actions (like the kinematic rules, training/trainer.py 2k), not access to the layout or to the exact belief:
+#      nothing about pits, the wumpus or the gold enters.
+#    - Why (C-k, C-l): the agent dies by stepping into cells it had proven deadly, where its current percept already
+#      warned (a breeze or a stench) and the certainty rests on which neighbours it has visited. The latent tracks
+#      visited cells poorly (Step D, reports/2026-10-02_wumpus_diagnostics/feature_localise.py), so an auxiliary
+#      readout of the dead-reckoned map is the representation lever.
+#    - They equal the exact tracker's own cell and heading at every live step (tested). Steps whose input
+#      observation is GAME_OVER are not live (the position after a fatal step is irrelevant).
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -87,6 +100,7 @@ from enum import IntEnum
 from itertools import combinations
 
 import torch
+import torch.nn.functional as F
 from torch import Tensor
 
 from .env import StepOutput
@@ -412,6 +426,48 @@ def game_outcomes(rewards: Tensor) -> dict[str, float]:
             "mean_win_step": float(win_step[won].double().mean()) if bool(won.any()) else float("nan")}
 
 
+def ego_map_targets(initial_observations: Tensor, actions: Tensor,
+                    observations: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor]:
+    """
+    Dead-reckoned own state for whole episodes (section 7): from the agent's actions and BUMP bits only.
+
+    Args:
+        initial_observations: o_0 (B,) int64 (only its device and batch size are used; o_0 never reports BUMP).
+        actions: a_0..a_{T-1} (B, T) int64.
+        observations: o_1..o_T (B, T) int64.
+
+    Returns:
+        (cell (B, T + 1) int64, heading (B, T + 1) int64, visited (B, T + 1, 16) float32 in {0, 1},
+         live (B, T + 1) bool: the step's input observation is not GAME_OVER).
+    """
+    batch, steps = actions.shape
+    device = actions.device
+    delta = torch.tensor([[1, 0], [0, 1], [-1, 0], [0, -1]], device=device)                    # E, N, W, S
+    cell = torch.full((batch,), START_CELL, dtype=torch.int64, device=device)
+    heading = torch.full((batch,), int(START_HEADING), dtype=torch.int64, device=device)
+    visited = F.one_hot(cell, NUM_CELLS).bool()
+    live = torch.ones(batch, dtype=torch.bool, device=device)
+    cells, headings, visits, lives = [cell], [heading], [visited], [live]
+    for t in range(steps):
+        a, o = actions[:, t], observations[:, t]
+        live = live & (o != GAME_OVER)
+        moved = live & (a == WumpusAction.FORWARD) & ((o & Percept.BUMP) == 0)
+        x, y = cell % GRID + delta[heading, 0], cell // GRID + delta[heading, 1]
+        if bool((moved & ~((x >= 0) & (x < GRID) & (y >= 0) & (y < GRID))).any()):
+            raise RuntimeError("FORWARD without BUMP would leave the grid: the episodes contradict the declared rules.")
+        cell = torch.where(moved, x + GRID * y, cell)
+        heading = torch.where(live & (a == WumpusAction.TURN_LEFT), (heading + 1) % 4, heading)
+        heading = torch.where(live & (a == WumpusAction.TURN_RIGHT), (heading + 3) % 4, heading)
+        visited = visited | F.one_hot(cell, NUM_CELLS).bool()
+        cells.append(cell)
+        headings.append(heading)
+        visits.append(visited)
+        lives.append(live)
+    if initial_observations.shape != (batch,):
+        raise ValueError(f"initial_observations must have shape ({batch},).")
+    return torch.stack(cells, 1), torch.stack(headings, 1), torch.stack(visits, 1).float(), torch.stack(lives, 1)
+
+
 @dataclass(frozen=True)
 class WumpusMarginals:
     """Exact posterior marginals, each (B, 16) float64, and the hunter's exact own state (B,)."""
@@ -514,4 +570,4 @@ class WumpusBeliefTracker:
 
 
 __all__ = ["GAME_OVER", "NUM_CELLS", "Heading", "Percept", "WumpusAction", "WumpusBeliefTracker", "WumpusMarginals",
-           "WumpusSimulator", "WumpusState", "WumpusWorld", "game_outcome_flags", "game_outcomes"]
+           "WumpusSimulator", "WumpusState", "WumpusWorld", "ego_map_targets", "game_outcome_flags", "game_outcomes"]

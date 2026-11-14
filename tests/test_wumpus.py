@@ -217,7 +217,7 @@ class TestLearningStack:
             decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0,
             codec_bound=CodecBound.DISCOUNTED, target_prune=False,
             double_partition=DoublePartition.BATCH, observation_head=ObservationHeadKind.JOINT,
-            kinematic_weight=0.0, filter=FilterKind.GRU)
+            kinematic_weight=0.0, filter=FilterKind.GRU, ego_map_weight=0.0)
         values.update(overrides)
         return RunConfig(**values)
 
@@ -582,6 +582,52 @@ class TestLearningStack:
             assert torch.allclose(soft[:, t, :48], torch.cat([m.pit, m.wumpus, m.gold], -1).float())
         assert torch.allclose(soft[:, 0, 48], soft[:, 0, 4] + soft[:, 0, 16 + 4])   # cell 4 is ahead; the wumpus lives
         assert bool((~live).any()) and bool(((soft >= 0) & (soft <= 1)).all())
+
+    def test_ego_map_targets_equal_the_exact_own_state(self):
+        # domain/wumpus.py, section 7: dead reckoning from actions and BUMP bits equals the exact tracker's own cell and
+        # heading at every live step; visited is the union of the cells occupied so far; live as the tracker's.
+        from ipomdp.agents import UniformRandomAgent
+        from ipomdp.domain.wumpus import ego_map_targets
+        from ipomdp.training import play_episodes
+        world = WumpusWorld(CPU, DISCOUNT)
+        episodes, _ = play_episodes(WumpusSimulator(world, 128, 40, 7, CPU), UniformRandomAgent(world.num_actions, 128, 8, CPU))
+        cell, heading, visited, live = ego_map_targets(episodes.initial_observations, episodes.actions, episodes.observations)
+        marginals = WumpusBeliefTracker(world).filter_episodes(episodes.initial_observations, episodes.actions,
+                                                               episodes.observations)
+        assert cell.shape == heading.shape == live.shape == (128, 41) and visited.shape == (128, 41, 16)
+        seen = torch.zeros(128, 16, dtype=torch.bool)
+        for t, m in enumerate(marginals):
+            assert torch.equal(live[:, t], ~m.done)
+            assert torch.equal(cell[:, t][live[:, t]], m.cell[live[:, t]])
+            assert torch.equal(heading[:, t][live[:, t]], m.heading[live[:, t]])
+            seen |= torch.nn.functional.one_hot(m.cell, 16).bool() & live[:, t:t + 1]
+            assert torch.equal(visited[:, t][live[:, t]].bool(), seen[live[:, t]])
+        assert bool((~live).any()) and int(visited[:, -1].sum(-1).max()) > 3     # deaths and multi-cell walks occur
+
+    def test_ego_map_term_trains_and_reaches_the_filter(self):
+        # training/run.py, section 27; trainer.py, section 2m: Tiger raises; the readout is a network and trains with the
+        # filter; the reported loss is lambda times the readout's loss; the filter receives its gradient.
+        from ipomdp.experiments import tiger_setup, wumpus_setup
+        from ipomdp.training import EpisodeBatch, Representation, TrainingRun
+        with pytest.raises(ValueError, match="section 27"):
+            TrainingRun(tiger_setup(CPU), self._config(ego_map_weight=0.5), CPU)
+        setup = wumpus_setup(CPU, DISCOUNT)
+        assert "ego_map_readout" not in TrainingRun(setup, self._config(), CPU).networks
+        run = TrainingRun(setup, self._config(ego_map_weight=0.5, representation=Representation.DECODER), CPU)
+        assert "ego_map_readout" in run.networks
+        assert {id(p) for p in run.ego_map.parameters()} <= {id(p) for p in run.trainer.parameters}
+        metrics = run.collect_and_train()
+        assert metrics["loss_ego_map"] > 0
+        batch = run.buffer.sample(4)
+        z = run.belief_filter.unroll(torch.nn.functional.one_hot(batch.actions, 5).float(),
+                                     torch.nn.functional.one_hot(batch.observations, 33).float(),
+                                     torch.nn.functional.one_hot(batch.initial_observations, 33).float())
+        loss = run.ego_map(z, batch)
+        run.belief_filter.zero_grad()
+        loss.backward()
+        assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in run.belief_filter.parameters())
+        with pytest.raises(ValueError, match="slot indices"):
+            run.ego_map(z.detach(), EpisodeBatch(batch.actions, batch.observations, batch.rewards, batch.initial_observations))
 
     def test_privileged_term_trains_and_resumes(self, tmp_path):
         # training/run.py, section 12; trainer.py, section 2e.

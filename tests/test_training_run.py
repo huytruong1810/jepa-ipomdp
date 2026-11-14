@@ -31,7 +31,7 @@ def _config(**overrides) -> RunConfig:
             decision_aware_weight=0.0, observation_reward=False, q_equivalent_weight=0.0,
             codec_bound=CodecBound.DISCOUNTED, target_prune=False,
             double_partition=DoublePartition.BATCH, observation_head=ObservationHeadKind.JOINT,
-            kinematic_weight=0.0, filter=FilterKind.GRU)
+            kinematic_weight=0.0, filter=FilterKind.GRU, ego_map_weight=0.0)
     values.update(overrides)
     return RunConfig(**values)
 

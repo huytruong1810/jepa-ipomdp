@@ -392,6 +392,14 @@
 #      the trainer's targets expand token states of the stored prefixes. Decoder representation only; no horizon or
 #      n-step (raises).
 #    - gru (the default, canonical Tiger) is the old filter and search model, bit for bit.
+#
+# 27. Dead-Reckoned Ego Map (2026-11-13; domain/wumpus.py section 7, trainer.py 2m; PROTOCOL.md C-m):
+#    - cfg.ego_map_weight = lambda > 0 adds a readout of the hunter's own cell, heading and visited cells, which the
+#      domain computes from the agent's own actions and BUMP bits (DomainSetup.ego_map; declared action semantics, no
+#      layout or belief). Its loss, times lambda, reaches the filter. It reuses the privileged term's readout and
+#      per-slot target cache (training/privileged.py, PrivilegedBeliefLoss); only the targets differ, and they are
+#      not privileged. Tiger declares none and raises.
+#    - 0 (the default, canonical Tiger) builds nothing and draws nothing.
 # ==============================================================================
 
 from collections.abc import Callable
@@ -455,6 +463,7 @@ class DomainSetup:
             (models/heads.py, section 3b; section 24), or None if the percept is not factored (Tiger).
         kinematics: The declared action semantics of the kinematic-consistency term (trainer.py 2k; section 25),
             or None (Tiger).
+        ego_map: The dead-reckoned own-state targets of the ego-map term (section 27), or None (Tiger).
     """
 
     domain: Domain
@@ -465,6 +474,7 @@ class DomainSetup:
     absorbing_observation: int | None = None
     observation_factors: ObservationFactors | None = None
     kinematics: KinematicRules | None = None
+    ego_map: PrivilegedSpec | None = None
 
 
 TRANSFORMER_LAYERS, TRANSFORMER_HEADS = 2, 4      # section 26
@@ -544,6 +554,7 @@ class RunConfig:
     observation_head: ObservationHeadKind  # joint (default) | chain-factored observation head (section 24)
     kinematic_weight: float           # kinematic-consistency term (section 25); 0 = off
     filter: FilterKind                # gru (default) | transformer history filter (section 26)
+    ego_map_weight: float             # dead-reckoned ego-map readout into the filter (section 27); 0 = off
 
 
 class TrainingRun:
@@ -616,6 +627,8 @@ class TrainingRun:
             raise ValueError("self_predictive_weight is for the decoder representation; JEPA has the term already (section 18).")
         if cfg.absorbing_value and setup.absorbing_observation is None:
             raise ValueError("absorbing_value needs a domain with an absorbing percept (DomainSetup.absorbing_observation; section 19).")
+        if cfg.ego_map_weight < 0.0 or (cfg.ego_map_weight > 0.0 and setup.ego_map is None):
+            raise ValueError("ego_map_weight must be >= 0 and, when on, needs a domain with ego-map targets (section 27).")
         if (cfg.risk_margin != 1.0 or cfg.trial_prob > 0.0) and setup.risk is None:
             raise ValueError("risk_margin and trial_prob need a domain with a fatal outcome (DomainSetup.risk; sections 16, 17).")
         domain = self.domain = setup.domain
@@ -648,6 +661,9 @@ class TrainingRun:
         self.privileged = (PrivilegedBeliefLoss(setup.privileged, cfg.buffer_capacity, cfg.episode_length, cfg.latent_dim,
                                                 cfg.hidden_dim, cfg.num_blocks).to(device)
                            if cfg.privileged_belief_loss else None)                                   # section 12
+        self.ego_map = (PrivilegedBeliefLoss(setup.ego_map, cfg.buffer_capacity, cfg.episode_length, cfg.latent_dim,
+                                             cfg.hidden_dim, cfg.num_blocks).to(device)
+                        if cfg.ego_map_weight > 0.0 else None)                                        # section 27
         if cfg.value_estimator is not ValueEstimator.MAX:                                                 # section 13
             second = ValueHead(cfg.latent_dim, cfg.hidden_dim, cfg.num_blocks, cfg.num_bins).to(device)
             self.value_head = ValuePair(self.value_head, second, cfg.value_estimator)
@@ -661,7 +677,8 @@ class TrainingRun:
                                          codec_bound if cfg.codec_bound is CodecBound.ABSORBING else None,  # section 22
                                          self._target_prune(cfg),                                            # section 23
                                          cfg.double_partition,                                               # section 13
-                                         cfg.kinematic_weight, self._kinematics(setup, cfg))                 # section 25
+                                         cfg.kinematic_weight, self._kinematics(setup, cfg),                 # section 25
+                                         self.ego_map, cfg.ego_map_weight)                                   # section 27
 
         # Polyak-averaged copies the agent acts with (section 4).
         self.acting_filter = frozen_copy(self.belief_filter)
@@ -708,7 +725,8 @@ class TrainingRun:
                      "acting_planning_observation": self.acting_planning_observation_head}
                     if self.planning_observation_head is not None else {})
         privileged = {"privileged_readout": self.privileged} if self.privileged is not None else {}
-        return {**representation, **multistep, **privileged, "value": self.value_head, "reward": self.reward_head,
+        ego = {"ego_map_readout": self.ego_map} if self.ego_map is not None else {}                     # section 27
+        return {**representation, **multistep, **privileged, **ego, "value": self.value_head, "reward": self.reward_head,
                 "observation": self.observation_head, "target_value": self.trainer.target_value_head,
                 "acting_filter": self.acting_filter, "acting_reward": self.acting_reward_head,
                 "acting_observation": self.acting_observation_head, "acting_value": self.acting_value_head, **planning}
@@ -744,10 +762,12 @@ class TrainingRun:
         return metrics
 
     def _store(self, episodes: EpisodeBatch, greedy: bool) -> None:
-        """Adds episodes to the replay buffer; the privileged term forgets the rewritten slots (section 12)."""
+        """Adds episodes to the replay buffer; the per-slot target caches forget the rewritten slots (sections 12, 27)."""
         slots = self.buffer.add(episodes, greedy)
         if self.privileged is not None:
             self.privileged.forget(slots)
+        if self.ego_map is not None:
+            self.ego_map.forget(slots)
 
     @property
     def in_warmup(self) -> bool:
@@ -830,6 +850,8 @@ class TrainingRun:
         self.buffer.load_state_dict(state["buffer"])
         if self.privileged is not None:
             self.privileged.forget()                                                      # section 12
+        if self.ego_map is not None:
+            self.ego_map.forget()                                                         # section 27
         self.env.load_state_dict(state["env"])
         self.eval_env.load_state_dict(state["eval_env"])
         self.warmup_agent.load_state_dict(state["warmup_agent"])
