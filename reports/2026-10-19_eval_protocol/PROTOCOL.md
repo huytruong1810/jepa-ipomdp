@@ -243,6 +243,22 @@ Failure head / exact danger at the set's fatal chosen FORWARDs on the 512 analys
 - Reading: averaged over risky states the dedicated head is about calibrated (0.64-1.18), but at the steps the planner dies on it rates the risk at about 0. On several seeds the exact danger there is 1: the cell ahead is provably deadly, and the latent does not carry that. The dedicated head is no better than the stored heads. The AUC for fatal vs survived among chosen risky FORWARDs is 0.07-0.78 (stored 0.09-0.81).
 - Consequence: a constraint on any head read from this latent cannot remove these deaths, so the chance-constrained search is not built and CC-play is not run.
 
+## C-l result (diagnostic, read 2026-11-14 00:30; logs `runs/wumpus/deadly_probe/<set>_seed<s>.log`): MIXED
+
+Probe recall (prediction at least 0.5) at live analysis-game states with a provably deadly cell ahead. "Missed" means the observation head's max(P_O, P_R) was below 0.5; "stepped" means the agent moved FORWARD into the cell and died. The floor is a probe on a re-initialised filter.
+
+| Set | Seed | Deadly states (flagged / missed / stepped) | Recall: missed | Recall: flagged | Recall: stepped | Floor: missed |
+|---|---|---|---|---|---|---|
+| control | 0 | 353 / 113 / 9 | **0.717** | 0.963 | 0.778 | 0.106 |
+| control | 1 | 492 / 486 / 13 | **0.344** | 0.904 | 0.308 | 0.101 |
+| control | 2 | 129 / 259 / 14 | **0.517** | 0.791 | 0.500 | 0.344 |
+| union | 0 / 1 / 2 | 940 / 345 / 38, 226 / 220 / 20, 710 / 298 / 50 | 0.470 / 0.709 / 0.574 | 0.864 / 0.947 / 0.979 | 0.289 / 0.000 / 0.380 | 0.122 / 0.050 / 0.087 |
+
+- Verdict: MIXED. On the control set seed 0 reads IN-LATENT, seed 1 NOT-IN-LATENT and seed 2 MIXED, so no reading holds on 2 of 3 seeds.
+- On held-out buffer states the probe's recall at provably deadly cells is 0.72-0.88 (floor 0.24-0.30). The latent carries "deadly ahead" on most of its own states, partly at the states the head misses, and least at the states the agent steps into: recall there is 0.00-0.78, and at most 0.38 on 4 of 6 set-seeds.
+- At every provably deadly state the head missed, on all six set-seeds, the hunter's current percept already warned: a breeze for a pit ahead, a stench for a wumpus. The certainty comes from combining that warning with which neighbours are known safe (visited). The deaths therefore sit on the visited-tracking deficit found by the earlier localisation (Step D), not on missing percept information.
+- Consequence (no rule-bound action, as the reading is MIXED): both levers remain. One is the head's training signal: P(GAME_OVER | z, FORWARD) is supervised only where FORWARD was taken, which is rare at provably deadly cells. The other is the representation's tracking of visited cells.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 

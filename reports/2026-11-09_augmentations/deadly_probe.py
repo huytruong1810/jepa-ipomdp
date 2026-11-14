@@ -31,6 +31,11 @@ DESIGN DECISIONS & THEORETICAL FOUNDATIONS
 #      the share where the danger is a pit vs a wumpus.
 # 3. Pre-registered rule (PROTOCOL.md C-l; control set, seeds 0-2): recall at head-missed states >= 0.7 on 2 of 3 ->
 #    IN-LATENT; <= 0.4 on 2 of 3 -> NOT-IN-LATENT; otherwise MIXED. Union reported.
+# 4. RESULT (2026-11-14; runs/wumpus/deadly_probe/, PROTOCOL.md "C-l result"): MIXED. Control recall at head-missed
+#    provably deadly states 0.717 / 0.344 / 0.517 (floor 0.11 / 0.10 / 0.34); at the stepped-into states 0.778 / 0.308 /
+#    0.500; union 0.470 / 0.709 / 0.574 at missed and 0.289 / 0.000 / 0.380 at stepped. Held-out buffer recall at certain
+#    death 0.72-0.88. Every missed state's current percept already warned (breeze for a pit, stench for a wumpus): the
+#    certainty needs the visited neighbours, i.e. the visited-tracking deficit, not missing percept information.
 # ==============================================================================
 """
 
