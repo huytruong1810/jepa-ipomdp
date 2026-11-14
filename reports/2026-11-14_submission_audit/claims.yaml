@@ -117,7 +117,7 @@
 - {id: dev.declined.glitter_ratio.max, paper: 0.44, decimals: 2, where: "Results, Localisation paragraph"}
 - {id: dev.flip_share.M.min, paper: 8, decimals: 0, where: "Results, Localisation paragraph"}
 - {id: dev.flip_share.M.max, paper: 14, decimals: 0, where: "Results, Localisation paragraph"}
-- {id: dev.flip_share.EP.min, paper: 42, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EP.min, paper: 41, decimals: 0, where: "Results, Localisation paragraph"}
 - {id: dev.flip_share.EP.max, paper: 62, decimals: 0, where: "Results, Localisation paragraph"}
 - {id: dev.flip_share.EPR.min, paper: 48, decimals: 0, where: "Results, Localisation paragraph"}
 - {id: dev.flip_share.EPR.max, paper: 81, decimals: 0, where: "Results, Localisation paragraph"}
@@ -212,3 +212,17 @@
 - {id: dev.remedy.union.glitter_change.seeds_repaired, paper: 4, decimals: 0, where: "Repairing the observation model"}
 - {id: dev.control_minus_agent.data.min, paper: -92, decimals: 0, where: "Repairing the observation model"}
 - {id: dev.control_minus_agent.data.max, paper: 107, decimals: 0, where: "Repairing the observation model"}
+- {id: dev.flip_share.EP_turn_side.min, paper: 33, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EP_turn_side.max, paper: 55, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EPR_turn_side.min, paper: 40, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EPR_turn_side.max, paper: 74, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.M_per_game.min, paper: 9, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.M_per_game.max, paper: 18, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EP_per_game.min, paper: 35, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EP_per_game.max, paper: 71, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EPR_per_game.min, paper: 39, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.flip_share.EPR_per_game.max, paper: 88, decimals: 0, where: "Results, Localisation paragraph"}
+- {id: dev.declined.gold_calibration_own_histories.min, paper: 0.94, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.declined.gold_calibration_own_histories.max, paper: 1.09, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.declined.gold_calibration.min, paper: 0.51, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.declined.gold_calibration.max, paper: 0.59, decimals: 2, where: "Results, Localisation paragraph"}

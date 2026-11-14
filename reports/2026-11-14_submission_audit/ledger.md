@@ -116,12 +116,12 @@
 | heldout.sims10_minus_ours.hi | -3 | -3.38 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain_heldout/seed{5..9}/analysis_heldout/exact_play_learned_sims10.npz | OK |
 | dev.declined.glitter_ratio.min | 0.22 | 0.2222 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json | OK |
 | dev.declined.glitter_ratio.max | 0.44 | 0.4442 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json | OK |
-| dev.flip_share.M.min | 8 | 7.60 | Results, Localisation paragraph | runs/wumpus/q_localise_seed{0..4}.log | OK |
-| dev.flip_share.M.max | 14 | 14.40 | Results, Localisation paragraph | runs/wumpus/q_localise_seed{0..4}.log | OK |
-| dev.flip_share.EP.min | 42 | 41.50 | Results, Localisation paragraph | runs/wumpus/q_localise_seed{0..4}.log | OK |
-| dev.flip_share.EP.max | 62 | 62.20 | Results, Localisation paragraph | runs/wumpus/q_localise_seed{0..4}.log | OK |
-| dev.flip_share.EPR.min | 48 | 47.90 | Results, Localisation paragraph | runs/wumpus/q_localise_seed{0..4}.log | OK |
-| dev.flip_share.EPR.max | 81 | 80.90 | Results, Localisation paragraph | runs/wumpus/q_localise_seed{0..4}.log | OK |
+| dev.flip_share.M.min | 8 | 7.58 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.M.max | 14 | 14.38 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.EP.min | 41 | 41.49 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.EP.max | 62 | 62.20 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.EPR.min | 48 | 47.86 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.EPR.max | 81 | 80.86 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
 | dev.declined.visited_misread_pct.min | 19 | 18.85 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json | OK |
 | dev.declined.visited_misread_pct.max | 35 | 35.36 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json | OK |
 | dev.remedy.VE25.seed0 | -57 | -56.98 | tab:remedies / Repairing the observation model | runs/wumpus/ve_screen/VE25_seed*.returns.npy vs runs/wumpus/ve_screen/control_seed*.returns.npy | OK |
@@ -213,3 +213,17 @@
 | dev.remedy.union.glitter_change.seeds_repaired | 4 | 4.00 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{union,control}_seed*.json | OK |
 | dev.control_minus_agent.data.min | -92 | -92.12 | Repairing the observation model | runs/wumpus/coverage/control_seed*.returns.npy vs exact_play_learned.npz | OK |
 | dev.control_minus_agent.data.max | 107 | 106.82 | Repairing the observation model | runs/wumpus/coverage/control_seed*.returns.npy vs exact_play_learned.npz | OK |
+| dev.flip_share.EP_turn_side.min | 33 | 32.78 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.EP_turn_side.max | 55 | 54.75 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.EPR_turn_side.min | 40 | 40.11 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.EPR_turn_side.max | 74 | 73.57 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.M_per_game.min | 9 | 9.31 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.M_per_game.max | 18 | 17.66 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.EP_per_game.min | 35 | 34.94 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.EP_per_game.max | 71 | 71.16 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.EPR_per_game.min | 39 | 39.27 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.flip_share.EPR_per_game.max | 88 | 88.42 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz | OK |
+| dev.declined.gold_calibration_own_histories.min | 0.94 | 0.9393 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json | OK |
+| dev.declined.gold_calibration_own_histories.max | 1.09 | 1.0895 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json | OK |
+| dev.declined.gold_calibration.min | 0.51 | 0.5144 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json | OK |
+| dev.declined.gold_calibration.max | 0.59 | 0.5913 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json | OK |

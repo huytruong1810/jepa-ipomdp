@@ -20,8 +20,8 @@
 #      (runs/references/wumpus_exact_planner/seed20261019/games.npz), the model-free baseline's games
 #      (runs/baselines/r2d2_heldout/seed*/analysis_heldout/games.npz), and exact_play_*.npz.
 #    - Wumpus development: runs/sweeps/wumpus_retrain/seed{0..4}/analysis/ (exact_play_*.npz,
-#      feature_localise*.json), runs/wumpus/q_localise_seed*.log (per-state shares; the only log read,
-#      because q_localise.npz stores the per-state Q values and the log line is their summary), and the
+#      feature_localise*.json, q_localise.npz with the game ids of declined_states.pt; the summary line of
+#      runs/wumpus/q_localise_seed*.log is checked against the shares recomputed from the npz), and the
 #      per-game returns of the retrain screens under runs/wumpus/{ve,da,qe}_screen, coverage and branch.
 #    - The untrained-filter probe control exists only as a log (copied to logs/); its claims are parsed
 #      from that copy and are marked "log" in the ledger.
@@ -287,20 +287,36 @@ def wumpus_development(ledger: Ledger) -> None:
         ledger.put(f"dev.{name}.died_pct_max", max(outcomes(r)["died"] for r in table), src)
         ledger.put(f"dev.{name}.unfinished_pct", np.mean([outcomes(r)["unfinished"] for r in table]), src)
 
-    shares = {"M": [], "EP": [], "EPR": []}
+    # Flip shares from the per-state depth-two action values (q_localise.npz), counted per state as the paper
+    # prints them, with the substitution in the value of "turn, then step in" only, and per game (game ids from
+    # declined_states.pt; one game can contribute many states of one idle loop).
+    import torch                                  # only to read the game ids of declined_states.pt
+    shares: dict[str, list[float]] = {}
     for s in DEV:
+        q = load_npz(dev_dir(s) / "q_localise.npz")
+        meta = torch.load(_track(dev_dir(s) / "declined_states.pt"), map_location="cpu", weights_only=False)["meta"]
+        game = np.array([row["game"] for row in meta])
+        if game.size != q["q_mac_M"].size:
+            raise ValueError(f"development seed {s}: declined_states.pt and q_localise.npz hold different states.")
         text = _track(RUNS / "wumpus" / f"q_localise_seed{s}.log").read_text()
-        found = re.search(r"all \(\d+ states\): Q_mac > Q2\(chosen\): M ([\d.]+) .*?EP ([\d.]+) .*?EPR ([\d.]+)", text)
-        for key, value in zip(shares, found.groups()):
-            shares[key].append(100 * float(value))
+        logged = re.search(r"all \(\d+ states\): Q_mac > Q2\(chosen\): M ([\d.]+) .*?EP ([\d.]+) .*?EPR ([\d.]+)", text).groups()
+        for arm, printed in zip(("M", "EP", "EPR"), logged):
+            flips = (q[f"q_mac_{arm}"] > q[f"q_cho_{arm}"]).astype(float)
+            if abs(flips.mean() - float(printed)) > 5e-4:
+                raise ValueError(f"development seed {s}: q_localise.npz does not reproduce the logged {arm} share.")
+            shares.setdefault(arm, []).append(100 * flips.mean())
+            shares.setdefault(f"{arm}_per_game", []).append(100 * np.mean([flips[game == g].mean() for g in np.unique(game)]))
+            if arm != "M":
+                shares.setdefault(f"{arm}_turn_side", []).append(100 * (q[f"q_mac_{arm}"] > q["q_cho_M"]).mean())
     for key, values in shares.items():
-        ledger.put(f"dev.flip_share.{key}.min", min(values), "runs/wumpus/q_localise_seed{0..4}.log")
-        ledger.put(f"dev.flip_share.{key}.max", max(values), "runs/wumpus/q_localise_seed{0..4}.log")
+        ledger.put(f"dev.flip_share.{key}.min", min(values), "runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz")
+        ledger.put(f"dev.flip_share.{key}.max", max(values), "runs/sweeps/wumpus_retrain/seed{0..4}/analysis/q_localise.npz")
 
     features = [load_json(dev_dir(s) / "feature_localise.json") for s in DEV]
     fsrc = "runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json"
     for name, values in (("glitter_ratio", [f["joint_glitter_ratio_c"] for f in features]),
                          ("gold_calibration", [f["mlp"]["c"]["gold"]["calibration"] for f in features]),
+                         ("gold_calibration_own_histories", [f["mlp"]["a"]["gold"]["calibration"] for f in features]),
                          ("visited_misread_pct", [100 * (1 - f["mlp"]["c"]["unvisited"]["acc"]) for f in features])):
         ledger.put(f"dev.declined.{name}.min", min(values), fsrc)
         ledger.put(f"dev.declined.{name}.max", max(values), fsrc)
