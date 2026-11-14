@@ -209,3 +209,5 @@
 | dev.remedy.VE100.seed2 | 12 | 12.41 | Repairing the observation model | runs/wumpus/ve_screen/VE100_seed*.returns.npy vs runs/wumpus/ve_screen/control_seed*.returns.npy | OK |
 | dev.remedy.DA50.glitter_change.min | -0.1 | -0.0954 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{DA50,ctl}_seed*.json | OK |
 | dev.remedy.QE5.glitter_change.max | 0.09 | 0.0877 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{QE5,ctl}_seed*.json | OK |
+| dev.remedy.own.glitter_change.seeds_repaired | 2 | 2.00 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{own,control}_seed*.json | OK |
+| dev.remedy.union.glitter_change.seeds_repaired | 4 | 4.00 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{union,control}_seed*.json | OK |

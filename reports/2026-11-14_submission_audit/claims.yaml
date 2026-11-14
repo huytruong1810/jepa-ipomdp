@@ -208,3 +208,5 @@
 - {id: dev.remedy.VE100.seed2, paper: 12, decimals: 0, where: "Repairing the observation model"}
 - {id: dev.remedy.DA50.glitter_change.min, paper: -0.1, decimals: 2, where: "Repairing the observation model"}
 - {id: dev.remedy.QE5.glitter_change.max, paper: 0.09, decimals: 2, where: "Repairing the observation model"}
+- {id: dev.remedy.own.glitter_change.seeds_repaired, paper: 2, decimals: 0, where: "Repairing the observation model"}
+- {id: dev.remedy.union.glitter_change.seeds_repaired, paper: 4, decimals: 0, where: "Repairing the observation model"}
