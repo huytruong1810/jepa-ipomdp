@@ -84,6 +84,13 @@ Every Wumpus screen, threshold and design choice up to 2026-10-18 was read on tr
   - **MISS RATE** is the share of live analysis-game states with a provably deadly cell ahead (exact danger at least 0.999) at which the observation head's max(P_O, P_R) is below 0.5. It comes from `risk_localise.py` on the arm and on the control, in the same stage.
   - **Decision rule, per arm:** MECHANISM passes if the arm's MISS RATE is at most the control's minus 0.10 on 2 of 3 seeds. PLAY passes if arm minus control is positive on 2 of 3 seeds and deaths rise by no more than 2 points on any seed. An arm passes only if both pass. Two arms are read and no correction is applied.
   - **Consequence:** a passing arm enters R2. If none passes, the ego map is closed.
+- **C-n (third tuning round of the model-free baseline; registered 2026-11-14, before any of its runs).** C-c and C-f never screened two of the baseline's choices. First, its exploration: the Ape-X ladder has a fixed mean epsilon of about 0.065 and never anneals, while the planner explores with 0.25 decaying to 0.1. Second, its value rescaling h, which fits E[h(G)] and decodes a biased value for stochastic returns. Both are now default-off options in `src/ipomdp/baselines/recurrent_dqn.py` header 5. The budget is unchanged: 448,000 environment steps, 18,432 updates and the same data schedule.
+  - **Development screen** (training seeds 0-2, analysis seed 12345, `--output analysis`; runner `runs/week/stages.d/a6_r2d2_c_n.sh`). Three arms against the C-c defaults (`r2d2_lr1e-4_n5`, already run on these seeds):
+    - N1 (`r2d2_n1`): `exploration=anneal`, the planner's schedule: one epsilon for all rows, 0.25, times 0.97 per collection, floor 0.1.
+    - N2 (`r2d2_n2`): `value_scale=linear`, targets and Q-values divided by 1000. This is a linear map, so the regression decodes E[G] without bias.
+    - N3 (`r2d2_n3`): both.
+  - **Choice rule (as C-f).** The arm with the highest mean best-network return over seeds 0-2 is a candidate. It is CHOSEN only if its paired per-seed difference from the defaults has a mean greater than one standard error of that difference. The readout prints the per-seed values, the Student-t 95% interval on the per-seed differences and the standard error.
+  - **Held-out read (only if an arm is chosen):** the chosen arm on held-out training seeds 5-9, analysis seed 20261019, `--output analysis_heldout`, blind. It is reported as in C-f, and the paper's model-free row becomes that arm. Either way, the screen is reported.
 - Later method claims (for example, a new objective against this recipe) must be added to this file **before** their held-out runs start. Each states its comparison, its interval and its decision rule.
 
 ## Confirmatory results (read once, 2026-10-20 22:20)
@@ -268,6 +275,7 @@ Any change after the first held-out read is logged here with its date and reason
 
 - No change to any claim. Operational note: held-out training seed 7 was aborted at collection 19 on 2026-10-19 by the VRAM guardrail (a diagnostic job beside it, not a property of the recipe). Before any held-out read it was moved to `runs/wumpus/heldout_seed7_aborted_20261019` and retrained from scratch with the identical command (training is deterministic per seed).
 - Operational note (2026-11-02): C-e arm 2 (`abl_noretrain`) training seed 5 was aborted at collection 20 on 2026-11-01 22:31 by the VRAM guardrail (an unrelated process on the GPU took ~12 GB during the run; not a property of the arm). Before any read of the arm it was moved to `runs/wumpus/abl_noretrain_aborted_20261101` and the arm restarts from scratch with the identical command (training is deterministic per seed).
+- Correction (2026-11-14, no claim affected): the model-free baseline takes 96 x 192 = 18,432 optimiser updates, not 19,200 as C-c and C-f state. It does not train during the 4 warm-up collections; the recipe does. The baseline's header (`recurrent_dqn.py` section 2) is corrected. The paper already gives 18,432.
 
 ## Deviations and post hoc analyses (submission audit, 2026-11-14)
 Found by the audit in `reports/2026-11-14_submission_audit/` (`AUDIT_LOG.md`; every number below is recomputed from the per-game files by `ledger.py`, table in `statistics.md`). Nothing above this section was edited.

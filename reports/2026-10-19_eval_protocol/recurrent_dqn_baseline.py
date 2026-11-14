@@ -56,7 +56,8 @@ for item in args.set:
     key, value = item.split("=", 1)
     if key not in types:
         raise ValueError(f"Unknown RecurrentDQNConfig field {key!r}.")
-    overrides[key] = (float if types[key] in (float, "float") else int)(value)
+    kind = types[key]
+    overrides[key] = (value if kind in (str, "str") else float(value) if kind in (float, "float") else int(value))
 cfg = replace(RecurrentDQNConfig(), **overrides)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -35,8 +35,10 @@
 #    - The collection and evaluation layouts use the agent's RunStream ids (training/seeding.py)
 #      of the same training seed, so seed k of the baseline sees the same layout sequence as
 #      seed k of the agent (its own actions differ, so its trajectories do).
-#    - Gradient updates: 192 per collection = 19,200, the agent's count (64 per collection plus
-#      two whole-buffer retrains of 6400). Each update trains on `batch_size` whole episodes.
+#    - Gradient updates: 192 per collection after warm-up = 96 x 192 = 18,432 (corrected 2026-11-14; this header said
+#      19,200, the agent's count of 64 per collection plus two whole-buffer retrains of 6400). The baseline does not
+#      train during the 4 warm-up collections (train_recurrent_dqn: `if not in_warmup`), the agent does. Each update
+#      trains on `batch_size` whole episodes.
 #
 # 3. Learning Rule:
 #    - Input at step t: one-hot o_t (33 observations, GAME_OVER included) and one-hot a_{t-1}
@@ -71,6 +73,20 @@
 #        F2 width 512:         58 / 46 /  72 -> 58.6
 #        F3 n 10 + batch 64:   62 / 73 /  74 -> 69.8 (final networks -62 / 73 / 100)
 #      NOT CHOSEN: the best arm (F1) is below the defaults' 87.2, so the defaults stay and no held-out run follows.
+#
+# 5. Exploration and Value-Scale Options (2026-11-14; PROTOCOL.md C-n, third screen; both default off):
+#    - Why: an independent review found the two choices never screened. (i) The Ape-X ladder gives a fixed mean
+#      epsilon of about 0.065 per row and never anneals, while the planner explores with one epsilon of 0.25 decaying
+#      by 0.97 per collection to 0.1; 4 of 5 held-out baseline networks never turn. (ii) Value rescaling h is
+#      non-linear, so for stochastic returns the network fits E[h(G)] and decodes h^{-1}(E[h(G)]) != E[G] (biased
+#      towards the median, against Wumpus's rare +999 / -1001 outcomes).
+#    - exploration = "anneal": one epsilon for every row, epsilon_start (0.25) in the first collection after warm-up,
+#      multiplied by epsilon_decay (0.97) after every non-warm-up collection, floor epsilon_min (0.1), exactly the
+#      planner's schedule (training/run.py section 7). "apex" (the default) is section 1's ladder.
+#    - value_scale = "linear": targets and Q-values are G / value_scale_divisor (1000, the size of a win or a
+#      death): a linear map, so the regression's fixed point decodes to E[G] without bias, while the outputs stay of
+#      order 1 for Adam and the gradient clip. "rescale" (the default) is section 3's h. (A two-hot value head, as the
+#      planner's, would change the network and the loss together; the linear map changes only the bias in question.)
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -122,6 +138,22 @@ class RecurrentDQNConfig:
     eval_every: int = 5
     eval_episodes: int = 128
     buffer_capacity: int = 10000
+    exploration: str = "apex"            # apex (section 1) | anneal (section 5)
+    epsilon_start: float = 0.25          # section 5, exploration = anneal
+    epsilon_decay: float = 0.97
+    epsilon_min: float = 0.1
+    value_scale: str = "rescale"         # rescale (section 3, h) | linear (section 5)
+    value_scale_divisor: float = 1000.0
+
+    def __post_init__(self) -> None:
+        if self.exploration not in ("apex", "anneal"):
+            raise ValueError(f"exploration must be apex or anneal, got {self.exploration!r}.")
+        if self.value_scale not in ("rescale", "linear"):
+            raise ValueError(f"value_scale must be rescale or linear, got {self.value_scale!r}.")
+        if not 0.0 <= self.epsilon_min <= self.epsilon_start <= 1.0 or not 0.0 < self.epsilon_decay <= 1.0:
+            raise ValueError("need 0 <= epsilon_min <= epsilon_start <= 1 and 0 < epsilon_decay <= 1.")
+        if self.value_scale_divisor <= 0.0:
+            raise ValueError("value_scale_divisor must be positive.")
 
 
 class RecurrentQNetwork(nn.Module):
@@ -193,13 +225,23 @@ class RecurrentDQNTrainer:
         self.target.requires_grad_(False)
         self.optimizer = torch.optim.Adam(network.parameters(), lr=cfg.learning_rate, eps=cfg.adam_eps)
 
+    def encode(self, returns: Tensor) -> Tensor:
+        """Return -> the network's output space (h, or the linear map of section 5)."""
+        return (value_rescale(returns) if self.cfg.value_scale == "rescale"
+                else returns / self.cfg.value_scale_divisor)
+
+    def decode(self, outputs: Tensor) -> Tensor:
+        """The network's output space -> return."""
+        return (value_rescale_inverse(outputs) if self.cfg.value_scale == "rescale"
+                else outputs * self.cfg.value_scale_divisor)
+
     def train_step(self, episodes: EpisodeBatch) -> Tensor:
         """One update; returns the detached loss tensor (no host sync here: the caller checks finiteness per collection)."""
         q = self.network.unroll(episodes)                                          # (B, T + 1, A)
         with torch.no_grad():
             greedy = q.argmax(dim=-1, keepdim=True)
-            bootstrap = value_rescale_inverse(self.target.unroll(episodes).gather(-1, greedy).squeeze(-1))
-            target = value_rescale(nstep_targets(episodes.rewards, bootstrap, self.discount, self.cfg.nstep))
+            bootstrap = self.decode(self.target.unroll(episodes).gather(-1, greedy).squeeze(-1))
+            target = self.encode(nstep_targets(episodes.rewards, bootstrap, self.discount, self.cfg.nstep))
         taken = q[:, :-1].gather(-1, episodes.actions.unsqueeze(-1)).squeeze(-1)
         loss = F.mse_loss(taken, target)
         self.optimizer.zero_grad(set_to_none=True)
@@ -270,7 +312,9 @@ def train_recurrent_dqn(cfg: RecurrentDQNConfig, world: WumpusWorld, max_steps: 
     collect_env = WumpusSimulator(world, cfg.env_batch_size, length, stream(RunStream.COLLECTION_ENV), device)
     eval_env = WumpusSimulator(world, cfg.eval_episodes, length, stream(RunStream.EVAL_ENV), device)
     warmup = UniformRandomAgent(world.num_actions, cfg.env_batch_size, stream(RunStream.WARMUP_AGENT), device)
-    actor = RecurrentDQNAgent(network, apex_epsilons(cfg.env_batch_size), stream(RunStream.TRAIN_AGENT), device)
+    epsilons = (apex_epsilons(cfg.env_batch_size) if cfg.exploration == "apex"            # sections 1, 5
+                else torch.full((cfg.env_batch_size,), cfg.epsilon_start, dtype=torch.float64))
+    actor = RecurrentDQNAgent(network, epsilons, stream(RunStream.TRAIN_AGENT), device)
     evaluator = RecurrentDQNAgent(network, torch.zeros(cfg.eval_episodes), stream(RunStream.EVAL_AGENT), device)
 
     best_return, best_state, best_collection, evaluations = -float("inf"), None, -1, []
@@ -286,6 +330,8 @@ def train_recurrent_dqn(cfg: RecurrentDQNConfig, world: WumpusWorld, max_steps: 
             if not bool(torch.isfinite(losses).all()):    # one host sync per collection, never skipped
                 raise FloatingPointError(f"Non-finite recurrent DQN loss in collection {collection}.")
             loss = float(losses.mean())
+            if cfg.exploration == "anneal":                                                  # section 5
+                actor.epsilon = (actor.epsilon * cfg.epsilon_decay).clamp(min=cfg.epsilon_min)
         if collection % cfg.eval_every == 0:
             greedy, _ = play_episodes(eval_env, evaluator)
             buffer.add(greedy, greedy=True)
