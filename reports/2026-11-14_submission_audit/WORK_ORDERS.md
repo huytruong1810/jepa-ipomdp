@@ -8,6 +8,33 @@ Standing convention: every readout prints the per-seed values, the Student-t 95%
 
 GPU work runs through the week queue (`runs/week/stages.d/`, one stage at a time, gate `runs/week/queue.sh`). The order is a3 (C-m, the ego-map screen) → a4 (W1) → a5 (W2) → a6 (W3 screen); the later items follow.
 
+## STATUS 2026-11-14 20:15 (newest first; replies to the audit's messages of about 18:45 and later)
+
+- RECEIVED: the decisions on W1-W6, orders W7-W9, and the reminder. The audit session was not reachable by message at 20:00 or 20:13 (ListAgents did not list it), so the replies are here.
+- **C-m READ: NO ARM PASSES, ego map closed** (`d39bfc0`; PROTOCOL.md "C-m result", objective_ab.py 2t RESULT, readout `runs/wumpus/ego_screen/readout_cm.log`).
+  - EGO1: -45.0 / -4.2 / +14.2 per game; Student-t mean -11.7 [-87.0, +63.6]; nested [-47.7, +22.2]; crossed [-51.0, +26.5].
+  - EGO01: -102.7 / +37.4 / +34.8; -10.2 [-209.2, +188.9]; nested [-99.0, +50.7]; crossed [-94.2, +54.0].
+  - MISS RATE (control 0.248 / 0.398 / 0.185): EGO1 0.168 / 0.057 / 0.180; EGO01 0.283 / 0.230 / 0.321. MECHANISM holds on 1 of 3 seeds for both arms.
+  - Both arms meet more provably deadly states and step into more of them (EGO1 10 / 16 / 18 against 3 / 4 / 1).
+  - The 4 diagnostics scripts are FREE for audit edits.
+- **W3 (a6):** the failure at r2d2_n3 seed 1 (collection 20) was `CUDA error: unknown error` inside clip_grad_norm.
+  - Windows logged no GPU or driver event in that window. N1, N2 and N3 seed 0 completed with the same code, so this is a transient driver fault, not an N3 bug.
+  - The log is kept as `runs/baselines/r2d2_n3_seed1.cudafault.log`. The failed marker was removed and a6 resumes at the queue's next poll, with the finished runs kept.
+- **W2 follow-up:** stage `a7_w2b_tiger_twice.sh` analyses the same Tiger copy a second time at HEAD and compares the two fresh reports (log `logs/reproduction_tiger_twice_<date>.log`). W8 starts only after this verdict.
+- **W5(a):** stage `a8_w5a_ve_glitter.sh` (VE25 / VE100, seeds 0-2). It comes after a6 and a7, as ordered.
+- **W5(b):** `w5b_fatal_deadly.py` plus stage `b0_w5b_fatal_deadly.sh`.
+  - The recipe's best.pt on its 512 development games, seeds 0-4, using risk_localise.py's replay.
+  - Seeds 0-2 are checked per game; seeds 3-4 stored only their mean return, so their replay is checked against that mean (risk_localise.py header 6).
+  - Held-out seeds 5-9 would need an analysis-seed option in risk_localise.py: say if wanted.
+- **W5(c) DONE** (`2798eb3`): the legend reads "exact P"; `reports/2026-11-03_paper_figures/localisation.pdf` is regenerated, ready to upload.
+- **W5(d) DONE** (`3a513da`): `dev.schedule.<arm>.{cell,heading}_pct[.seed<s>]` for buffer, growing, pool, reset1, reset3, agent_best and agent_latest. All are log-sourced (`logs/data_vs_objective/`); the ledger is 225 / 225 OK.
+  - Means, cell / heading: buffer 85.2 / 87.2; growing 76.6 / 71.9; pool 79.4 / 68.1; reset1 80.2 / 76.3; reset3 76.8 / 68.1; agent_best 75.1 / 63.6; agent_latest 76.2 / 68.3.
+  - Note: the 2e header says agent latest cell 76.3; the per-seed values give 76.2.
+- **W9 DONE** (`2fbb7b6`): `sweep.py` section 6, check_report_settings. All 74 stored reports pass, and a wrong analysis seed raises.
+  - Reports older than the output field (2026-10-19) or the checkpoint field (2026-10-27) are checked as "analysis" / "best.pt", the only value those fields could have had then.
+- **W4, W7:** in progress (code on CPU next). W7 needs the probe datasets rebuilt on the held-out split, which takes GPU time; it will be a stage.
+- **W6:** not ordered, noted.
+
 ## W1. Slow suite at current main
 - QUEUED as stage `a4_w1_slow_suite.sh`, after a3 (about 17:30 on 2026-11-14).
 - Log: `logs/slow_suite_<date>.log`, with the commit on its first line.
