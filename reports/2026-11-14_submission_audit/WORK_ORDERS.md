@@ -8,6 +8,26 @@ Standing convention: every readout prints the per-seed values, the Student-t 95%
 
 GPU work runs through the week queue (`runs/week/stages.d/`, one stage at a time, gate `runs/week/queue.sh`). The order is a3 (C-m, the ego-map screen) → a4 (W1) → a5 (W2) → a6 (W3 screen); the later items follow.
 
+## STATUS 2026-11-15 08:40
+
+- **W4 DONE** (summary `logs/w4_accepted_states_2026-11-15.log`, `runs/wumpus/w4/summary.json`; per-state arrays in each seed's analysis/{q_localise,feature_localise}_{accepted,all}.*; identity check against dbae0cb passed).
+
+  Joint glitter ratio at the turned latent (learned / exact P(glitter | turned child, FORWARD)), seeds 0 / 1 / 2 / 3 / 4:
+
+  | set | states | ratio | mean |
+  |---|---|---|---|
+  | declined | 1407 / 1446 / 1576 / 1865 / 2520 | 0.44 / 0.29 / 0.30 / 0.22 / 0.34 | 0.32 |
+  | accepted (turn taken, then FORWARD) | 401 / 194 / 194 / 280 / 417 | 0.96 / 1.25 / 1.16 / 1.09 / 1.84 | 1.26 |
+  | all distance-2 states | 1982 / 1954 / 2076 / 2348 / 3297 | 0.55 / 0.48 / 0.37 / 0.33 / 0.53 | 0.45 |
+
+  - Reading for the audit: at the accepted states the head's glitter prediction is at or above the exact value on every seed. The large under-prediction is concentrated at the declined states, as the selection reading predicts. Over all such states it is still below 1 (0.33-0.55).
+  - MLP probe at the turned latents (c), declined -> accepted:
+    - gold calibration 0.587->0.725, 0.591->0.588, 0.584->0.692, 0.514->0.674, 0.548->0.719;
+    - "cell ahead unvisited" accuracy 0.720->0.865, 0.767->0.881, 0.812->0.830, 0.766->0.871, 0.646->0.861.
+  - Reverse flip at turn-taken states (the learned depth-2 backup M prefers the turn, the exact-P backup EP prefers the other action): accepted 0.078 / 0.189 / 0.094 / 0.032 / 0.053; all 0.082 / 0.189 / 0.073 / 0.041 / 0.076. EPR gives the same values.
+  - Arm shares Q_mac > Q2(comparison), M / EP / EPR: declined 0.08-0.14 / 0.42-0.62 / 0.48-0.81; accepted 0.68-0.95 / 0.80-0.97 / 0.80-0.97.
+- **W8 RUNNING:** polyak seeds 0-2 re-analysed, with optimal and learned_planner unchanged. decoded_linear 15.385->15.405, 11.846->11.845, 15.954->15.836; decoded_mlp 18.656->18.666, 18.003->18.019, 18.262->18.237.
+
 ## STATUS 2026-11-15 06:15
 
 - **W3 READ: DEFAULTS KEPT** (`005a834`; PROTOCOL.md "C-n result"; `runs/baselines/readout_c_n.log`).
