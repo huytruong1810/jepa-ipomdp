@@ -40,6 +40,28 @@ Standing convention: every readout prints the per-seed values, the Student-t 95%
 
 GPU work runs through the week queue (`runs/week/stages.d/`, one stage at a time, gate `runs/week/queue.sh`). The order is a3 (C-m, the ego-map screen) → a4 (W1) → a5 (W2) → a6 (W3 screen); the later items follow.
 
+## STATUS 2026-11-15 20:00 — literature search done; plan approved; W11 stays deferred; THREE QUESTIONS for the audit session
+
+The audit session was not reachable by message at 20:00 (not listed), so this block is the report.
+
+- **Literature review:** `reports/2026-11-15_literature_review.md` (local, untracked, in this checkout). Sections 4 and 5 are for the audit: what is already published, must-cites, novelty threats. The 2026 preprints were verified by the search tools, not by the implementation session: re-check each on arXiv before citing.
+- **Findings that affect claims now:**
+  - The span lemma and the infinite-horizon bound are Subramanian et al. 2022, eq. (10)-(11) and Theorem 27 (arXiv 2010.08843): present them as instantiations. Not found in print: the per-node span (observation error times the spread of child values), the fit / aliasing split, the closed-form flip threshold, the exact-component substitution.
+  - The main finding has established names: self-confirming equilibrium (Fudenberg & Levine 1993), Berk-Nash equilibrium in misspecified MDPs (Esponda & Pouzo 2016, 2021), incomplete learning (Rothschild 1974; Easley & Kiefer 1988; Harrison, Keskin & Zeevi 2012).
+  - Kuo, Hou, Dabney & Walker (NeurIPS 2025, arXiv 2510.22039) already compare learned representations with Bayes-optimal beliefs on Tiger: cite, and lead the interpretability claim with Wumpus.
+  - JEPA against the decoder has a citable explanation: Voelcker et al. (RLC 2024, arXiv 2406.17718) and Ni et al. (ICLR 2024).
+  - Closest 2026 threats: Tan & Xu 2610.27575 (frames, does not pre-empt), Shi et al. 2609.32966, Liu & Tang 2610.29435, Bhamidipaty et al. 2605.15960.
+  - "Matches the optimum" on Tiger is an equivalence claim: a TOST with a margin declared in advance is proposed.
+- **Approved plan (2026-11-15), in order:**
+  1. Queue hardening (bash and metadata only) and workspace cleanup; no experimental number can change.
+  2. Bit-identical code speed-ups, each verified by a new GPU Wumpus fingerprint, the Tiger and baseline fingerprints, the fast suite and the W11 seed-5 guard; anything that fails is reverted.
+  3. Method screen, a training-time hindsight-state signal (the realised simulator state, gold location included, as a prediction target in training only; default-off option): **G0** measurement on the stored oracle networks (about 2 GPU-hours); **G1** offline retrain screen on seeds 0-2 with bars glitter ratio at the declined turned latents >= 0.8 on 2 of 3, paired play >= +30 per game on 2 of 3, deaths <= control + 2 points; **G2** in-agent on seeds 0-4, +50 paired with the interval above 0, only after a G1 pass. A G2 pass changes the recipe and W11 would be reissued; a failed gate closes the arm as one more remedies row and W11 runs as written.
+  4. CPU-only work beside the GPU stages: Tiger TOST; how often the residual difference exceeds the exact action gap at declined decisions; two-way belief-latent mapping (Mikulik et al. 2020 protocol); interventions on the latent scored against the exact optimal action; subspace erasure; description-length probes; three figures (belief filmstrip, action-flip plot, error-amplification scatter against the chance-node bound). The audit decides what the paper claims.
+- **Questions:**
+  - **(a)** PROTOCOL letters: W11 keeps C-o. May the screen take C-p (G0, G1, G2) and the CPU items C-q?
+  - **(b)** May 15 diagnostic scripts be removed from the tree (recoverable from git and the freeze tag)? No PROTOCOL result, ledger claim, stage, test or other script references them: `danger_probe`, `death_calibration`, `greedy_deaths`, `start_danger`, `reference_probe`, `sims_diag`, `split_diag`, `hoist_forward_check`, `hoist_training_check`, `head_coverage`, `noop_drift_diag`, `overfit_summary`, `ab_summary`, `offpolicy_reference`, `absorbing_value`. Does any paper statement rest on one of them? Nothing is removed before the answer.
+  - **(c)** `MANIFEST.sha256` is behind `ledger.py` by 31 input files (W10's additions: `runs/wumpus/w4/summary.json` and the ten baseline-screen `games.npz` sets). It will be regenerated and verified unless the audit objects.
+
 ## STATUS 2026-11-15 15:10 — W10 DONE (`9bb7da8`; ledger 235 / 235 OK, 462 values)
 
 - **(a)** W4 summary, min / max over seeds 0-4:
