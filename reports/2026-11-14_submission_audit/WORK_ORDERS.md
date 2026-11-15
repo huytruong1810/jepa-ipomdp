@@ -4,7 +4,7 @@
 
 ## ORDER W11 (issued 2026-11-15 by the audit session; decision: the headline goes to ten held-out seeds; no world-model baseline)
 
-**ON HOLD since 2026-11-15:** held in the implementation session before registration; nothing is registered or launched. It starts only on a direct instruction to that session. The order below is unchanged.
+**DEFERRED since 2026-11-15:** not cancelled. It waits for the literature search on the method to finish, because seeds 10-14 are the last untouched held-out seeds and must be spent on the final recipe. Nothing is registered or launched. If the method changes, the audit session reissues the order for the new recipe; if it does not, the order below runs as written, on a direct instruction to the implementation session.
 
 Register as PROTOCOL.md C-o before any run, then run through the week queue. Read ONCE, after all five new seeds of every part are finished; no partial reads.
 
