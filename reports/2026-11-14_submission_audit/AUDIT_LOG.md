@@ -71,6 +71,17 @@ All other Tiger, held-out, ablation and localisation numbers (170 of 176 ledger 
 | E5 | OPEN | Reproduction of stored analyses (`logs/reproduction_2026-11-14.log`). Wumpus held-out recipe seed 5: all 15 arrays of `games.npz` reproduce bit for bit. Tiger polyak seed 0: the optimal and learned-planner returns reproduce exactly; the two decoded-belief returns, which depend on a fitted probe, reproduce to 0.02 (linear 15.405 against 15.385; MLP 18.666 against 18.656). | likely cause: Tiger seeds 0-4 were analysed before the filter's unroll was restructured on 2026-10-04 (float32 latents differ by up to 4e-7; probe fits are deterministic, shown by two identical Wumpus re-analyses), seeds 5-9 after. Ordered: confirm with two fresh runs, then re-analyse seeds 0-4 of both Tiger sweeps at the current code and update the probe-dependent numbers |
 | E6 | OPEN | Not ordered: an update-matched arm without re-initialisation (15 GPU-hours). Development screens at a matched 6,400 updates already show that uniform sampling of the final buffer, not the reset or the extra updates, accounts for the latent gain, and the paper claims no effect of retraining on the return. | ledger ids for the matched-count development numbers, then one sentence in the Ablation paragraph |
 
+## G. Independent code reviews (2026-11-14)
+
+Four reviewers read the code without the audit's conclusions; every finding acted on was first confirmed on the code or the stored files.
+
+| # | Scope | Result | Change |
+|---|---|---|---|
+| G1 | Exact Wumpus machinery (`domain/wumpus.py`, `agents/wumpus_reference.py`, `planning/wumpus_exact_model.py`, `planning/mcts.py`) | No bug that changes a number. An independent rules implementation matched the simulator on 3,000 random and 192 heuristic games; brute-force consistent-layout sets matched the tracker; the full-information table matched an independent value iteration; root values of the exact search equalled exhaustive expectimax. | paper wording: stench "in or next to" the wumpus's cell; the exact-belief planner uses the same pruning threshold and its leaf value is an upper bound; the heuristic waits in the 27 of 105 pit placements with a breeze at the start |
+| G2 | Evaluation and probing pipeline (`experiments/wumpus.py`, `interpretability/`, `training/seeding.py`, `sweep.py`, protocol scripts) | No bug in the returns: pairing, checkpoints, discounting, outcome classes and stream independence hold; the stored held-out aggregate reproduces. Findings: A16 (constant predictor), E5 (Tiger analyses from two code versions), a missing settings check in `sweep.py` (ordered). | see A16, E5 |
+| G3 | Localisation scripts (`exact_model_play.py`, `q_localise_diag.py`, `feature_localise.py`) | No bug in the exact quantities and no privileged information in the exact arms; the played comparison reproduces. Findings: A13, A14, D8. | see A13, A14, D8 |
+| G4 | Model-free baseline (`baselines/recurrent_dqn.py`, `runs/baselines/`) | Implemented correctly; the gap recomputes. Findings: A15 (update count), B5 (exploration and value rescaling never tuned). | see A15, B5 |
+
 ## F. Bibliography and related work
 
 | # | Status | Finding | Change |
