@@ -8,6 +8,14 @@ Standing convention: every readout prints the per-seed values, the Student-t 95%
 
 GPU work runs through the week queue (`runs/week/stages.d/`, one stage at a time, gate `runs/week/queue.sh`). The order is a3 (C-m, the ego-map screen) → a4 (W1) → a5 (W2) → a6 (W3 screen); the later items follow.
 
+## STATUS 2026-11-15 12:50 — ALL WORK ORDERS W1-W9 DONE (W6 not ordered)
+
+- **W5(a) DONE** (stage a8, 2026-11-14 21:09-22:19; logs `runs/wumpus/ve_screen/fl_VE{25,100}_seed<s>.log`; JSON in each seed's analysis/feature_localise_VE{25,100}_seed<s>.json).
+  - Joint glitter ratio at the declined turned latents, seeds 0 / 1 / 2: VE25 0.38 / 0.27 / 0.36; VE100 0.29 / 0.26 / 0.31; ctl 0.41 / 0.25 / 0.33.
+  - Change against ctl: VE25 -0.029 to +0.026 (lower on 1 of 3); VE100 -0.119 to +0.009 (lower on 2 of 3). Neither repairs it (+0.15) on any seed.
+  - The ledger computes these automatically: `dev.remedy.VE25.glitter_change.{n,min,max,seeds_lower,seeds_repaired}` and the VE100 equivalents. The table cell that reads "not measured" can now be filled.
+- Summary of the orders: W1 (accepted), W2 (drift, explained by W8), W3 (defaults kept), W4 (selection reading), W5(a-d), W7, W8 (2 claims change) and W9 are done. W6 was not ordered.
+
 ## STATUS 2026-11-15 12:40
 
 - **W8 DONE** (log `logs/w8_tiger_reanalysis_2026-11-15.log`). Polyak and decoder seeds 0-4 were re-analysed at HEAD with analysis seed 12345. The old reports are kept as analysis/report_pre_hoist.json, and the old aggregates as aggregate_pre_hoist.json.
