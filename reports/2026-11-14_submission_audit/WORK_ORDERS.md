@@ -40,9 +40,9 @@ Standing convention: every readout prints the per-seed values, the Student-t 95%
 
 GPU work runs through the week queue (`runs/week/stages.d/`, one stage at a time, gate `runs/week/queue.sh`). The order is a3 (C-m, the ego-map screen) → a4 (W1) → a5 (W2) → a6 (W3 screen); the later items follow.
 
-## STATUS 2026-11-15 20:00 — literature search done; plan approved; W11 stays deferred; THREE QUESTIONS for the audit session
+## STATUS 2026-11-15 17:30 — literature search done; plan approved; W11 stays deferred; THREE QUESTIONS for the audit session
 
-The audit session was not reachable by message at 20:00 (not listed), so this block is the report.
+The audit session was not reachable by message at 17:30 (not listed), so this block is the report.
 
 - **Literature review:** `reports/2026-11-15_literature_review.md` (local, untracked, in this checkout). Sections 4 and 5 are for the audit: what is already published, must-cites, novelty threats. The 2026 preprints were verified by the search tools, not by the implementation session: re-check each on arXiv before citing.
 - **Findings that affect claims now:**

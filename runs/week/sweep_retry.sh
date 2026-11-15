@@ -29,8 +29,8 @@ sweep_retry() {
     ok=0
     for attempt in 1 2 3 4 5; do
       gate
-      echo "$name seed $seed $(date '+%F %T')" > runs/week/GPU_BUSY
-      if nice -n 10 .venv/bin/python sweep.py "$name" --seeds "$prefix" "$@" 2> >(tee $errlog >&2); then ok=1; rm -f runs/week/GPU_BUSY; break; fi
+      echo "$name seed $seed pid=$$ since=$(date '+%F %T')" > runs/week/GPU_BUSY   # pid: the stage shell (queue.sh gate)
+      if nice -n ${JEPA_GPU_NICE:-5} .venv/bin/python sweep.py "$name" --seeds "$prefix" "$@" 2> >(tee $errlog >&2); then ok=1; rm -f runs/week/GPU_BUSY; break; fi
       rm -f runs/week/GPU_BUSY
       sleep 1  # let the stderr tee flush
       d=runs/sweeps/$name/seed$seed
