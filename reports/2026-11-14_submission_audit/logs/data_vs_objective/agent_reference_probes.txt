@@ -1,0 +1,14 @@
+u64_store_eval_eps_decoder_k5_seed0 probe_cell_acc 0.7610  probe_heading_acc 0.6463  probe_danger_error 0.0979  head_danger_error 0.1293  head_safe_miss 0.0033  
+u64_store_eval_eps_decoder_k5_seed1 probe_cell_acc 0.7508  probe_heading_acc 0.6453  probe_danger_error 0.1007  head_danger_error 0.1204  head_safe_miss 0.0035  
+u64_store_eval_eps_decoder_k5_seed2 probe_cell_acc 0.7401  probe_heading_acc 0.6161  probe_danger_error 0.1040  head_danger_error 0.1910  head_safe_miss 0.0046  
+u64_store_eval_eps_decoder_k5_seed3 probe_cell_acc 0.7465  probe_heading_acc 0.6457  probe_danger_error 0.0995  head_danger_error 0.1248  head_safe_miss 0.0051  
+u64_store_eval_eps_decoder_k5_seed4 probe_cell_acc 0.7546  probe_heading_acc 0.6206  probe_danger_error 0.1032  head_danger_error 0.1279  head_safe_miss 0.0025  
+u64_store_eval_eps_decoder_k5_double_seed0 probe_cell_acc 0.7328  probe_heading_acc 0.6246  probe_danger_error 0.1012  head_danger_error 0.1243  head_safe_miss 0.0036  
+u64_store_eval_eps_decoder_k5_double_seed1 probe_cell_acc 0.7358  probe_heading_acc 0.5959  probe_danger_error 0.1059  head_danger_error 0.1387  head_safe_miss 0.0020  
+u64_store_eval_eps_decoder_k5_double_seed2 probe_cell_acc 0.7499  probe_heading_acc 0.6444  probe_danger_error 0.1015  head_danger_error 0.1310  head_safe_miss 0.0022  
+u64_store_eval_eps_decoder_k5_privileged_double_seed0 probe_cell_acc 0.9986  probe_heading_acc 1.0000  probe_danger_error 0.0230  head_danger_error 0.0752  head_safe_miss 0.0039  
+u64_store_eval_eps_decoder_k5_privileged_double_seed1 probe_cell_acc 0.9950  probe_heading_acc 1.0000  probe_danger_error 0.0253  head_danger_error 0.0523  head_safe_miss 0.0034  
+u64_store_eval_eps_decoder_k5_privileged_double_seed2 probe_cell_acc 0.9654  probe_heading_acc 0.9821  probe_danger_error 0.0336  head_danger_error 0.1132  head_safe_miss 0.0135  
+u64_store_eval_eps_decoder_k5_seed0 latest.pt probe_cell_acc 0.7696  probe_heading_acc 0.7459  probe_danger_error 0.0743  head_safe_miss 0.0030  
+u64_store_eval_eps_decoder_k5_seed1 latest.pt probe_cell_acc 0.7576  probe_heading_acc 0.6540  probe_danger_error 0.1000  head_safe_miss 0.0043  
+u64_store_eval_eps_decoder_k5_seed2 latest.pt probe_cell_acc 0.7600  probe_heading_acc 0.6489  probe_danger_error 0.0998  head_safe_miss 0.0062  

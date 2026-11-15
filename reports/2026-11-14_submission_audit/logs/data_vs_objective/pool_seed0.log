@@ -1,0 +1,19 @@
+arm representation=decoder horizon=5 seed=0 weight_decay=0.0001; 8192 training games
+update 1600: loss_total 1.3746 loss_reward 0.3610 loss_value 0.6050 loss_observation 0.1489 loss_multistep_observation 0.2597
+update 3200: loss_total 1.2559 loss_reward 0.3961 loss_value 0.4362 loss_observation 0.1353 loss_multistep_observation 0.2883
+update 4800: loss_total 1.1956 loss_reward 0.3326 loss_value 0.5604 loss_observation 0.1116 loss_multistep_observation 0.1910
+update 6400: loss_total 0.9595 loss_reward 0.3958 loss_value 0.2826 loss_observation 0.0982 loss_multistep_observation 0.1829
+training took 2414s
+RESULT probe_pit_error 0.0549
+RESULT probe_wumpus_error 0.0360
+RESULT probe_gold_error 0.0242
+RESULT probe_cell_acc 0.8020
+RESULT probe_heading_acc 0.7192
+RESULT probe_danger_error 0.0977
+RESULT probe_certain_death 0.5868
+RESULT head_danger_error 0.1148
+RESULT head_safe 0.0853
+RESULT head_certain_death 0.3642
+RESULT head_safe_miss 0.0175
+RESULT head_nll_train 0.2224
+RESULT head_nll_held 0.2358

@@ -1,0 +1,22 @@
+arm representation=decoder horizon=5 seed=1 weight_decay=0.0001; 8960 training games from the buffer of runs/wumpus/u64_store_eval_eps_decoder_k5_seed1
+reset after update 1600: 1600 catch-up updates on 2112 games
+update 1600: loss_total 1.4193 loss_reward 0.4830 loss_value 0.6348 loss_observation 0.0947 loss_multistep_observation 0.2068
+reset after update 3200: 1600 catch-up updates on 4352 games
+update 3200: loss_total 1.4070 loss_reward 0.4433 loss_value 0.6206 loss_observation 0.0973 loss_multistep_observation 0.2458
+reset after update 4800: 1600 catch-up updates on 6592 games
+update 4800: loss_total 1.4609 loss_reward 0.5418 loss_value 0.5879 loss_observation 0.1005 loss_multistep_observation 0.2307
+update 6400: loss_total 1.4470 loss_reward 0.4461 loss_value 0.6716 loss_observation 0.0950 loss_multistep_observation 0.2344
+training took 4230s
+RESULT probe_pit_error 0.0569
+RESULT probe_wumpus_error 0.0394
+RESULT probe_gold_error 0.0243
+RESULT probe_cell_acc 0.7694
+RESULT probe_heading_acc 0.6438
+RESULT probe_danger_error 0.1014
+RESULT probe_certain_death 0.5717
+RESULT head_danger_error 0.1206
+RESULT head_safe 0.1054
+RESULT head_certain_death 0.4757
+RESULT head_safe_miss 0.0004
+RESULT head_nll_train 0.3921
+RESULT head_nll_held 0.3080

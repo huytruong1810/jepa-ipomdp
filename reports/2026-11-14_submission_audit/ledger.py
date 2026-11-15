@@ -25,6 +25,10 @@
 #      per-game returns of the retrain screens under runs/wumpus/{ve,da,qe}_screen, coverage and branch.
 #    - The untrained-filter probe control exists only as a log (copied to logs/); its claims are parsed
 #      from that copy and are marked "log" in the ledger.
+#    - The retraining-schedule screens (objective_ab.py 2e-2g, 2026-10-15/16) exist only as logs, copied to
+#      logs/data_vs_objective/ (W5(d), 2026-11-14): MLP cell / heading probe accuracy of the uniform buffer, growing,
+#      pool, reset1 and reset3 arms (RESULT lines) and of the agents themselves (agent_reference_probes.txt, best.pt
+#      and latest.pt). Per-seed values and their means, all marked "log".
 #
 # 3. Outcomes From Returns:
 #    - The retrain screens stored per-game discounted returns only. A death pays at most
@@ -367,11 +371,40 @@ def wumpus_development(ledger: Ledger) -> None:
 
 
 # ------------------------------------------------------------------------------------------ report
+def retrain_schedule(ledger: Ledger) -> None:
+    """Section 2: objective_ab.py 2e-2g probe accuracies (log-sourced), per seed 0-2 and the mean, in percent."""
+    logs = HERE / "logs" / "data_vs_objective"
+    for arm in ("buffer", "growing", "pool", "reset1", "reset3"):
+        for probe in ("cell", "heading"):
+            per_seed = []
+            for s in range(3):
+                text = _track(logs / f"{arm}_seed{s}.log").read_text()
+                per_seed.append(100 * float(re.search(rf"RESULT probe_{probe}_acc ([\d.]+)", text).group(1)))
+                ledger.put(f"dev.schedule.{arm}.{probe}_pct.seed{s}", per_seed[-1],
+                           f"logs/data_vs_objective/{arm}_seed{s}.log (log)")
+            ledger.put(f"dev.schedule.{arm}.{probe}_pct", float(np.mean(per_seed)),
+                       f"logs/data_vs_objective/{arm}_seed{{0,1,2}}.log (log)")
+    text = _track(logs / "agent_reference_probes.txt").read_text()
+    for which, pattern in (("agent_best", r"^u64_store_eval_eps_decoder_k5_seed(\d) probe_cell_acc ([\d.]+)\s+probe_heading_acc ([\d.]+)"),
+                           ("agent_latest", r"^u64_store_eval_eps_decoder_k5_seed(\d) latest\.pt probe_cell_acc ([\d.]+)\s+probe_heading_acc ([\d.]+)")):
+        found = {int(m.group(1)): (float(m.group(2)), float(m.group(3)))
+                 for m in re.finditer(pattern, text, flags=re.MULTILINE) if int(m.group(1)) < 3}
+        if sorted(found) != [0, 1, 2]:
+            raise ValueError(f"agent_reference_probes.txt: {which} rows for seeds 0-2 not found ({sorted(found)}).")
+        for k, probe in enumerate(("cell", "heading")):
+            for s in range(3):
+                ledger.put(f"dev.schedule.{which}.{probe}_pct.seed{s}", 100 * found[s][k],
+                           "logs/data_vs_objective/agent_reference_probes.txt (log)")
+            ledger.put(f"dev.schedule.{which}.{probe}_pct", 100 * float(np.mean([found[s][k] for s in range(3)])),
+                       "logs/data_vs_objective/agent_reference_probes.txt (log)")
+
+
 def main() -> None:
     ledger = Ledger()
     tiger(ledger)
     wumpus_heldout(ledger)
     wumpus_development(ledger)
+    retrain_schedule(ledger)
 
     claims = yaml.safe_load((HERE / "claims.yaml").read_text())
     lines = ["| id | paper | recomputed | where | source | |", "|---|---|---|---|---|---|"]
