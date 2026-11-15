@@ -1,0 +1,30 @@
+commit 3143a860d2d5c78c3805c7b97b389a5b0e71b2e3  started 2026-11-14 17:33:36
+  learned_planner  discounted return    246.50 +- 18.71 | win 0.332 death 0.002 unfinished 0.666
+  random           discounted return   -420.20 +- 25.80 | win 0.123 death 0.584 unfinished 0.293
+  reference_risk0  discounted return    509.13 +- 19.70 | win 0.609 death 0.000 unfinished 0.391
+  reference_risk0.4 discounted return    579.86 +- 20.10 | win 0.713 death 0.020 unfinished 0.268
+  reference_risk1  discounted return    540.60 +- 30.92 | win 0.828 death 0.170 unfinished 0.002
+  probe linear_random  |P - P_exact| (probe/constant): pit 0.0565/0.0825 wumpus 0.0470/0.0604 gold 0.0258/0.0237 | cell acc 0.730 heading acc 0.808
+  probe mlp_random     |P - P_exact| (probe/constant): pit 0.0557/0.0825 wumpus 0.0388/0.0604 gold 0.0257/0.0237 | cell acc 0.772 heading acc 0.860
+  probe linear_agent   |P - P_exact| (probe/constant): pit 0.0531/0.1142 wumpus 0.0328/0.0655 gold 0.0190/0.0245 | cell acc 0.842 heading acc 0.878
+  probe mlp_agent      |P - P_exact| (probe/constant): pit 0.0395/0.1142 wumpus 0.0174/0.0655 gold 0.0156/0.0245 | cell acc 0.867 heading acc 0.921
+report: runs/sweeps/wumpus_retrain_heldout/seed5/analysis_repro_w2/report.json
+V*(b0) = 19.362 (certified error 0.00962)
+  optimal          discounted return   18.476 +- 1.383
+  decoded_linear   discounted return   15.405 +- 0.759
+  decoded_mlp      discounted return   18.666 +- 1.319
+  learned_planner  discounted return   18.364 +- 1.384
+  probe linear/random  KL mean 0.00072  L1 mean 0.0216  L1 max 0.7868
+  probe linear/agent   KL mean 0.00062  L1 mean 0.0180  L1 max 0.5307
+  probe mlp/random     KL mean 0.00004  L1 mean 0.0038  L1 max 0.4082
+  probe mlp/agent      KL mean 0.00007  L1 mean 0.0040  L1 max 0.3595
+  bounds linear/agent L_V 55.0 L_Q 55.0 | worst case: value error 4.233 <= 29.189, regret 2.390 <= 58.379 | expected: value error 0.153 <= 0.990, regret 0.0126 <= 1.9796 | suboptimal decisions 0.0178
+  bounds mlp/agent    L_V 55.0 L_Q 55.0 | worst case: value error 2.570 <= 19.771, regret 0.703 <= 39.541 | expected: value error 0.042 <= 0.222, regret 0.0011 <= 0.4448 | suboptimal decisions 0.0015
+  geometry: explained variance [0.581, 0.31, 0.038, 0.029, 0.014]; minimality ratio 0.242
+    |Spearman(PC1..3, log-odds)| [0.068, 0.818, 0.069], |Spearman(PC1..3, |log-odds|)| [0.762, 0.002, 0.182]
+report: runs/repro_w2/tiger_polyak_seed0/analysis/report.json
+WUMPUS games.npz runs/sweeps/wumpus_retrain_heldout/seed5/analysis_heldout/games.npz vs runs/sweeps/wumpus_retrain_heldout/seed5/analysis_repro_w2/games.npz: EQUAL (15 arrays compared)
+  decoded_linear: stored {'mean': 15.384793271745728, 'stderr': 0.7591515692053667} reproduced {'mean': 15.404721915573582, 'stderr': 0.7592999564564069}
+  decoded_mlp: stored {'mean': 18.65586481283787, 'stderr': 1.3192983916437053} reproduced {'mean': 18.66598275224544, 'stderr': 1.3194009163844662}
+TIGER report.json returns runs/sweeps/polyak/seed0/analysis/report.json vs runs/repro_w2/tiger_polyak_seed0/analysis/report.json: NOT EQUAL (4 agents)
+finished 2026-11-14 17:56:32 rc=1

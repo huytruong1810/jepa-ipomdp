@@ -63,7 +63,9 @@ All other Tiger, held-out, ablation and localisation numbers (170 of 176 ledger 
 
 | # | Status | Finding | Change |
 |---|---|---|---|
-| E1 | OPEN | The slow acceptance suite last ran on 2026-10-19. | rerun at the audit's final commit |
+| E1 | FIXED (rerun again at the final commit) | The slow acceptance suite last ran on 2026-10-19. | 7 passed at `5eb9813` on 2026-11-14 (`logs/slow_suite_2026-11-14.log`) |
 | E2 | FIXED | `README.md` described the September state (Tiger only). | rewritten: both domains, the audited numbers with their intervals, current commands and layout |
 | E3 | FIXED | Several paper numbers existed only in logs that git does not track. | copied to `logs/`; `ledger.py` recomputes the rest from raw artifacts |
 | E4 | FIXED | `reports/2026-11-03_paper_figures/localisation.py` hard-codes its 35 values. | `localisation.py` and `ladder.py` read the raw per-game files and logs; figures regenerated |
+| E5 | OPEN | Reproduction of stored analyses (`logs/reproduction_2026-11-14.log`). Wumpus held-out recipe seed 5: all 15 arrays of `games.npz` reproduce bit for bit. Tiger polyak seed 0: the optimal and learned-planner returns reproduce exactly; the two decoded-belief returns, which depend on a fitted probe, reproduce to 0.02 (linear 15.405 against 15.385; MLP 18.666 against 18.656). | cause to be identified (drift since the stored analysis, or a probe fit that is not deterministic); then the paper states the reproducibility of probe-dependent numbers |
+| E6 | OPEN | Not ordered: an update-matched arm without re-initialisation (15 GPU-hours). Development screens at a matched 6,400 updates already show that uniform sampling of the final buffer, not the reset or the extra updates, accounts for the latent gain, and the paper claims no effect of retraining on the return. | ledger ids for the matched-count development numbers, then one sentence in the Ablation paragraph |
