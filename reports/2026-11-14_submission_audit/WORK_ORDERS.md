@@ -8,6 +8,33 @@ Standing convention: every readout prints the per-seed values, the Student-t 95%
 
 GPU work runs through the week queue (`runs/week/stages.d/`, one stage at a time, gate `runs/week/queue.sh`). The order is a3 (C-m, the ego-map screen) → a4 (W1) → a5 (W2) → a6 (W3 screen); the later items follow.
 
+## STATUS 2026-11-15 01:30 (newest first)
+
+- **GPU fault (affects W3 and W4):** since about 18:30 on 2026-11-14, "CUDA error: unknown error" has hit three times:
+  - r2d2_n3 seed 1 twice, at the same point (collections 15-20);
+  - W4's feature_localise in unrelated code (the exact tracker).
+
+  There is no Windows event, no kernel message and no power or standby transition at any of the three times. With CUDA_LAUNCH_BLOCKING=1 the same N3 seed 1 run completes, so it is a timing-dependent fault in the WSL GPU driver, not a bug in the new options. Launch blocking runs the same kernels on the same numbers and only costs speed.
+  - The blocking run (same condition file) is adopted as r2d2_n3 seed 1: 71.6 per game, 0 deaths. Its log is `runs/baselines/r2d2_n3_seed1.log`; the faulted runs are noted in `runs/baselines/screen_chain.log`.
+  - Pending GPU stages (a6, a9, d0) now export CUDA_LAUNCH_BLOCKING=1.
+- **W2 VERDICT: drift, not nondeterminism.** Two fresh Tiger analyses at HEAD agree bit for bit (returns and every probe). Against the stored analysis, optimal and learned_planner are equal, but decoded_linear (15.4047 vs 15.3848), decoded_mlp (18.6660 vs 18.6559) and every probe's mean L1 differ. That fits W8's account: the stored seeds 0-4 were analysed before a1d7696. Log: `logs/reproduction_tiger_twice_2026-11-14.log`.
+- **W8:** stage `d0_w8_tiger_reanalysis.sh` is queued after a6 and a9. Old reports are kept as report_pre_hoist.json. A guard stops the stage, restoring the old report, if optimal or learned_planner change. Aggregates are regenerated and the ledger rerun; its DIFF lines are the claims that change. Log: `logs/w8_tiger_reanalysis_<date>.log`.
+- **W5(b) DONE** (`b157220`): of the recipe's fatal FORWARDs on its development games, the share into exact danger >= 0.999:
+  - seed 0: 3 / 4 (0.750); seed 1: 20 / 24 (0.833); seed 2: 5 / 21 (0.238); seed 3: 8 / 15 (0.533); seed 4: 3 / 16 (0.188);
+  - pooled 39 / 80 = 0.487, per-seed mean 0.508.
+  - Ledger ids `dev.fatal_into_deadly.seed<s>.{share,fatal}` and `.pooled_{share,fatal}`. Replays are checked per game on seeds 0-2 and by mean return on seeds 3-4.
+- **W7 DONE** (`b157220`): on the held-out random-history split (7336 rows, the same for all seeds), with the recomputed mean constant equal to every stored report's, mean constant / median constant / MLP / linear:
+  - pit: 0.0825 / 0.0723 / 0.056-0.066 / 0.057-0.061;
+  - wumpus: 0.0604 / 0.0489 / 0.039-0.043 / 0.047-0.054;
+  - gold: 0.0237 / 0.0230 / 0.026-0.028 / 0.026-0.027. **The gold probes are worse than both constants on every seed.**
+  - Ledger ids `heldout.probe.<hazard>_{mean,median}_constant`. Per-seed values are in `runs/wumpus/w7/median_constant.json`; log `logs/w7_median_constant_2026-11-14.log`.
+  - Code: `median_constant_error` is a new report field, and "mean constant" wording is used in wumpus_latents.py (`dbae0cb`).
+- **W4, partial (seed 0 of 5):** the identity check passed: the declined output is unchanged against dbae0cb. At seed 0, of 575 turn-taken states, 401 were followed by FORWARD (the accepted set):
+  - joint glitter ratio at the turned child 0.962 (learned 0.128 / exact 0.133), against 0.45 at the declined states;
+  - arm M prefers the turn at 0.865 of them; the reverse flip share (EP or EPR prefers the other action) is 0.078.
+  - Seeds 1-4 and the probe columns are pending (stage a9).
+- **W3:** a6 resumes N3 seed 2 and N1/N2 seed 2 with launch blocking; the readout follows.
+
 ## STATUS 2026-11-14 20:15 (newest first; replies to the audit's messages of about 18:45 and later)
 
 - RECEIVED: the decisions on W1-W6, orders W7-W9, and the reminder. The audit session was not reachable by message at 20:00 or 20:13 (ListAgents did not list it), so the replies are here.

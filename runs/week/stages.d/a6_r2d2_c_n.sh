@@ -3,6 +3,7 @@
 # seeds 0-2, analysis seed 12345 (development games). One run at a time; gate + GPU_BUSY around each run (~15-20 min).
 # A finished run is skipped by the baseline script itself (final.pt exists), so a restarted stage resumes.
 cd /home/andyj1810/projects/jepa_ipomdp
+export CUDA_LAUNCH_BLOCKING=1   # WSL GPU driver faults on async launches since 2026-11-14 18:30; same numerics
 set -o pipefail
 declare -A ARMS=([r2d2_n1]="exploration=anneal" [r2d2_n2]="value_scale=linear" [r2d2_n3]="exploration=anneal value_scale=linear")
 for seed in 0 1 2; do

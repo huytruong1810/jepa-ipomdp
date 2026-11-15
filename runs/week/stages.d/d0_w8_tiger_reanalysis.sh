@@ -5,6 +5,7 @@
 # returns.learned_planner must be unchanged for every seed; otherwise the old report is restored and the stage stops.
 # Then sweep.py regenerates each sweep's aggregate.json over seeds 0-9 (no training: every report exists).
 cd /home/andyj1810/projects/jepa_ipomdp
+export CUDA_LAUNCH_BLOCKING=1   # WSL GPU driver faults on async launches since 2026-11-14 18:30; same numerics
 L=reports/2026-11-14_submission_audit/logs/w8_tiger_reanalysis_$(date +%F).log
 {
 echo "commit $(git log -1 --format=%H)"

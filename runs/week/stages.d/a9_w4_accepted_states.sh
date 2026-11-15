@@ -5,6 +5,7 @@
 # scripts (commit dbae0cb, a git worktree) and the current ones on 8 games of a scratch copy of seed 0 and require
 # equal outputs; otherwise the stage stops. Summary: reports/2026-11-14_submission_audit/w4_accepted_states.py.
 cd /home/andyj1810/projects/jepa_ipomdp
+export CUDA_LAUNCH_BLOCKING=1   # WSL GPU driver faults on async launches since 2026-11-14 18:30; same numerics
 D=reports/2026-10-02_wumpus_diagnostics
 L=reports/2026-11-14_submission_audit/logs
 O=runs/wumpus/w4
