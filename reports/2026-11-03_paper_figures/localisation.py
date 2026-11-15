@@ -10,7 +10,8 @@
 #   labels every number as development or held-out. Every seed moves right: that is the figure's message.
 # - Right (decisions): at the declined decisions of development seeds 0-4, the share at which the backup prefers
 #   "turn, then step in" to the chosen action, with the learned model (M), the exact observation probabilities
-#   substituted after the turn (EP), and both exact components (EPR) (q_localise_diag.py section 4). The three
+#   substituted in both action values (EP; the legend reads "exact P" since 2026-11-14), and both exact
+#   components (EPR) (q_localise_diag.py section 4). The three
 #   substitutions are ordered (more of the model made exact), so they take an ordinal one-hue ramp, light to dark.
 # - Values are read from the raw artifacts: per-game returns in each seed's exact_play_{learned,EPR}.npz (development)
 #   and games.npz / exact_play_EPR.npz (held-out), and the "all (N states)" line of runs/wumpus/q_localise_seed<s>.log
@@ -86,7 +87,7 @@ def main():
                 columnspacing=1.0)
 
     width = 0.26
-    names = ("learned model", "exact $P$ after the turn", "exact $P$ and $R$")
+    names = ("learned model", "exact $P$", "exact $P$ and $R$")
     for k, (name, colour) in enumerate(zip(names, RAMP)):
         xs = [s + (k - 1) * width for s, *_ in SHARES]
         ax_d.bar(xs, [row[k + 1] for row in SHARES], width=width - 0.03, color=colour, label=name)
