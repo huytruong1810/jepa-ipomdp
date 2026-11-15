@@ -87,6 +87,11 @@
 #      death): a linear map, so the regression's fixed point decodes to E[G] without bias, while the outputs stay of
 #      order 1 for Adam and the gradient clip. "rescale" (the default) is section 3's h. (A two-hot value head, as the
 #      planner's, would change the network and the loss together; the linear map changes only the bias in question.)
+#    - Third screen (PROTOCOL.md C-n, 2026-11-15; seeds 0-2, development games; runs/baselines/r2d2_n*):
+#        N1 anneal:   64 / 73 /  93 -> 76.5 (paired -10.7, se 11.6)
+#        N2 linear:   73 / 54 /  46 -> 57.5 (paired -29.7, se 26.2)
+#        N3 both:     65 / 72 /  61 -> 65.7 (paired -21.5, se 22.2)
+#      NOT CHOSEN: the best arm (N1) is not above one standard error of the defaults, so the defaults stay.
 # ==============================================================================
 
 from dataclasses import dataclass

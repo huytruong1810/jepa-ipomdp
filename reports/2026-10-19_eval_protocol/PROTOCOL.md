@@ -284,6 +284,20 @@ Arm minus control per game, paired on the 512 analysis games of training seeds 0
 - Both arms face many more provably deadly states than the control (EGO1 980 / 1052 / 1078 against 572 / 432 / 730) and step into them more often (EGO1 10 / 16 / 18 against 3 / 4 / 1). The latent that tracks its own position makes the agent go forward more, and the head's remaining misses then cost more.
 - Consequence: the ego map does not enter R2 and is closed.
 
+## C-n result (development screen, read 2026-11-15 06:10; `runs/baselines/readout_c_n.log`): DEFAULTS KEPT
+
+Best-network return on the 512 development games (analysis seed 12345). Paired difference from the defaults (`r2d2_lr1e-4_n5`: 65.4 / 69.8 / 126.4 on seeds 0 / 1 / 2).
+
+| Arm | Return (seeds 0 / 1 / 2, mean) | Arm − defaults per seed | Mean (se); Student-t 95% | Nested; crossed |
+|---|---|---|---|---|
+| N1 `exploration=anneal` | 64.1 / 72.8 / 92.5 (76.5) | −1.3 / +3.0 / −33.9 | −10.7 (11.6); [−60.8, +39.3] | [−34.6, +10.6]; [−37.9, +14.2] |
+| N2 `value_scale=linear` | 72.6 / 53.7 / 46.1 (57.5) | +7.2 / −16.1 / −80.3 | −29.7 (26.2); [−142.4, +82.9] | [−78.5, +7.0]; [−83.4, +6.7] |
+| N3 both | 65.0 / 71.6 / 60.6 (65.7) | −0.4 / +1.7 / −65.8 | −21.5 (22.2); [−116.8, +73.8] | [−62.6, +1.6]; [−63.0, +1.6] |
+
+- Every arm has 0% deaths and 10-14% wins. The candidate is N1 (highest mean). Its paired difference, −10.7, is not above one standard error (11.6), so it is NOT CHOSEN. The defaults stay and no held-out run follows.
+- Across the three screens (C-c, C-f, C-n), ten settings have been tried; the R2D2 defaults remain the best on development.
+- Operational note: r2d2_n3 seed 1 died twice at collections 15-20 with a WSL GPU driver fault ("CUDA error: unknown error"). The registered run is the identical-condition rerun with CUDA_LAUNCH_BLOCKING=1, which uses the same kernels and numerics (`runs/baselines/screen_chain.log`).
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 
