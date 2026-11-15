@@ -4,6 +4,8 @@
 
 ## ORDER W11 (issued 2026-11-15 by the audit session; decision: the headline goes to ten held-out seeds; no world-model baseline)
 
+**ON HOLD since 2026-11-15:** held in the implementation session before registration; nothing is registered or launched. It starts only on a direct instruction to that session. The order below is unchanged.
+
 Register as PROTOCOL.md C-o before any run, then run through the week queue. Read ONCE, after all five new seeds of every part are finished; no partial reads.
 
 1. **Guard first (about 10 minutes).** Train the recipe on held-out seed 5 at current main for the first 5 collections and compare its per-collection metrics with the stored `runs/sweeps/wumpus_retrain_heldout/seed5/main.log`. They must be identical: the new seeds have to come from the same training code path as seeds 5-9. If they differ, stop and report.
