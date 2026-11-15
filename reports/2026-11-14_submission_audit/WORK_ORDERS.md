@@ -8,6 +8,15 @@ Standing convention: every readout prints the per-seed values, the Student-t 95%
 
 GPU work runs through the week queue (`runs/week/stages.d/`, one stage at a time, gate `runs/week/queue.sh`). The order is a3 (C-m, the ego-map screen) → a4 (W1) → a5 (W2) → a6 (W3 screen); the later items follow.
 
+## STATUS 2026-11-15 06:15
+
+- **W3 READ: DEFAULTS KEPT** (`005a834`; PROTOCOL.md "C-n result"; `runs/baselines/readout_c_n.log`).
+  - N1 anneal: 76.5 (64.1 / 72.8 / 92.5). Arm - defaults -1.3 / +3.0 / -33.9; mean -10.7, se 11.6; Student-t [-60.8, +39.3]; nested [-34.6, +10.6]; crossed [-37.9, +14.2].
+  - N2 linear: 57.5; -29.7 (se 26.2).
+  - N3 both: 65.7; -21.5 (se 22.2).
+  - 0% deaths in every arm. The candidate N1 is not above one standard error, so there is no held-out run and the paper's baseline row stays R2D2-lite.
+- **W4:** seeds 0-3 done, seed 4 running. W8 follows.
+
 ## STATUS 2026-11-15 01:30 (newest first)
 
 - **GPU fault (affects W3 and W4):** since about 18:30 on 2026-11-14, "CUDA error: unknown error" has hit three times:
