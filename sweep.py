@@ -64,6 +64,16 @@
 #    - --baseline-runs (Wumpus) adds the model-free baseline (PROTOCOL.md C-c), trained per seed by
 #      reports/2026-10-19_eval_protocol/recurrent_dqn_baseline.py: seed k's games from
 #      <dir>/seed<k>/<analysis output>/games.npz, same checks, aggregate only.
+#
+# 6. A Stored Report Must Match the Sweep's Analysis Settings (2026-11-14, submission audit W9):
+#    - A seed whose report.json exists is aggregated, not re-analysed. check_report_settings raises if that report's
+#      recorded settings differ from the sweep's in any field both record (analysis seed, episodes, probe steps, solver
+#      tolerance, reference thresholds, output, checkpoint), so a report from another analysis condition can never
+#      enter an aggregate.
+#    - Two fields are younger than some stored reports, and each had a single possible value before it existed. Reports
+#      written before 2026-10-19 record no output; the analysis then always wrote to "analysis". Reports written before
+#      2026-10-27 record no checkpoint; the analysis then read only best.pt. A missing output or checkpoint is checked
+#      as that value; any other missing field raises.
 # ==============================================================================
 
 import argparse
@@ -117,6 +127,19 @@ def record_condition(sweep_dir: Path, overrides: list[str], settings: AnalysisSe
     else:
         sweep_dir.mkdir(parents=True, exist_ok=True)   # may already hold symlinked seeds (section 4)
         path.write_text(json.dumps(condition, indent=2))
+
+
+def check_report_settings(report: dict, settings: AnalysisSettings | WumpusAnalysisSettings, path: Path) -> None:
+    """Section 6: the stored report's analysis settings equal the sweep's (missing output / checkpoint: their only old value)."""
+    recorded, wanted = dict(report.get("settings", {})), json.loads(json.dumps(asdict(settings)))
+    for field, only_value in (("output", "analysis"), ("checkpoint", "best.pt")):       # section 6: younger fields
+        if field in wanted and field not in recorded:
+            recorded[field] = only_value
+    missing = sorted(set(wanted) - set(recorded))
+    differ = sorted(k for k in wanted if k in recorded and recorded[k] != wanted[k])
+    if missing or differ:
+        raise ValueError(f"{path} was analysed with other settings: missing {missing}, differing "
+                         + ", ".join(f"{k} {recorded[k]!r} != {wanted[k]!r}" for k in differ) + " (section 6).")
 
 
 def main() -> None:
@@ -182,7 +205,9 @@ def main() -> None:
             analyze(seed_dir, settings, device)
             if device.type == "cuda":
                 torch.cuda.empty_cache()     # section 2: the analysis runs in this process; free its cache
-        reports.append(json.loads(report_path.read_text()))
+        report = json.loads(report_path.read_text())
+        check_report_settings(report, settings, report_path)                       # section 6
+        reports.append(report)
 
     statistics = aggregate_reports(reports, domain)
     reference = ({"optimal_value_b0": reports[0]["optimal_value_b0"]} if domain == "tiger" else {})

@@ -62,8 +62,13 @@
 # 5. Overrides (2026-11-13): --set k=v (repeatable) hosts the saved sets in a fresh run of the run's config with the
 #    overrides applied (saved_networks.host_run), for sets trained with options that add networks (e.g.
 #    model.ego_map_weight, PROTOCOL.md C-m). Without --set nothing changes.
+# 6. Reference check (2026-11-14): a full 512-game read must reproduce the stored games. Normally the reference is
+#    retrain_play.py's per-game <saved>.returns.npy; a set exported from a run that stored only its mean return
+#    (reports/2026-11-14_submission_audit/w5b_fatal_deadly.py) carries <saved>.reference_mean.json instead, and the
+#    replay's mean must match it to 1e-6. Without either file a full read raises.
 # ==============================================================================
 
+import json
 import sys
 import time
 from pathlib import Path
@@ -163,7 +168,12 @@ for saved in saved_sets:
     episodes, _ = play_episodes(WumpusSimulator(world, n, cfg.env.max_steps, stream_seed(settings.seed, 1), dev), rec)
     returns = discounted_returns(episodes.rewards, world.discount).double().cpu().numpy()
     # The replay check needs retrain_play.py's returns, which exist for full 512-game reads only (a smoke has none).
-    if n == settings.episodes and np.abs(returns - np.load(saved.with_suffix(".returns.npy"))).max() > 1e-6:
+    # Header 6: a set that has only a stored mean return (<saved>.reference_mean.json) is checked against that mean.
+    mean_file = saved.with_suffix(".reference_mean.json")
+    if n == settings.episodes and not saved.with_suffix(".returns.npy").exists() and mean_file.exists():
+        if abs(float(returns.mean()) - json.loads(mean_file.read_text())["discounted_return"]) > 1e-6:
+            raise RuntimeError(f"{saved}: the replay's mean return differs from {mean_file}.")
+    elif n == settings.episodes and np.abs(returns - np.load(saved.with_suffix(".returns.npy"))).max() > 1e-6:
         raise RuntimeError(f"{saved}: the replay differs from retrain_play.py's returns.")
     rows = {k: torch.stack([r[k] for r in rec.rows], 1).cpu() for k in rec.rows[0]}   # (G, T) / (G, T, A)
     fatal = torch.zeros_like(rows["live"])
