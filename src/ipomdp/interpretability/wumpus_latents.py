@@ -22,9 +22,12 @@
 #
 # 3. Metrics (held-out):
 #    - Hazard marginals: mean |P_exact - P_probe| per object (pit, wumpus, gold), and the same
-#      error of the best CONSTANT predictor (the data set's mean marginal per cell). The
-#      ratio says how much of the history-dependent belief the probe recovers; Tiger's KL/L1
-#      metrics do not transfer because the marginals are not one categorical distribution.
+#      error of two CONSTANT predictors fitted on the fit set: the MEAN marginal per cell
+#      (constant_error) and the MEDIAN marginal per cell (median_constant_error, added 2026-11-14).
+#      The median minimises mean absolute error, so it is the best constant under this metric; the
+#      mean is not (this header and the report field called the mean "the best constant" until
+#      2026-11-14; stored reports keep only constant_error). Tiger's KL/L1 metrics do not
+#      transfer because the marginals are not one categorical distribution.
 #    - Own state: accuracy of cell, heading, arrow and wumpus-life decoding.
 #
 # 4. Figures:
@@ -167,33 +170,37 @@ class WumpusProbeReport:
 
     rows: int
     hazard_error: dict[str, float]            # mean |P_exact - P_probe| per object
-    constant_error: dict[str, float]          # same error of the best constant predictor (fit-set mean)
+    constant_error: dict[str, float]          # same error of the fit-set MEAN per cell (a constant, not the best one)
     hazard_error_p99: dict[str, float]        # 99th percentile of the per-cell absolute error
     cell_accuracy: float
     heading_accuracy: float
     arrow_accuracy: float
     alive_accuracy: float
+    median_constant_error: dict[str, float]   # same error of the fit-set MEDIAN per cell, the best constant (section 3)
 
 
 @torch.no_grad()
 def evaluate_wumpus_probe(probe: WumpusProbe, fit: WumpusLatentDataset,
                           held_out: WumpusLatentDataset) -> WumpusProbeReport:
-    """Scores a probe on held-out histories against exact targets and the constant baseline."""
+    """Scores a probe on held-out histories against exact targets and the mean- and median-constant baselines."""
     decoded = probe.hazards(held_out.latents)
     constant = fit.hazards.mean(0, keepdim=True)
+    median = fit.hazards.median(0, keepdim=True).values
     out = probe.logits(held_out.latents)
-    error, baseline, p99 = {}, {}, {}
+    error, baseline, p99, median_baseline = {}, {}, {}, {}
     for k, name in enumerate(HAZARDS):
         cells = slice(k * NUM_CELLS, (k + 1) * NUM_CELLS)
         absolute = (decoded[:, cells] - held_out.hazards[:, cells]).abs()
         error[name] = float(absolute.mean())
         p99[name] = float(absolute.flatten().quantile(0.99)) if absolute.numel() < 2 ** 24 else float("nan")
         baseline[name] = float((constant[:, cells] - held_out.hazards[:, cells]).abs().mean())
+        median_baseline[name] = float((median[:, cells] - held_out.hazards[:, cells]).abs().mean())
     accuracy = lambda logits, target: float((logits.argmax(-1) == target).double().mean())  # noqa: E731
     binary = lambda logits, target: float(((logits > 0) == target).double().mean())  # noqa: E731
     return WumpusProbeReport(int(held_out.latents.shape[0]), error, baseline, p99,
                              accuracy(out["cell"], held_out.cell), accuracy(out["heading"], held_out.heading),
-                             binary(out["arrow"], held_out.arrow), binary(out["alive"], held_out.wumpus_alive))
+                             binary(out["arrow"], held_out.arrow), binary(out["alive"], held_out.wumpus_alive),
+                             median_baseline)
 
 
 _ARROWS = {0: (0.32, 0.0), 1: (0.0, 0.32), 2: (-0.32, 0.0), 3: (0.0, -0.32)}   # E, N, W, S in grid units

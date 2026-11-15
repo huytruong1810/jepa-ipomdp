@@ -740,6 +740,10 @@ class TestLearningStack:
         assert torch.allclose(data.hazards[:, :16].sum(1), torch.full((len(data.cell),), 2.0, dtype=torch.float64))
         report = evaluate_wumpus_probe(fit_linear_wumpus_probe(data), data, data)
         assert set(report.hazard_error) == {"pit", "wumpus", "gold"} and 0.0 <= report.cell_accuracy <= 1.0
+        # wumpus_latents.py section 3: scored on its own fit set, the per-cell median minimises mean absolute error, so
+        # the median constant is never worse than the mean constant.
+        for name in ("pit", "wumpus", "gold"):
+            assert report.median_constant_error[name] <= report.constant_error[name] + 1e-12
         probe = fit_linear_wumpus_probe(data)
         plt.close(plot_belief_maps(data, probe, episode=int(data.episode[0]), num_steps=3))
         plt.close(plot_latent_pca(data))
