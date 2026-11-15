@@ -8,6 +8,21 @@ Standing convention: every readout prints the per-seed values, the Student-t 95%
 
 GPU work runs through the week queue (`runs/week/stages.d/`, one stage at a time, gate `runs/week/queue.sh`). The order is a3 (C-m, the ego-map screen) → a4 (W1) → a5 (W2) → a6 (W3 screen); the later items follow.
 
+## STATUS 2026-11-15 15:10 — W10 DONE (`9bb7da8`; ledger 235 / 235 OK, 462 values)
+
+- **(a)** W4 summary, min / max over seeds 0-4:
+  - `dev.w4.accepted.glitter_ratio.{min,max}` 0.962 / 1.844
+  - `dev.w4.all.glitter_ratio.{min,max}` 0.334 / 0.548
+  - `dev.w4.all.share_M.{min,max}` 0.192 / 0.267
+  - `dev.w4.all.share_EPR.{min,max}` 0.567 / 0.833
+- **(b)** Baseline screens, from per-game files (runs/baselines/<setting>/seed{0,1,2}/analysis/games.npz):
+  - `dev.baseline.settings_tried` 10
+  - `dev.baseline.defaults.return` 87.22
+  - `dev.baseline.best_alternative_minus_defaults` +3.92 (r2d2_lr1e-4_n10)
+  - `dev.baseline.n1_minus_defaults` -10.75
+- **(c)** `heldout.probe.gold_error.seed5..9` 0.0257 / 0.0260 / 0.0269 / 0.0280 / 0.0268, `.min` / `.max` 0.0257 / 0.0280, beside `heldout.probe.gold_{mean,median}_constant` 0.0237 / 0.0230.
+- **(d)** The W8 aggregates of runs/sweeps/{polyak,decoder}/aggregate.json are committed.
+
 ## STATUS 2026-11-15 12:50 — ALL WORK ORDERS W1-W9 DONE (W6 not ordered)
 
 - **W5(a) DONE** (stage a8, 2026-11-14 21:09-22:19; logs `runs/wumpus/ve_screen/fl_VE{25,100}_seed<s>.log`; JSON in each seed's analysis/feature_localise_VE{25,100}_seed<s>.json).
