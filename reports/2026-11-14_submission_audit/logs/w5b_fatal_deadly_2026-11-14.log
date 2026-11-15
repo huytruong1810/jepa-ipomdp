@@ -1,0 +1,6 @@
+seed 0: fatal FORWARDs 4, into exact danger >= 0.999: 3 (0.750); games lost to a death 4
+seed 1: fatal FORWARDs 24, into exact danger >= 0.999: 20 (0.833); games lost to a death 24
+seed 2: fatal FORWARDs 21, into exact danger >= 0.999: 5 (0.238); games lost to a death 21
+seed 3: fatal FORWARDs 15, into exact danger >= 0.999: 8 (0.533); games lost to a death 15
+seed 4: fatal FORWARDs 16, into exact danger >= 0.999: 3 (0.188); games lost to a death 16
+per-seed share mean 0.508 (range 0.188-0.833); pooled 39/80 = 0.487

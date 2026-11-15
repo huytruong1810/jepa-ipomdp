@@ -1,0 +1,33 @@
+commit dbae0cb854bc00faaffb1e9e6576c44c38e416c6  started 2026-11-14 20:20:20
+V*(b0) = 19.362 (certified error 0.00962)
+  optimal          discounted return   18.476 +- 1.383
+  decoded_linear   discounted return   15.405 +- 0.759
+  decoded_mlp      discounted return   18.666 +- 1.319
+  learned_planner  discounted return   18.364 +- 1.384
+  probe linear/random  KL mean 0.00072  L1 mean 0.0216  L1 max 0.7868
+  probe linear/agent   KL mean 0.00062  L1 mean 0.0180  L1 max 0.5307
+  probe mlp/random     KL mean 0.00004  L1 mean 0.0038  L1 max 0.4082
+  probe mlp/agent      KL mean 0.00007  L1 mean 0.0040  L1 max 0.3595
+  bounds linear/agent L_V 55.0 L_Q 55.0 | worst case: value error 4.233 <= 29.189, regret 2.390 <= 58.379 | expected: value error 0.153 <= 0.990, regret 0.0126 <= 1.9796 | suboptimal decisions 0.0178
+  bounds mlp/agent    L_V 55.0 L_Q 55.0 | worst case: value error 2.570 <= 19.771, regret 0.703 <= 39.541 | expected: value error 0.042 <= 0.222, regret 0.0011 <= 0.4448 | suboptimal decisions 0.0015
+  geometry: explained variance [0.581, 0.31, 0.038, 0.029, 0.014]; minimality ratio 0.242
+    |Spearman(PC1..3, log-odds)| [0.068, 0.818, 0.069], |Spearman(PC1..3, |log-odds|)| [0.762, 0.002, 0.182]
+report: runs/repro_w2/tiger_polyak_seed0_run2/analysis/report.json
+  returns.decoded_linear: fresh run 1 15.4047219156 vs fresh run 2 15.4047219156 -> EQUAL
+  returns.decoded_mlp: fresh run 1 18.6659827522 vs fresh run 2 18.6659827522 -> EQUAL
+  returns.learned_planner: fresh run 1 18.3644283932 vs fresh run 2 18.3644283932 -> EQUAL
+  returns.optimal: fresh run 1 18.4762220666 vs fresh run 2 18.4762220666 -> EQUAL
+  probes.linear/agent: EQUAL (mean L1 0.017996569294963106 vs 0.017996569294963106)
+  probes.linear/random: EQUAL (mean L1 0.021598299773776194 vs 0.021598299773776194)
+  probes.mlp/agent: EQUAL (mean L1 0.004044044451115008 vs 0.004044044451115008)
+  probes.mlp/random: EQUAL (mean L1 0.003790444370813501 vs 0.003790444370813501)
+  returns.decoded_linear: fresh run 1 15.4047219156 vs stored 15.3847932717 -> DIFFER
+  returns.decoded_mlp: fresh run 1 18.6659827522 vs stored 18.6558648128 -> DIFFER
+  returns.learned_planner: fresh run 1 18.3644283932 vs stored 18.3644283932 -> EQUAL
+  returns.optimal: fresh run 1 18.4762220666 vs stored 18.4762220666 -> EQUAL
+  probes.linear/agent: DIFFER (mean L1 0.017996569294963106 vs 0.017856688480053572)
+  probes.linear/random: DIFFER (mean L1 0.021598299773776194 vs 0.02160907995163561)
+  probes.mlp/agent: DIFFER (mean L1 0.004044044451115008 vs 0.004039570165786713)
+  probes.mlp/random: DIFFER (mean L1 0.003790444370813501 vs 0.0037877317794758627)
+VERDICT: two fresh runs at HEAD AGREE bit for bit -> the mismatch is drift since the stored analysis
+finished 2026-11-14 21:09:22

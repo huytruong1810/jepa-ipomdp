@@ -1,0 +1,10 @@
+commit 497228788554c4634d42f08ef24409521f33d1ee
+held-out random-history rows 7336; recomputed mean constant equals every stored report's.
+                                               pit                                      wumpus                                        gold
+                  mean c / median c / MLP / linear            mean c / median c / MLP / linear            mean c / median c / MLP / linear
+seed 5        0.0825    0.0723    0.0557    0.0565        0.0604    0.0489    0.0388    0.0470        0.0237    0.0230    0.0257    0.0258
+seed 6        0.0825    0.0723    0.0587    0.0593        0.0604    0.0489    0.0397    0.0544        0.0237    0.0230    0.0260    0.0268
+seed 7        0.0825    0.0723    0.0572    0.0572        0.0604    0.0489    0.0393    0.0499        0.0237    0.0230    0.0269    0.0255
+seed 8        0.0825    0.0723    0.0657    0.0610        0.0604    0.0489    0.0433    0.0482        0.0237    0.0230    0.0280    0.0264
+seed 9        0.0825    0.0723    0.0593    0.0583        0.0604    0.0489    0.0393    0.0521        0.0237    0.0230    0.0268    0.0263
+saved runs/wumpus/w7/median_constant.json

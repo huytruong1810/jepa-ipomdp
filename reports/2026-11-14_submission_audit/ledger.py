@@ -399,12 +399,33 @@ def retrain_schedule(ledger: Ledger) -> None:
                        "logs/data_vs_objective/agent_reference_probes.txt (log)")
 
 
+def audit_measurements(ledger: Ledger) -> None:
+    """W5(b) and W7 (2026-11-14): fatal steps into provably deadly cells, and the probes' constant baselines."""
+    fatal_all, deadly_all = 0, 0
+    for s in DEV:
+        rows = load_npz(RUNS / "wumpus" / "w5b" / f"seed{s}_best.risk.npz")
+        fatal = rows["fatal"]
+        deadly = fatal & (rows["danger"] >= 0.999)
+        src = f"runs/wumpus/w5b/seed{s}_best.risk.npz (risk_localise.py replay of best.pt on the development games)"
+        ledger.put(f"dev.fatal_into_deadly.seed{s}.share", deadly.sum() / fatal.sum(), src)
+        ledger.put(f"dev.fatal_into_deadly.seed{s}.fatal", fatal.sum(), src)
+        fatal_all, deadly_all = fatal_all + int(fatal.sum()), deadly_all + int(deadly.sum())
+    ledger.put("dev.fatal_into_deadly.pooled_share", deadly_all / fatal_all, "runs/wumpus/w5b/seed{0..4}_best.risk.npz")
+    ledger.put("dev.fatal_into_deadly.pooled_fatal", fatal_all, "runs/wumpus/w5b/seed{0..4}_best.risk.npz")
+    w7 = load_json(RUNS / "wumpus" / "w7" / "median_constant.json")
+    src = "runs/wumpus/w7/median_constant.json (w7_median_constant.py; mean constant checked equal to every report)"
+    for hazard in ("pit", "wumpus", "gold"):
+        ledger.put(f"heldout.probe.{hazard}_mean_constant", w7["mean_constant"][hazard], src)
+        ledger.put(f"heldout.probe.{hazard}_median_constant", w7["median_constant"][hazard], src)
+
+
 def main() -> None:
     ledger = Ledger()
     tiger(ledger)
     wumpus_heldout(ledger)
     wumpus_development(ledger)
     retrain_schedule(ledger)
+    audit_measurements(ledger)
 
     claims = yaml.safe_load((HERE / "claims.yaml").read_text())
     lines = ["| id | paper | recomputed | where | source | |", "|---|---|---|---|---|---|"]

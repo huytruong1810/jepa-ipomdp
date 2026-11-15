@@ -1,0 +1,5 @@
+q_localise.npz: EQUAL
+feature_localise_smoke.npz: EQUAL
+feature_localise_smoke.json: EQUAL
+declined_states_smoke.pt: EQUAL
+IDENTITY OK: the default output is unchanged
