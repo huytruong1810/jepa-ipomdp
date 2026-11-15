@@ -14,7 +14,7 @@
 | tiger.decoded_mlp.return_ci | 0.24 | 0.2366 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | tiger.decoded_mlp.gap | -0.2 | -0.2037 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | tiger.decoded_mlp.gap_ci | 0.24 | 0.2366 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.suboptimal_pct | 0.14 | 0.1452 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | DIFF |
+| tiger.suboptimal_pct | 0.15 | 0.1452 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | tiger.linear_agent.l1 | 0.016 | 0.01613 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | tiger.decoded_linear.gap | -4.7 | -4.704 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | tiger.bounds.value_bound_mean | 0.24 | 0.2417 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
@@ -66,7 +66,6 @@
 | heldout.probe.cell_agent_pct | 88 | 88.19 | Results, Wumpus World paragraph / tab:wumpus | runs/sweeps/wumpus_retrain_heldout/seed{5..9}/analysis_heldout/report.json | OK |
 | heldout.probe.heading_agent_pct | 92 | 91.66 | Results, Wumpus World paragraph / tab:wumpus | runs/sweeps/wumpus_retrain_heldout/seed{5..9}/analysis_heldout/report.json | OK |
 | heldout.probe.pit_error | 0.059 | 0.05932 | Results, Wumpus World paragraph / tab:wumpus | runs/sweeps/wumpus_retrain_heldout/seed{5..9}/analysis_heldout/report.json | OK |
-| heldout.probe.pit_constant | 0.083 | 0.08252 | Results, Wumpus World paragraph / tab:wumpus | runs/sweeps/wumpus_retrain_heldout/seed{5..9}/analysis_heldout/report.json | OK |
 | heldout.untrained_probe.cell_pct | 46 | 46.00 | Results, Wumpus World paragraph / tab:wumpus | logs/untrained_probe_control.log (log) | OK |
 | heldout.untrained_probe.heading_pct | 43 | 43.10 | Results, Wumpus World paragraph / tab:wumpus | logs/untrained_probe_control.log (log) | OK |
 | heldout.untrained_probe.pit_error | 0.073 | 0.07300 | Results, Wumpus World paragraph / tab:wumpus | logs/untrained_probe_control.log (log) | OK |
@@ -202,7 +201,7 @@
 | heldout.sims10_minus_ours.t_hi | 2 | 1.65 | Localisation | runs/sweeps/wumpus_retrain_heldout/seed{5..9}/analysis_heldout/exact_play_learned_sims10.npz | OK |
 | tiger.bounds.value_bound_max_over_seeds | 43 | 42.99 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | tiger.bounds.regret_bound_max_over_seeds | 86 | 85.97 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.bounds.policy_loss_bound_mean | 9.5 | 9.668 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | DIFF |
+| tiger.bounds.policy_loss_bound_mean | 9.7 | 9.668 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | tiger.mlp_random.l1 | 0.004 | 0.00376 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | dev.remedy.VE100.seed0 | -64 | -63.75 | Repairing the observation model | runs/wumpus/ve_screen/VE100_seed*.returns.npy vs runs/wumpus/ve_screen/control_seed*.returns.npy | OK |
 | dev.remedy.VE100.seed1 | 31 | 30.66 | Repairing the observation model | runs/wumpus/ve_screen/VE100_seed*.returns.npy vs runs/wumpus/ve_screen/control_seed*.returns.npy | OK |
@@ -227,3 +226,14 @@
 | dev.declined.gold_calibration_own_histories.max | 1.09 | 1.0895 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json | OK |
 | dev.declined.gold_calibration.min | 0.51 | 0.5144 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json | OK |
 | dev.declined.gold_calibration.max | 0.59 | 0.5913 | Results, Localisation paragraph | runs/sweeps/wumpus_retrain/seed{0..4}/analysis/feature_localise.json | OK |
+| heldout.probe.pit_median_constant | 0.072 | 0.07226 | Results, Wumpus World paragraph | runs/wumpus/w7/median_constant.json (w7_median_constant.py; mean constant checked equal to every report) | OK |
+| dev.schedule.buffer.cell_pct | 85 | 85.24 | Results, Ablation paragraph | logs/data_vs_objective/buffer_seed{0,1,2}.log (log) | OK |
+| dev.schedule.buffer.heading_pct | 87 | 87.21 | Results, Ablation paragraph | logs/data_vs_objective/buffer_seed{0,1,2}.log (log) | OK |
+| dev.schedule.growing.cell_pct | 77 | 76.59 | Results, Ablation paragraph | logs/data_vs_objective/growing_seed{0,1,2}.log (log) | OK |
+| dev.schedule.growing.heading_pct | 72 | 71.92 | Results, Ablation paragraph | logs/data_vs_objective/growing_seed{0,1,2}.log (log) | OK |
+| dev.fatal_into_deadly.pooled_fatal | 80 | 80.00 | Results, Wumpus World paragraph | runs/wumpus/w5b/seed{0..4}_best.risk.npz | OK |
+| dev.fatal_into_deadly.pooled_share | 0.49 | 0.4875 | Results, Wumpus World paragraph | runs/wumpus/w5b/seed{0..4}_best.risk.npz | OK |
+| dev.fatal_into_deadly.seed4.share | 0.19 | 0.1875 | Results, Wumpus World paragraph | runs/wumpus/w5b/seed4_best.risk.npz (risk_localise.py replay of best.pt on the development games) | OK |
+| dev.fatal_into_deadly.seed1.share | 0.83 | 0.8333 | Results, Wumpus World paragraph | runs/wumpus/w5b/seed1_best.risk.npz (risk_localise.py replay of best.pt on the development games) | OK |
+| dev.remedy.VE100.glitter_change.seeds_lower | 2 | 2.00 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{VE100,ctl}_seed*.json | OK |
+| dev.remedy.VE25.glitter_change.seeds_repaired | 0 | 0.00 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{VE25,ctl}_seed*.json | OK |

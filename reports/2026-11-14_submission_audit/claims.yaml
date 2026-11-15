@@ -13,7 +13,7 @@
 - {id: tiger.decoded_mlp.return_ci, paper: 0.24, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
 - {id: tiger.decoded_mlp.gap, paper: -0.2, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
 - {id: tiger.decoded_mlp.gap_ci, paper: 0.24, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
-- {id: tiger.suboptimal_pct, paper: 0.14, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
+- {id: tiger.suboptimal_pct, paper: 0.15, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
 - {id: tiger.linear_agent.l1, paper: 0.016, decimals: 3, where: "Results, Tiger paragraph / tab:tiger"}
 - {id: tiger.decoded_linear.gap, paper: -4.7, decimals: 1, where: "Results, Tiger paragraph / tab:tiger"}
 - {id: tiger.bounds.value_bound_mean, paper: 0.24, decimals: 2, where: "Results, Tiger paragraph / tab:tiger"}
@@ -65,7 +65,6 @@
 - {id: heldout.probe.cell_agent_pct, paper: 88, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
 - {id: heldout.probe.heading_agent_pct, paper: 92, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
 - {id: heldout.probe.pit_error, paper: 0.059, decimals: 3, where: "Results, Wumpus World paragraph / tab:wumpus"}
-- {id: heldout.probe.pit_constant, paper: 0.083, decimals: 3, where: "Results, Wumpus World paragraph / tab:wumpus"}
 - {id: heldout.untrained_probe.cell_pct, paper: 46, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
 - {id: heldout.untrained_probe.heading_pct, paper: 43, decimals: 0, where: "Results, Wumpus World paragraph / tab:wumpus"}
 - {id: heldout.untrained_probe.pit_error, paper: 0.073, decimals: 3, where: "Results, Wumpus World paragraph / tab:wumpus"}
@@ -201,7 +200,7 @@
 - {id: heldout.sims10_minus_ours.t_hi, paper: 2, decimals: 0, where: "Localisation"}
 - {id: tiger.bounds.value_bound_max_over_seeds, paper: 43, decimals: 0, where: "Results, Tiger paragraph"}
 - {id: tiger.bounds.regret_bound_max_over_seeds, paper: 86, decimals: 0, where: "Results, Tiger paragraph"}
-- {id: tiger.bounds.policy_loss_bound_mean, paper: 9.5, decimals: 1, where: "Results, Tiger paragraph"}
+- {id: tiger.bounds.policy_loss_bound_mean, paper: 9.7, decimals: 1, where: "Results, Tiger paragraph"}
 - {id: tiger.mlp_random.l1, paper: 0.004, decimals: 3, where: "Results, Tiger paragraph"}
 - {id: dev.remedy.VE100.seed0, paper: -64, decimals: 0, where: "Repairing the observation model"}
 - {id: dev.remedy.VE100.seed1, paper: 31, decimals: 0, where: "Repairing the observation model"}
@@ -226,3 +225,14 @@
 - {id: dev.declined.gold_calibration_own_histories.max, paper: 1.09, decimals: 2, where: "Results, Localisation paragraph"}
 - {id: dev.declined.gold_calibration.min, paper: 0.51, decimals: 2, where: "Results, Localisation paragraph"}
 - {id: dev.declined.gold_calibration.max, paper: 0.59, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: heldout.probe.pit_median_constant, paper: 0.072, decimals: 3, where: "Results, Wumpus World paragraph"}
+- {id: dev.schedule.buffer.cell_pct, paper: 85, decimals: 0, where: "Results, Ablation paragraph"}
+- {id: dev.schedule.buffer.heading_pct, paper: 87, decimals: 0, where: "Results, Ablation paragraph"}
+- {id: dev.schedule.growing.cell_pct, paper: 77, decimals: 0, where: "Results, Ablation paragraph"}
+- {id: dev.schedule.growing.heading_pct, paper: 72, decimals: 0, where: "Results, Ablation paragraph"}
+- {id: dev.fatal_into_deadly.pooled_fatal, paper: 80, decimals: 0, where: "Results, Wumpus World paragraph"}
+- {id: dev.fatal_into_deadly.pooled_share, paper: 0.49, decimals: 2, where: "Results, Wumpus World paragraph"}
+- {id: dev.fatal_into_deadly.seed4.share, paper: 0.19, decimals: 2, where: "Results, Wumpus World paragraph"}
+- {id: dev.fatal_into_deadly.seed1.share, paper: 0.83, decimals: 2, where: "Results, Wumpus World paragraph"}
+- {id: dev.remedy.VE100.glitter_change.seeds_lower, paper: 2, decimals: 0, where: "Repairing the observation model"}
+- {id: dev.remedy.VE25.glitter_change.seeds_repaired, paper: 0, decimals: 0, where: "Repairing the observation model"}
