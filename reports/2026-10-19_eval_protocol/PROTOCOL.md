@@ -270,6 +270,20 @@ Probe recall (prediction at least 0.5) at live analysis-game states with a prova
 - At every provably deadly state the head missed, on all six set-seeds, the hunter's current percept already warned: a breeze for a pit ahead, a stench for a wumpus. The certainty comes from combining that warning with which neighbours are known safe (visited). The deaths therefore sit on the visited-tracking deficit found by the earlier localisation (Step D), not on missing percept information.
 - Consequence (no rule-bound action, as the reading is MIXED): both levers remain. One is the head's training signal: P(GAME_OVER | z, FORWARD) is supervised only where FORWARD was taken, which is rare at provably deadly cells. The other is the representation's tracking of visited cells.
 
+## C-m result (development screen, read 2026-11-14 20:15; logs `runs/wumpus/ego_screen/`, readout `readout_cm.log`): NO ARM PASSES, EGO MAP CLOSED
+
+Arm minus control per game, paired on the 512 analysis games of training seeds 0 / 1 / 2 (± one standard error). MISS RATE is the share of live states with a provably deadly cell ahead (exact danger at least 0.999) where max(P_O, P_R) < 0.5. The control plays 270.0 / 214.7 / 194.3, with deaths 1.0 / 1.8 / 7.2% and MISS RATE 0.248 / 0.398 / 0.185.
+
+| Arm | Play: seed 0 / 1 / 2 | Mean, Student-t 95% (nested; crossed) | Deaths | MISS RATE | Steps into deadly cells (control 3 / 4 / 1) | Verdict |
+|---|---|---|---|---|---|---|
+| EGO1 | −45.0 ± 19.1 / −4.2 ± 14.8 / +14.2 ± 19.8 | −11.7 [−87.0, +63.6] ([−47.7, +22.2]; [−51.0, +26.5]) | 2.7 / 3.3 / 3.5% | 0.168 / 0.057 / 0.180 | 10 / 16 / 18 | FAIL (MECHANISM 1 of 3, PLAY 1 of 3) |
+| EGO01 | −102.7 ± 19.4 / +37.4 ± 16.6 / +34.8 ± 19.3 | −10.2 [−209.2, +188.9] ([−99.0, +50.7]; [−94.2, +54.0]) | 2.5 / 2.7 / 2.3% | 0.283 / 0.230 / 0.321 | 8 / 7 / 10 | FAIL (MECHANISM 1 of 3; PLAY 2 of 3) |
+
+- Neither arm passes MECHANISM, so neither passes; EGO01 passes PLAY alone. Deaths stay within control + 2 points on every seed.
+- The ego-map readout helps the head recognise provably deadly cells strongly on one seed (EGO1 seed 1: MISS RATE 0.398 to 0.057) and not on the others.
+- Both arms face many more provably deadly states than the control (EGO1 980 / 1052 / 1078 against 572 / 432 / 730) and step into them more often (EGO1 10 / 16 / 18 against 3 / 4 / 1). The latent that tracks its own position makes the agent go forward more, and the head's remaining misses then cost more.
+- Consequence: the ego map does not enter R2 and is closed.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 

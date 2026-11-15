@@ -592,6 +592,11 @@
 #      * An arm passes when both pass. Reported: deaths at provably deadly cells, MLP cell / heading and "unvisited"
 #        accuracy at (c), joint glitter ratio, the ego-map loss in the training log.
 #      -> A passing arm enters the in-agent run R2. No arm passes: the ego map is closed.
+#    - RESULT (2026-11-14; runs/wumpus/ego_screen/, PROTOCOL.md "C-m result"): NO ARM PASSES; ego map closed.
+#      arm - control per game, seeds 0 / 1 / 2: EGO1 -45.0 / -4.2 / +14.2 (Student-t mean -11.7 [-87.0, +63.6]);
+#      EGO01 -102.7 / +37.4 / +34.8 (-10.2 [-209.2, +188.9]). MISS RATE (control 0.248 / 0.398 / 0.185): EGO1 0.168 /
+#      0.057 / 0.180, EGO01 0.283 / 0.230 / 0.321 -> MECHANISM 1 of 3 for both. The arms meet many more provably deadly
+#      states (EGO1 980-1078 vs 432-730) and step into more of them (10-18 vs 1-4).
 #
 # 3. Usage:
 #    uv run python reports/2026-10-02_wumpus_diagnostics/objective_ab.py --representation jepa \

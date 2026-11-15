@@ -1,0 +1,11 @@
+C-m readout (PROTOCOL.md C-m; dev seeds 0-2). Control = runs/wumpus/ve_screen/control_seed<s>.pt
+  EGO1 seed 0: return 224.9 vs control 270.0, diff -45.0 +- 19.1; deaths 2.7% (control 1.0%); MISS RATE 0.168 vs control 0.248 (deadly states 980 / 572; stepped into deadly 10 / 3)
+  EGO1 seed 1: return 210.5 vs control 214.7, diff -4.2 +- 14.8; deaths 3.3% (control 1.8%); MISS RATE 0.057 vs control 0.398 (deadly states 1052 / 432; stepped into deadly 16 / 4)
+  EGO1 seed 2: return 208.5 vs control 194.3, diff +14.2 +- 19.8; deaths 3.5% (control 7.2%); MISS RATE 0.180 vs control 0.185 (deadly states 1078 / 730; stepped into deadly 18 / 1)
+  EGO1: mean -11.7; per seed -45.0, -4.2, +14.2; Student-t [-87.0, +63.6]; nested -47.7, +22.2; crossed -51.0, +26.5
+  VERDICT EGO1: MECHANISM 1/3 seeds (need 2), PLAY positive 1/3 (need 2), deaths within +2 pts: True -> FAIL
+  EGO01 seed 0: return 167.3 vs control 270.0, diff -102.7 +- 19.4; deaths 2.5% (control 1.0%); MISS RATE 0.283 vs control 0.248 (deadly states 672 / 572; stepped into deadly 8 / 3)
+  EGO01 seed 1: return 252.0 vs control 214.7, diff +37.4 +- 16.6; deaths 2.7% (control 1.8%); MISS RATE 0.230 vs control 0.398 (deadly states 387 / 432; stepped into deadly 7 / 4)
+  EGO01 seed 2: return 229.1 vs control 194.3, diff +34.8 +- 19.3; deaths 2.3% (control 7.2%); MISS RATE 0.321 vs control 0.185 (deadly states 343 / 730; stepped into deadly 10 / 1)
+  EGO01: mean -10.2; per seed -102.7, +37.4, +34.8; Student-t [-209.2, +188.9]; nested -99.0, +50.7; crossed -94.2, +54.0
+  VERDICT EGO01: MECHANISM 1/3 seeds (need 2), PLAY positive 2/3 (need 2), deaths within +2 pts: True -> FAIL
