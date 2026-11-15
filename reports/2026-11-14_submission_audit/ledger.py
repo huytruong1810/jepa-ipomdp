@@ -419,6 +419,46 @@ def audit_measurements(ledger: Ledger) -> None:
         ledger.put(f"heldout.probe.{hazard}_median_constant", w7["median_constant"][hazard], src)
 
 
+def audit_w10(ledger: Ledger) -> None:
+    """W10 (2026-11-15): ids for numbers the paper prints from the W4 summary, the baseline screens and the gold probe."""
+    # (a) accepted-state control (W4): min and max over development seeds 0-4.
+    w4 = load_json(RUNS / "wumpus" / "w4" / "summary.json")
+    src = "runs/wumpus/w4/summary.json (w4_accepted_states.py)"
+    for key, (state_set, field) in {"accepted.glitter_ratio": ("accepted", "glitter_ratio_fl"),
+                                    "all.glitter_ratio": ("all", "glitter_ratio_fl")}.items():
+        values = [w4[str(s)][state_set][field] for s in DEV]
+        ledger.put(f"dev.w4.{key}.min", min(values), src)
+        ledger.put(f"dev.w4.{key}.max", max(values), src)
+    for arm in ("M", "EPR"):
+        values = [w4[str(s)]["all"]["share"][arm] for s in DEV]
+        ledger.put(f"dev.w4.all.share_{arm}.min", min(values), src)
+        ledger.put(f"dev.w4.all.share_{arm}.max", max(values), src)
+    # (b) model-free baseline screens: development best-network return (per-game files of seeds 0-2, mean over seeds).
+    screens = {"C-c": ("r2d2_lr1e-4_n5", "r2d2_lr1e-4_n10", "r2d2_lr3e-4_n5", "r2d2_lr3e-4_n10"),
+               "C-f": ("r2d2_f1", "r2d2_f2", "r2d2_f3"), "C-n": ("r2d2_n1", "r2d2_n2", "r2d2_n3")}
+    def dev_return(name: str) -> float:
+        return float(np.mean([load_npz(RUNS / "baselines" / name / f"seed{s}" / "analysis" / "games.npz")
+                              ["recurrent_dqn.return"].mean() for s in range(3)]))
+    bsrc = "runs/baselines/<setting>/seed{0,1,2}/analysis/games.npz (recurrent_dqn.return)"
+    settings = [name for names in screens.values() for name in names]
+    returns = {name: dev_return(name) for name in settings}
+    defaults = returns["r2d2_lr1e-4_n5"]
+    alternatives = {name: value for name, value in returns.items() if name != "r2d2_lr1e-4_n5"}
+    best = max(alternatives, key=alternatives.get)
+    ledger.put("dev.baseline.settings_tried", len(settings), bsrc)
+    ledger.put("dev.baseline.defaults.return", defaults, bsrc)
+    ledger.put("dev.baseline.best_alternative_minus_defaults", alternatives[best] - defaults, bsrc + f" (best: {best})")
+    ledger.put("dev.baseline.n1_minus_defaults", returns["r2d2_n1"] - defaults, bsrc)
+    # (c) held-out gold probe on random histories against the constants (W7).
+    reports = [load_json(heldout_dir("wumpus_retrain_heldout", s) / "report.json") for s in HELD]
+    gold = [r["probes"]["mlp_random"]["hazard_error"]["gold"] for r in reports]
+    psrc = "runs/sweeps/wumpus_retrain_heldout/seed{5..9}/analysis_heldout/report.json (mlp_random)"
+    for s, value in zip(HELD, gold):
+        ledger.put(f"heldout.probe.gold_error.seed{s}", value, psrc)
+    ledger.put("heldout.probe.gold_error.min", min(gold), psrc)
+    ledger.put("heldout.probe.gold_error.max", max(gold), psrc)
+
+
 def main() -> None:
     ledger = Ledger()
     tiger(ledger)
@@ -426,6 +466,7 @@ def main() -> None:
     wumpus_development(ledger)
     retrain_schedule(ledger)
     audit_measurements(ledger)
+    audit_w10(ledger)
 
     claims = yaml.safe_load((HERE / "claims.yaml").read_text())
     lines = ["| id | paper | recomputed | where | source | |", "|---|---|---|---|---|---|"]
