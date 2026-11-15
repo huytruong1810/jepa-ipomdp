@@ -102,6 +102,11 @@
 #    searches token states (planning/search_model.py, section 10). The rows' histories are converted to token states
 #    for every expansion, the turned STATES feed the next expansions, and the probes and the saved z_turn read the
 #    turned LATENTS (Expansion.next_latents). With the GRU both are the same tensor, so every earlier result stands.
+# 7. State sets (2026-11-14, submission audit W4; descriptive, no pass rule; the default is unchanged bit for bit):
+#    --states declined|accepted|all, as q_localise_diag.py section 5: accepted = the planner took the heuristic's
+#    turn and then stepped FORWARD; all = every distance-2 near-turn state. At a turn-taken state the comparison
+#    action ("chosen") is the tree's best root action other than the turn. The stored-file cross-checks
+#    (macro_reach.npz, q_localise.npz) apply to the declined set only; outputs carry the suffix _<states>.
 # ==============================================================================
 
 import copy
@@ -200,6 +205,13 @@ while "--set" in args:
     i = args.index("--set")
     overrides.append(args[i + 1])
     del args[i:i + 2]
+STATES = "declined"                                           # section 7
+if "--states" in args:
+    i = args.index("--states")
+    STATES = args[i + 1]
+    del args[i:i + 2]
+if STATES not in ("declined", "accepted", "all"):
+    raise ValueError(f"--states must be declined, accepted or all, got {STATES!r}.")
 run_dir, dev = Path(args[0]), torch.device(args[1])
 settings = WumpusAnalysisSettings()
 n = int(args[2]) if len(args) > 2 else settings.episodes
@@ -268,7 +280,10 @@ class Recorder:
         pit, wumpus, gold = m.pit.cpu().tolist(), m.wumpus.cpu().tolist(), m.gold.cpu().tolist()
         alive, done = m.wumpus_alive.tolist(), m.done.tolist()
         for b in range(n):
-            if done[b] or heuristic[b] not in TURNS or chosen[b] == heuristic[b]:
+            if done[b] or heuristic[b] not in TURNS:
+                continue
+            took_turn = chosen[b] == heuristic[b]
+            if (STATES == "declined" and took_turn) or (STATES == "accepted" and not took_turn):   # section 7
                 continue
             cell, heading = int(m.cell[b]), int(m.heading[b])
             if gold[b][cell] > 1.0 - _ZERO:
@@ -283,10 +298,15 @@ class Recorder:
             if target_distance(cell, heading, safe, goal) != 2:
                 continue
             root = planner.planner.roots[b]
-            q1_chosen = root.edges[chosen[b]].reward + GAMMA * sum(
-                p * c.leaf_value for p, c in zip(root.edges[chosen[b]].observation_probs, root.edges[chosen[b]].children))
+            other = chosen[b]
+            if took_turn:                                              # section 7: best root action other than the turn
+                q_root = planner.planner.statistics.q_values[b].copy()
+                q_root[heuristic[b]] = -np.inf
+                other = int(q_root.argmax())
+            q1_chosen = root.edges[other].reward + GAMMA * sum(
+                p * c.leaf_value for p, c in zip(root.edges[other].observation_probs, root.edges[other].children))
             own = s._own
-            self.rows.append({"game": b, "t": self.t, "chosen": chosen[b], "turn": heuristic[b], "z": state[b],
+            self.rows.append({"game": b, "t": self.t, "chosen": other, "turn": heuristic[b], "z": state[b],
                               "layouts": torch.nonzero(s._consistent[b]).squeeze(1),
                               "own": (int(own.cell[b]), int(own.heading[b]), bool(own.arrow[b]),
                                       bool(own.wumpus_alive[b])),
@@ -362,12 +382,18 @@ if full:
     reported = json.loads((run_dir / "analysis" / "report.json").read_text())["returns"]["learned_planner"]
     if abs(reported["discounted_return"] - returns.mean()) > 1e-6:
         raise RuntimeError(f"Replay is not faithful: {returns.mean()} vs report.json {reported['discounted_return']}.")
-    saved_mr = np.load(run_dir / "analysis" / "macro_reach.npz")
-    ref = saved_mr["q1_chosen"][saved_mr["distance"] == 2]
-    mine = np.array([r["q1_chosen"] for r in rec.rows])
-    if ref.shape != mine.shape or np.abs(ref - mine).max() > 1e-6:
-        raise RuntimeError(f"State selection differs from macro_reach.npz: {ref.shape} vs {mine.shape}.")
+    if STATES == "declined":                                   # section 7
+        saved_mr = np.load(run_dir / "analysis" / "macro_reach.npz")
+        ref = saved_mr["q1_chosen"][saved_mr["distance"] == 2]
+        mine = np.array([r["q1_chosen"] for r in rec.rows])
+        if ref.shape != mine.shape or np.abs(ref - mine).max() > 1e-6:
+            raise RuntimeError(f"State selection differs from macro_reach.npz: {ref.shape} vs {mine.shape}.")
 del planner
+if STATES == "accepted":                                       # section 7: the turn was followed by FORWARD
+    _acts = episodes.actions.cpu().numpy()
+    _before = len(rec.rows)
+    rec.rows = [r for r in rec.rows if r["t"] + 1 < _acts.shape[1] and _acts[r["game"], r["t"] + 1] == FWD]
+    print(f"  accepted states: {len(rec.rows)} of {_before} turn-taken states were followed by FORWARD", flush=True)
 
 rows = rec.rows
 z_root = torch.stack([r["z"] for r in rows])
@@ -432,8 +458,8 @@ for r in rows:
     turn_p.append(p); turn_f.append(f)
 root_p, root_f, turn_p, turn_f = map(np.array, (root_p, root_f, turn_p, turn_f))
 tv_joint = 0.5 * np.abs(p_joint - turn_p).sum(1)
-saved = np.load(run_dir / "analysis" / "q_localise.npz") if full else None
-if full and base_mode:
+saved = np.load(run_dir / "analysis" / "q_localise.npz") if full and STATES == "declined" else None
+if full and base_mode and STATES == "declined":
     if np.abs(tv_joint - saved["tv_fwd"]).max() > 1e-4:
         raise RuntimeError("The joint head at the turned latents does not reproduce q_localise.npz's tv_fwd.")
 print(f"  turned latents: joint-head TV median {np.median(tv_joint):.3f}; exact glitter at (c) "
@@ -443,8 +469,10 @@ torch.save({"z_root": z_root.cpu(), "z_turn": z_turn.cpu(), "o_turn": torch.tens
             "factors_root": torch.from_numpy(root_f), "factors_turn": torch.from_numpy(turn_f), "factor_names": FACTORS,
             "meta": [{k: r[k] for k in ("game", "t", "chosen", "turn", "own", "visited")} for r in rows],
             "layouts": [r["layouts"].cpu() for r in rows]},
-           run_dir / "analysis" / ("declined_states_smoke.pt" if not full else "declined_states.pt" if base_mode
-                                   else f"declined_states_{networks_path.stem}.pt"))
+           run_dir / "analysis" / (("declined_states_smoke.pt" if not full else "declined_states.pt" if base_mode
+                                    else f"declined_states_{networks_path.stem}.pt") if STATES == "declined"
+                                   else f"{STATES}_states{'' if base_mode else '_' + networks_path.stem}"
+                                        f"{'' if full else '_smoke'}.pt"))
 
 def pruned(probs: np.ndarray) -> np.ndarray:
     """The search's branch weights over all |O| (planning/mcts.py section 6), along the last axis."""
@@ -495,7 +523,8 @@ def arm_m() -> tuple[np.ndarray, np.ndarray]:
 
 
 q_mac, q_cho = arm_m()
-if full and base_mode and (np.abs(q_mac - saved["q_mac_M"]).max() > 1e-2 or np.abs(q_cho - saved["q_cho_M"]).max() > 1e-2):
+if full and base_mode and STATES == "declined" and (np.abs(q_mac - saved["q_mac_M"]).max() > 1e-2
+                                                   or np.abs(q_cho - saved["q_cho_M"]).max() > 1e-2):
     raise RuntimeError("Arm M does not reproduce q_localise.npz.")
 decision_share = float((q_mac > q_cho).mean())
 print(f"  decision share M (Q_mac > Q2(chosen)) {decision_share:.3f}", flush=True)
@@ -653,7 +682,8 @@ summary["joint_glitter_ratio_c"] = float(p_joint[:, BITS["glitter"]].sum(1).mean
 print(f"  glitter at (c), learned / exact: joint head {summary['joint_glitter_ratio_c']:.2f}, mlp direct "
       f"{summary['direct_glitter_ratio_c']:.2f}, composed (1 - wall^) gold^ {summary['composed_glitter_ratio_c']:.2f}",
       flush=True)
-suffix = ("" if base_mode else f"_{networks_path.stem}") + ("" if full else "_smoke")
+suffix = (("" if base_mode else f"_{networks_path.stem}") + ("" if STATES == "declined" else f"_{STATES}")   # section 7
+          + ("" if full else "_smoke"))
 np.savez(run_dir / "analysis" / f"feature_localise{suffix}.npz", factors_root=root_f, factors_turn=turn_f,
          p_joint_turn=p_joint, **per_row)
 (run_dir / "analysis" / f"feature_localise{suffix}.json").write_text(json.dumps(summary, indent=2))

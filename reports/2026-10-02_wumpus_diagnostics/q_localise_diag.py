@@ -35,7 +35,20 @@
 #             not defined: the learned branches include observations the exact belief rules out.)
 #    - Descriptive extras: at the turned child (the exact turn outcome), learned vs exact P(o2 | FORWARD):
 #      total variation, P(GAME_OVER), P(glitter); learned V at the stepped-into latents vs at the chosen child.
-#    - Usage: uv run python <this> <run dir> 512; results to <run>/analysis/q_localise.npz.
+#    - Usage: uv run python <this> <run dir> 512 [--states declined|accepted|all]; results to
+#      <run>/analysis/q_localise.npz (declined, the default) or q_localise_<states>.npz (section 5).
+#
+# 5. State sets (2026-11-14, submission audit W4; descriptive, no pass rule; the default is unchanged bit for bit):
+#    - Why: the declined states are selected by the planner's own choice, so some under-prediction of the informative
+#      observation there could be selection alone. Two control sets with the same distance-2 rule:
+#        accepted  the planner TOOK the heuristic's turn and its next action was FORWARD (the turn-then-step it declines
+#                  elsewhere, executed);
+#        all       every distance-2 near-turn state, whatever the planner chose.
+#    - At a state where the planner chose the turn there is no declined action; the comparison action ("chosen" in
+#      the arrays) is then the tree's best root action other than the turn (largest root Q), and chose_turn = 1.
+#      Q_mac > Q2(chosen) is then the depth-2 backup preferring the turn; the REVERSE FLIP share is, among those
+#      states where arm M prefers the turn, the share where arm EP prefers the other action.
+#    - The macro_reach.npz cross-check applies to the declined set only (that file holds the declined states).
 #
 # 3. Pre-registered readout (written 2026-10-17 before any run; 5 seeds, distance-2 states, share of
 #    Q_mac > Q2(chosen)):
@@ -84,7 +97,15 @@ from ipomdp.experiments.wumpus import WumpusAnalysisSettings
 from ipomdp.planning import BeliefTreeSearch
 from ipomdp.training import discounted_returns, play_episodes, stream_seed
 
-run_dir, n = Path(sys.argv[1]), int(sys.argv[2])
+argv = sys.argv[1:]
+STATES = "declined"                                           # section 5
+if "--states" in argv:
+    i = argv.index("--states")
+    STATES = argv[i + 1]
+    del argv[i:i + 2]
+if STATES not in ("declined", "accepted", "all"):
+    raise ValueError(f"--states must be declined, accepted or all, got {STATES!r}.")
+run_dir, n = Path(argv[0]), int(argv[1])
 dev = torch.device("cuda")
 settings = WumpusAnalysisSettings()
 trained = load_trained_run(run_dir, dev)
@@ -154,7 +175,10 @@ class Recorder:
         pit, wumpus, gold = m.pit.cpu().tolist(), m.wumpus.cpu().tolist(), m.gold.cpu().tolist()
         alive, done = m.wumpus_alive.tolist(), m.done.tolist()
         for b in range(n):
-            if done[b] or heuristic[b] not in TURNS or chosen[b] == heuristic[b]:
+            if done[b] or heuristic[b] not in TURNS:
+                continue
+            took_turn = chosen[b] == heuristic[b]
+            if (STATES == "declined" and took_turn) or (STATES == "accepted" and not took_turn):   # section 5
                 continue
             cell, heading = int(m.cell[b]), int(m.heading[b])
             if gold[b][cell] > 1.0 - _ZERO:
@@ -169,10 +193,16 @@ class Recorder:
             if target_distance(cell, heading, safe, goal) != 2:
                 continue
             root = planner.planner.roots[b]
-            q1_chosen = root.edges[chosen[b]].reward + GAMMA * sum(
-                p * c.leaf_value for p, c in zip(root.edges[chosen[b]].observation_probs, root.edges[chosen[b]].children))
+            other = chosen[b]
+            if took_turn:                                              # section 5: best root action other than the turn
+                q_root = planner.planner.statistics.q_values[b].copy()
+                q_root[heuristic[b]] = -np.inf
+                other = int(q_root.argmax())
+            q1_chosen = root.edges[other].reward + GAMMA * sum(
+                p * c.leaf_value for p, c in zip(root.edges[other].observation_probs, root.edges[other].children))
             own = s._own
-            self.rows.append({"game": b, "t": self.t, "chosen": chosen[b], "turn": heuristic[b], "z": state[b],
+            self.rows.append({"game": b, "t": self.t, "chosen": other, "turn": heuristic[b], "z": state[b],
+                              "chose_turn": int(took_turn),
                               "layouts": torch.nonzero(s._consistent[b]).squeeze(1),
                               "own": (int(own.cell[b]), int(own.heading[b]), bool(own.arrow[b]),
                                       bool(own.wumpus_alive[b])),
@@ -304,11 +334,17 @@ if n == settings.episodes:
     reported = json.loads((run_dir / "analysis" / "report.json").read_text())["returns"]["learned_planner"]
     if abs(reported["discounted_return"] - returns.mean()) > 1e-6:
         raise RuntimeError(f"Replay is not faithful: {returns.mean()} vs report.json {reported['discounted_return']}.")
-    saved = np.load(run_dir / "analysis" / "macro_reach.npz")
-    ref = saved["q1_chosen"][saved["distance"] == 2]
-    mine = np.array([r["q1_chosen"] for r in rec.rows])
-    if ref.shape != mine.shape or np.abs(ref - mine).max() > 1e-6:
-        raise RuntimeError(f"State selection differs from macro_reach.npz: {ref.shape} vs {mine.shape}.")
+    if STATES == "declined":                                   # section 5: macro_reach.npz holds the declined states
+        saved = np.load(run_dir / "analysis" / "macro_reach.npz")
+        ref = saved["q1_chosen"][saved["distance"] == 2]
+        mine = np.array([r["q1_chosen"] for r in rec.rows])
+        if ref.shape != mine.shape or np.abs(ref - mine).max() > 1e-6:
+            raise RuntimeError(f"State selection differs from macro_reach.npz: {ref.shape} vs {mine.shape}.")
+if STATES == "accepted":                                       # section 5: the turn was followed by FORWARD
+    actions = episodes.actions.cpu().numpy()
+    before = len(rec.rows)
+    rec.rows = [r for r in rec.rows if r["t"] + 1 < actions.shape[1] and actions[r["game"], r["t"] + 1] == FWD]
+    print(f"  accepted states: {len(rec.rows)} of {before} turn-taken states were followed by FORWARD", flush=True)
 
 res = analyse(rec.rows)
 if np.abs(res["q1_chosen_check"] - np.array([r["q1_chosen"] for r in rec.rows])).max() > 1e-2:
@@ -335,4 +371,21 @@ for a in range(NUM_A):
     if sel.any():
         print(f"  chosen {world.action_names[a]} ({sel.sum()}): learned - exact R(b, a): mean {res['dr_chosen'][sel].mean():+.2f}, "
               f"median {np.median(res['dr_chosen'][sel]):+.2f}; the turn's: mean {res['dr_turn'][sel].mean():+.2f}")
-np.savez(run_dir / "analysis" / "q_localise.npz", outcome=outcome, **res)
+chose_turn = np.array([r["chose_turn"] for r in rec.rows])
+if STATES != "declined":                                       # section 5: reverse flips at turn-taken states
+    sel = chose_turn == 1
+    if sel.any():
+        m_turn = res["q_mac_M"][sel] > res["q_cho_M"][sel]
+        for arm in ("EP", "EPR"):
+            reverse = (res[f"q_mac_{arm}"][sel] <= res[f"q_cho_{arm}"][sel]) & m_turn
+            print(f"  turn-taken states ({sel.sum()}): arm M prefers the turn at {m_turn.mean():.3f}; reverse flip "
+                  f"({arm} prefers the other action where M prefers the turn) {reverse.sum() / max(m_turn.sum(), 1):.3f}",
+                  flush=True)
+    ratio = res["p_glitter_fwd_model"].mean() / res["p_glitter_fwd_exact"].mean()
+    print(f"  {STATES} states ({len(rec.rows)}; turn taken {int(chose_turn.sum())}): joint glitter ratio at the turned "
+          f"child {ratio:.3f} (learned {res['p_glitter_fwd_model'].mean():.4f} / exact {res['p_glitter_fwd_exact'].mean():.4f})",
+          flush=True)
+if STATES == "declined":                                       # the default output, unchanged
+    np.savez(run_dir / "analysis" / "q_localise.npz", outcome=outcome, **res)
+else:
+    np.savez(run_dir / "analysis" / f"q_localise_{STATES}.npz", outcome=outcome, chose_turn=chose_turn, **res)
