@@ -2,6 +2,27 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## ORDER W11 (issued 2026-11-15 by the audit session; decision: the headline goes to ten held-out seeds; no world-model baseline)
+
+Register as PROTOCOL.md C-o before any run, then run through the week queue. Read ONCE, after all five new seeds of every part are finished; no partial reads.
+
+1. **Guard first (about 10 minutes).** Train the recipe on held-out seed 5 at current main for the first 5 collections and compare its per-collection metrics with the stored `runs/sweeps/wumpus_retrain_heldout/seed5/main.log`. They must be identical: the new seeds have to come from the same training code path as seeds 5-9. If they differ, stop and report.
+2. **Recipe on training seeds 10-14** (frozen command of "Frozen choices", `best.pt`), analysed on analysis seed 20261019 into `analysis_heldout/`, with the exact-planner games of that seed. A seed aborted by the guardrail or the driver fault is rerun from scratch, as before.
+3. **Model-free baseline on seeds 10-14** at the defaults (C-c, C-f and C-n all kept them), analysed the same way.
+4. **Exact one-step model in play (EPR) on the recipe's seeds 10-14**, held-out games, as `exact_model_play.py` section 6. This makes the localisation result a registered claim: on seeds 5-9 it was read without registration.
+
+Quantities (per seed values always printed; Student-t 95% on the per-seed or per-seed paired means is the interval the paper cites; the hierarchical and crossed bootstraps are printed beside it):
+- C-o.1 return of the recipe, with won / died / unfinished; gaps to the heuristic and to the exact-belief planner (paired per game).
+- C-o.2 recipe minus baseline, paired per game.
+- C-o.3 EPR minus learned, paired per game; deaths of EPR.
+- C-o.4 the C-b probes (cell, heading, pit error with the median constant) on random and own histories.
+
+Each quantity is reported three ways: seeds 10-14 alone (the replication), seeds 5-9 as already read, and all ten seeds 5-14 (the number the paper will cite). No pass threshold for C-o.1, C-o.2 and C-o.4. Prediction for C-o.3, stated before the run: the paired gain is positive on at least 4 of the 5 new seeds and the Student-t interval over the ten seeds excludes zero; either outcome is reported.
+
+Not part of this order: ablation arms on seeds 10-14 (the ablation table stays on seeds 5-9 and the paper says so); any world-model baseline.
+
+When done: add ledger ids for the ten-seed and the 10-14-only versions of every quantity above (the existing `heldout.*` ids stay as the 5-9 values), rerun the ledger, and report by message and here.
+
 ## How to reach the implementation session (2026-11-15)
 
 - **By message:** the WSL session that implements and runs jepa_ipomdp is named `execute-audit-augmentation-manifest` (a successor session may have another name; it announces itself when it starts). It polls every 2 hours and reads peer messages then.
