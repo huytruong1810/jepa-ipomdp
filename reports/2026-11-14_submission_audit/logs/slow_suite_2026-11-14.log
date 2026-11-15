@@ -1,0 +1,19 @@
+commit 3143a860d2d5c78c3805c7b97b389a5b0e71b2e3  started 2026-11-14 17:07:57
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0 -- /home/andyj1810/projects/jepa_ipomdp/.venv/bin/python
+rootdir: /home/andyj1810/projects/jepa_ipomdp
+configfile: pyproject.toml
+testpaths: tests
+plugins: hydra-core-1.3.3
+collecting ... collected 270 items / 263 deselected / 7 selected
+
+tests/test_domain.py::TestEndToEnd::test_infinite_horizon_value_and_policy PASSED [ 14%]
+tests/test_planner_and_agent.py::test_exact_model_planner_matches_optimal_policy_return PASSED [ 28%]
+tests/test_world_model_acceptance.py::test_belief_filter_encodes_exact_posterior PASSED [ 42%]
+tests/test_world_model_acceptance.py::test_reward_head_decodes_expected_reward PASSED [ 57%]
+tests/test_world_model_acceptance.py::test_observation_head_matches_exact_predictive PASSED [ 71%]
+tests/test_world_model_acceptance.py::test_value_head_approaches_optimal_value PASSED [ 85%]
+tests/test_world_model_acceptance.py::test_learned_model_planner_is_near_optimal PASSED [100%]
+
+================ 7 passed, 263 deselected in 1371.33s (0:22:51) ================
+finished 2026-11-14 17:33:35 rc=0

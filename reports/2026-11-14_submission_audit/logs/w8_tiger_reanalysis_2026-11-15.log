@@ -1,0 +1,54 @@
+commit 684c8c265642aa685682b8e53d56b5b413d60729
+runs/sweeps/polyak/seed0: optimal and learned_planner unchanged; changed returns {'decoded_linear': (15.384793271745728, 15.404721915573582), 'decoded_mlp': (18.65586481283787, 18.66598275224544)}
+runs/sweeps/polyak/seed1: optimal and learned_planner unchanged; changed returns {'decoded_linear': (11.84646747277084, 11.84475323950424), 'decoded_mlp': (18.003276782930893, 18.018933206601883)}
+runs/sweeps/polyak/seed2: optimal and learned_planner unchanged; changed returns {'decoded_linear': (15.954268421609347, 15.836211311487828), 'decoded_mlp': (18.261697235195424, 18.23668952239345)}
+runs/sweeps/polyak/seed3: optimal and learned_planner unchanged; changed returns {'decoded_linear': (8.648742815507198, 8.611183593871088), 'decoded_mlp': (18.640545485986735, 18.61335524720722)}
+runs/sweeps/polyak/seed4: optimal and learned_planner unchanged; changed returns {'decoded_linear': (13.649247297841889, 13.553460811067762), 'decoded_mlp': (17.666450117264453, 17.6905927509535)}
+
+polyak (tiger): 10 seeds [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], V*(b0) = 19.362
+  metric                                         mean   t 95% CI        std        IQM      IQM 95% bootstrap
+  return/optimal                              18.4762     0.0000     0.0000    18.4762 [  18.4762,   18.4762]
+  return/learned_planner                      18.4927     0.0576     0.0805    18.4774 [  18.4514,   18.5383]
+  return/decoded_mlp                          18.2726     0.2366     0.3308    18.2895 [  18.0529,   18.5400]
+  return/decoded_linear                       13.7724     1.9260     2.6924    14.2481 [  11.9251,   15.8182]
+  probe_kl/mlp_random                          0.0000     0.0000     0.0000     0.0000 [   0.0000,    0.0000]
+  probe_kl/linear_random                       0.0009     0.0003     0.0004     0.0009 [   0.0007,    0.0012]
+  probe_kl/mlp_agent                           0.0001     0.0000     0.0000     0.0001 [   0.0001,    0.0001]
+  probe_kl/linear_agent                        0.0005     0.0001     0.0001     0.0005 [   0.0004,    0.0006]
+  suboptimal_decisions/mlp_agent               0.0015     0.0002     0.0003     0.0015 [   0.0012,    0.0017]
+  suboptimal_decisions/linear_agent            0.0121     0.0020     0.0029     0.0117 [   0.0103,    0.0138]
+  minimality_ratio                             0.2786     0.0210     0.0294     0.2753 [   0.2581,    0.2955]
+  selection_score (biased)                    22.6474     0.9756     1.3637    22.4566 [  21.7883,   23.5991]
+  gap/learned_planner - optimal                0.0165     0.0576     0.0805     0.0012 [  -0.0248,    0.0621]
+  gap/decoded_mlp - optimal                   -0.2037     0.2366     0.3308    -0.1868 [  -0.4233,    0.0637]
+  gap/learned_planner - decoded_mlp            0.2201     0.2651     0.3705     0.2018 [  -0.0605,    0.4874]
+aggregate: /home/andyj1810/projects/jepa_ipomdp/runs/sweeps/polyak/aggregate.json
+runs/sweeps/decoder/seed0: optimal and learned_planner unchanged; changed returns {'decoded_linear': (17.007829394472974, 17.006191513360758)}
+runs/sweeps/decoder/seed1: optimal and learned_planner unchanged; changed returns {'decoded_linear': (13.34442501724886, 13.410555596342757), 'decoded_mlp': (18.68220794206065, 18.688612571148333)}
+runs/sweeps/decoder/seed2: optimal and learned_planner unchanged; changed returns {'decoded_linear': (11.31961602872111, 11.47654999236735), 'decoded_mlp': (18.76031697460374, 18.628102681917532)}
+runs/sweeps/decoder/seed3: optimal and learned_planner unchanged; changed returns {'decoded_linear': (16.79703266493167, 16.76738233926683), 'decoded_mlp': (18.46562241926354, 18.46567884546852)}
+runs/sweeps/decoder/seed4: optimal and learned_planner unchanged; changed returns {'decoded_linear': (12.78186132630016, 12.799660443680096), 'decoded_mlp': (17.29754010724212, 17.30849301054513)}
+
+decoder (tiger): 10 seeds [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], V*(b0) = 19.362
+  metric                                         mean   t 95% CI        std        IQM      IQM 95% bootstrap
+  return/optimal                              18.4762     0.0000     0.0000    18.4762 [  18.4762,   18.4762]
+  return/learned_planner                      18.4743     0.0733     0.1025    18.4711 [  18.4071,   18.5299]
+  return/decoded_mlp                          18.3846     0.3146     0.4397    18.5024 [  18.1705,   18.6527]
+  return/decoded_linear                       13.0334     3.1822     4.4484    13.9324 [  10.9613,   15.6014]
+  probe_kl/mlp_random                          0.0001     0.0000     0.0000     0.0000 [   0.0000,    0.0001]
+  probe_kl/linear_random                       0.0008     0.0001     0.0002     0.0008 [   0.0006,    0.0009]
+  probe_kl/mlp_agent                           0.0001     0.0000     0.0000     0.0001 [   0.0001,    0.0001]
+  probe_kl/linear_agent                        0.0006     0.0001     0.0001     0.0006 [   0.0005,    0.0007]
+  suboptimal_decisions/mlp_agent               0.0008     0.0002     0.0003     0.0009 [   0.0007,    0.0010]
+  suboptimal_decisions/linear_agent            0.0184     0.0044     0.0062     0.0190 [   0.0138,    0.0232]
+  minimality_ratio                             0.3030     0.0204     0.0285     0.2995 [   0.2825,    0.3255]
+  selection_score (biased)                    22.8726     0.9610     1.3434    22.7021 [  21.9798,   23.9035]
+  gap/learned_planner - optimal               -0.0020     0.0733     0.1025    -0.0051 [  -0.0691,    0.0537]
+  gap/decoded_mlp - optimal                   -0.0916     0.3146     0.4397     0.0262 [  -0.3057,    0.1765]
+  gap/learned_planner - decoded_mlp            0.0897     0.3101     0.4335    -0.0238 [  -0.1555,    0.2817]
+aggregate: /home/andyj1810/projects/jepa_ipomdp/runs/sweeps/decoder/aggregate.json
+ledger:
+| tiger.suboptimal_pct | 0.14 | 0.1452 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | DIFF |
+| tiger.bounds.policy_loss_bound_mean | 9.5 | 9.668 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | DIFF |
+
+225 claims, 223 OK, 2 not OK; 443 values computed (218 without a claim)

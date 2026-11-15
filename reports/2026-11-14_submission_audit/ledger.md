@@ -9,20 +9,20 @@
 | tiger.learned.gap_ci | 0.06 | 0.0576 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | tiger.optimal.return | 18.48 | 18.4762 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | tiger.optimal.value_b0 | 19.36 | 19.3618 | tab:tiger caption | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.mlp_agent.l1 | 0.004 | 0.00433 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.decoded_mlp.return | 18.27 | 18.2728 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.decoded_mlp.return_ci | 0.24 | 0.2422 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.decoded_mlp.gap | -0.2 | -0.2034 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.decoded_mlp.gap_ci | 0.24 | 0.2422 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.suboptimal_pct | 0.14 | 0.1439 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.linear_agent.l1 | 0.016 | 0.01611 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.decoded_linear.gap | -4.7 | -4.681 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.bounds.value_bound_mean | 0.24 | 0.2379 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.bounds.value_error_mean | 0.05 | 0.0460 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.bounds.regret_bound_mean | 0.48 | 0.4758 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.bounds.regret_mean | 0.001 | 0.00102 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.bounds.value_bound_max | 24 | 24.14 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.bounds.regret_bound_max | 48 | 48.28 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.mlp_agent.l1 | 0.004 | 0.00439 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.decoded_mlp.return | 18.27 | 18.2726 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.decoded_mlp.return_ci | 0.24 | 0.2366 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.decoded_mlp.gap | -0.2 | -0.2037 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.decoded_mlp.gap_ci | 0.24 | 0.2366 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.suboptimal_pct | 0.14 | 0.1452 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | DIFF |
+| tiger.linear_agent.l1 | 0.016 | 0.01613 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.decoded_linear.gap | -4.7 | -4.704 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.bounds.value_bound_mean | 0.24 | 0.2417 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.bounds.value_error_mean | 0.05 | 0.0461 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.bounds.regret_bound_mean | 0.48 | 0.4834 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.bounds.regret_mean | 0.001 | 0.00103 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.bounds.value_bound_max | 24 | 24.12 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.bounds.regret_bound_max | 48 | 48.23 | Results, Tiger paragraph / tab:tiger | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | tiger.decoder.gap | 0.0 | -0.0020 | Results, Tiger paragraph / tab:tiger | runs/sweeps/{polyak,decoder}/seed{0..9}/analysis/report.json | OK |
 | tiger.decoder.gap_ci | 0.07 | 0.0733 | Results, Tiger paragraph / tab:tiger | runs/sweeps/{polyak,decoder}/seed{0..9}/analysis/report.json | OK |
 | tiger.decoder_minus_jepa | -0.02 | -0.0185 | Results, Tiger paragraph / tab:tiger | runs/sweeps/{polyak,decoder}/seed{0..9}/analysis/report.json | OK |
@@ -200,10 +200,10 @@
 | heldout.sims100_minus_ours.t_hi | 7 | 6.75 | Localisation | runs/sweeps/wumpus_retrain_heldout/seed{5..9}/analysis_heldout/exact_play_learned_sims100.npz | OK |
 | heldout.sims10_minus_ours.t_lo | -46 | -46.44 | Localisation | runs/sweeps/wumpus_retrain_heldout/seed{5..9}/analysis_heldout/exact_play_learned_sims10.npz | OK |
 | heldout.sims10_minus_ours.t_hi | 2 | 1.65 | Localisation | runs/sweeps/wumpus_retrain_heldout/seed{5..9}/analysis_heldout/exact_play_learned_sims10.npz | OK |
-| tiger.bounds.value_bound_max_over_seeds | 43 | 42.97 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.bounds.regret_bound_max_over_seeds | 86 | 85.94 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.bounds.policy_loss_bound_mean | 9.5 | 9.516 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
-| tiger.mlp_random.l1 | 0.004 | 0.00377 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.bounds.value_bound_max_over_seeds | 43 | 42.99 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.bounds.regret_bound_max_over_seeds | 86 | 85.97 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.bounds.policy_loss_bound_mean | 9.5 | 9.668 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | DIFF |
+| tiger.mlp_random.l1 | 0.004 | 0.00376 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
 | dev.remedy.VE100.seed0 | -64 | -63.75 | Repairing the observation model | runs/wumpus/ve_screen/VE100_seed*.returns.npy vs runs/wumpus/ve_screen/control_seed*.returns.npy | OK |
 | dev.remedy.VE100.seed1 | 31 | 30.66 | Repairing the observation model | runs/wumpus/ve_screen/VE100_seed*.returns.npy vs runs/wumpus/ve_screen/control_seed*.returns.npy | OK |
 | dev.remedy.VE100.seed2 | 12 | 12.41 | Repairing the observation model | runs/wumpus/ve_screen/VE100_seed*.returns.npy vs runs/wumpus/ve_screen/control_seed*.returns.npy | OK |

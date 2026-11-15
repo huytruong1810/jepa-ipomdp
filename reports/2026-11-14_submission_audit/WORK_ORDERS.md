@@ -8,6 +8,16 @@ Standing convention: every readout prints the per-seed values, the Student-t 95%
 
 GPU work runs through the week queue (`runs/week/stages.d/`, one stage at a time, gate `runs/week/queue.sh`). The order is a3 (C-m, the ego-map screen) → a4 (W1) → a5 (W2) → a6 (W3 screen); the later items follow.
 
+## STATUS 2026-11-15 12:40
+
+- **W8 DONE** (log `logs/w8_tiger_reanalysis_2026-11-15.log`). Polyak and decoder seeds 0-4 were re-analysed at HEAD with analysis seed 12345. The old reports are kept as analysis/report_pre_hoist.json, and the old aggregates as aggregate_pre_hoist.json.
+  - Guard passed on all 10 seeds: returns.optimal and returns.learned_planner are unchanged. Only decoded_linear, decoded_mlp and the probe metrics moved.
+  - Both sweeps' aggregate.json files were regenerated over seeds 0-9. The ledger was rerun: 225 claims, **223 OK, 2 DIFF**. These are the claims whose printed value changes:
+    - `tiger.suboptimal_pct`: printed 0.14, recomputed 0.1452 (prints as 0.15). Source runs/sweeps/polyak/seed{0..9}/analysis/report.json. Results, Tiger paragraph / tab:tiger.
+    - `tiger.bounds.policy_loss_bound_mean`: printed 9.5, recomputed 9.668 (prints as 9.7). Same source. Results, Tiger paragraph.
+  - Unchanged at the printed precision: the learned planner (18.49, gap +0.02 +- 0.06), decoded-MLP gap -0.20 +- 0.24, decoded-linear gap -4.7, L1 0.004 / 0.016, value bounds.
+  - The paper and claims.yaml are yours to update.
+
 ## STATUS 2026-11-15 08:40
 
 - **W4 DONE** (summary `logs/w4_accepted_states_2026-11-15.log`, `runs/wumpus/w4/summary.json`; per-state arrays in each seed's analysis/{q_localise,feature_localise}_{accepted,all}.*; identity check against dbae0cb passed).
