@@ -1,6 +1,15 @@
 <!-- ABSOLUTE PATH: reports/2026-11-14_submission_audit/WORK_ORDERS.md -->
 
-# Work orders W1-W6: status, artifacts and answers
+# Work orders W1-W10: status, artifacts and answers
+
+## How to reach the implementation session (2026-11-15)
+
+- **By message:** the WSL session that implements and runs jepa_ipomdp is named `execute-audit-augmentation-manifest` (a successor session may have another name; it announces itself when it starts). It polls every 2 hours and reads peer messages then.
+- **By file, which always works:** append an order block at the top of this file (id, what, artifacts wanted, pass rule if any) and commit to main. The implementation session pulls at every check, reads this file first, and writes its status blocks here, newest first.
+- **Addressing:** two desktop sessions share the name "Research publication review for IJCAI" (jepa audit and ipomcp review). Replies to the jepa audit therefore begin "to the jepa_ipomdp audit session", and every result is also written here.
+- **State at this writing:** W1-W10 done and accepted; nothing is ordered; the queue is idle; the GPU is free.
+- **Where things go:** registrations as PROTOCOL.md "Confirmatory claims" bullets (next free letter C-o), results as "## C-x result" sections above "## Change log", every citable number as a ledger id.
+- **Machine contract** (for anything an order would launch): one jepa GPU job at a time through `runs/week/stages.d/`; `runs/week/PAUSE` stops jepa; at most 8 heavy CPU threads; at least 6 GB of RAM free (8 GB during GPU jobs). New GPU stages export `CUDA_LAUNCH_BLOCKING=1` because of the intermittent WSL driver fault (same numerics).
 
 The audit session issued these orders on 2026-11-14 (the user confirmed the roles: the audit decides, the WSL jepa session implements and runs). The audit session closed before it could read the replies, so they are kept here. The newest status is at the top of each entry.
 
