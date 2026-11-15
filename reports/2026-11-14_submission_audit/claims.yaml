@@ -236,3 +236,14 @@
 - {id: dev.fatal_into_deadly.seed1.share, paper: 0.83, decimals: 2, where: "Results, Wumpus World paragraph"}
 - {id: dev.remedy.VE100.glitter_change.seeds_lower, paper: 2, decimals: 0, where: "Repairing the observation model"}
 - {id: dev.remedy.VE25.glitter_change.seeds_repaired, paper: 0, decimals: 0, where: "Repairing the observation model"}
+- {id: dev.w4.accepted.glitter_ratio.min, paper: 0.96, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.w4.accepted.glitter_ratio.max, paper: 1.84, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.w4.all.glitter_ratio.min, paper: 0.33, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.w4.all.glitter_ratio.max, paper: 0.55, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.w4.all.share_M.min, paper: 0.19, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.w4.all.share_M.max, paper: 0.27, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.w4.all.share_EPR.min, paper: 0.57, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.w4.all.share_EPR.max, paper: 0.83, decimals: 2, where: "Results, Localisation paragraph"}
+- {id: dev.baseline.settings_tried, paper: 10, decimals: 0, where: "Reference agents"}
+- {id: dev.baseline.best_alternative_minus_defaults, paper: 4, decimals: 0, where: "Reference agents"}
+- {id: dev.baseline.n1_minus_defaults, paper: -11, decimals: 0, where: "Reference agents"}

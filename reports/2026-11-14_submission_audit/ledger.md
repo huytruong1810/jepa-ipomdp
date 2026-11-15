@@ -237,3 +237,14 @@
 | dev.fatal_into_deadly.seed1.share | 0.83 | 0.8333 | Results, Wumpus World paragraph | runs/wumpus/w5b/seed1_best.risk.npz (risk_localise.py replay of best.pt on the development games) | OK |
 | dev.remedy.VE100.glitter_change.seeds_lower | 2 | 2.00 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{VE100,ctl}_seed*.json | OK |
 | dev.remedy.VE25.glitter_change.seeds_repaired | 0 | 0.00 | Repairing the observation model | runs/sweeps/wumpus_retrain/seed*/analysis/feature_localise_{VE25,ctl}_seed*.json | OK |
+| dev.w4.accepted.glitter_ratio.min | 0.96 | 0.9619 | Results, Localisation paragraph | runs/wumpus/w4/summary.json (w4_accepted_states.py) | OK |
+| dev.w4.accepted.glitter_ratio.max | 1.84 | 1.8444 | Results, Localisation paragraph | runs/wumpus/w4/summary.json (w4_accepted_states.py) | OK |
+| dev.w4.all.glitter_ratio.min | 0.33 | 0.3338 | Results, Localisation paragraph | runs/wumpus/w4/summary.json (w4_accepted_states.py) | OK |
+| dev.w4.all.glitter_ratio.max | 0.55 | 0.5484 | Results, Localisation paragraph | runs/wumpus/w4/summary.json (w4_accepted_states.py) | OK |
+| dev.w4.all.share_M.min | 0.19 | 0.1917 | Results, Localisation paragraph | runs/wumpus/w4/summary.json (w4_accepted_states.py) | OK |
+| dev.w4.all.share_M.max | 0.27 | 0.2669 | Results, Localisation paragraph | runs/wumpus/w4/summary.json (w4_accepted_states.py) | OK |
+| dev.w4.all.share_EPR.min | 0.57 | 0.5670 | Results, Localisation paragraph | runs/wumpus/w4/summary.json (w4_accepted_states.py) | OK |
+| dev.w4.all.share_EPR.max | 0.83 | 0.8326 | Results, Localisation paragraph | runs/wumpus/w4/summary.json (w4_accepted_states.py) | OK |
+| dev.baseline.settings_tried | 10 | 10.00 | Reference agents | runs/baselines/<setting>/seed{0,1,2}/analysis/games.npz (recurrent_dqn.return) | OK |
+| dev.baseline.best_alternative_minus_defaults | 4 | 3.92 | Reference agents | runs/baselines/<setting>/seed{0,1,2}/analysis/games.npz (recurrent_dqn.return) (best: r2d2_lr1e-4_n10) | OK |
+| dev.baseline.n1_minus_defaults | -11 | -10.75 | Reference agents | runs/baselines/<setting>/seed{0,1,2}/analysis/games.npz (recurrent_dqn.return) | OK |
