@@ -66,9 +66,39 @@
 #      reported in SearchStatistics.max_pruned_mass.
 #    - observation_prune = 0 keeps every observation, zero-probability ones included, and does
 #      NOT renormalise: canonical Tiger's search is bit-identical to the unpruned search.
+#
+# 7. Cost of the Python Tree (2026-11-15; results bit-identical to the earlier implementation):
+#    - A Wumpus recipe seed spends about three quarters of its wall time in this module's Python,
+#      not on the GPU (profile_recipe.py). Four costs were removed without changing one number
+#      (checked by the GPU Wumpus fingerprint: every metric, parameter sum and the full-state hash):
+#        a. Children are created LAZILY. An expansion creates about 15 kept children per node, of
+#           which the search later visits one or two. An edge now holds the children's leaf values
+#           as plain floats and builds a DecisionNode only when the descent selects that child (or
+#           when `Edge.children` is read from outside, which materialises all of them).
+#        b. A node's state is a HANDLE (the expansion's next_states block and an index), turned into
+#           a tensor only when the node is expanded. The earlier code created a tensor view per
+#           child (about a thousand GPU-tensor views per simulation step that were never read).
+#        c. Selection works on Python floats: sqrt(N + 1) once per node, c_puct * P(a) once per
+#           search, a first-maximum loop for the argmax, and the cumulative branch probabilities
+#           cached per edge (bisect on a list). Each expression keeps its order of operations.
+#        d. Edge.refresh accumulates p * V^ in an explicit left-to-right loop.
+#    - What must NOT be "simplified" (each would change rounding):
+#        * Python 3.12's built-in sum() uses compensated summation for exact floats, while the
+#          earlier generator of np.float64 products was added plainly, left to right. The explicit
+#          `acc += p * v` loop is the same plain addition; sum() over Python floats is not.
+#        * The pruned mass and the renormalisation stay per-edge numpy calls on the compacted
+#          array: numpy's reduction is not a left-to-right sum, and its order depends on the length.
+#        * math.sqrt and np.sqrt agree (both correctly rounded), and a product of a Python float
+#          and an np.float64 is the same IEEE double product.
+#    - The model's contract is unchanged (one batched expand per simulation step; states are rows
+#      of next_states), so every SearchModel and wrapper works as before. Edge.refresh reads a
+#      materialised child's CURRENT value, so code that edits a child's leaf_value and refreshes
+#      the edge (reports/.../self_loop_diag.py) behaves as before.
 # ==============================================================================
 
+from bisect import bisect_right
 from dataclasses import dataclass, field
+import math
 
 import numpy as np
 import torch
@@ -95,15 +125,29 @@ class MinMaxStats:
         return 0.5
 
 
-@dataclass
 class DecisionNode:
-    """A belief (or latent) node; `edges` is None until the node is expanded."""
+    """A belief (or latent) node; `edges` is None until the node is expanded.
 
-    state: Tensor
-    leaf_value: float
-    visits: int = 0
-    edges: list["Edge"] | None = None
-    cached_value: float | None = None
+    The state is either a tensor (roots, nodes built by callers) or a handle into the expansion that created
+    the node (section 7b): `source[index]`, read through the `state` property only when it is needed.
+    """
+
+    __slots__ = ("_state", "_source", "_index", "leaf_value", "visits", "edges", "cached_value", "__dict__")
+
+    def __init__(self, state: Tensor | None, leaf_value: float, source: Tensor | None = None,
+                 index: tuple[int, ...] | None = None):
+        self._state, self._source, self._index = state, source, index
+        self.leaf_value = leaf_value
+        self.visits = 0
+        self.edges: list["Edge"] | None = None
+        self.cached_value: float | None = None
+
+    @property
+    def state(self) -> Tensor:
+        """The node's state tensor (materialised from the expansion block on first use)."""
+        if self._state is None:
+            self._state = self._source[self._index]
+        return self._state
 
     def value(self) -> float:
         """V^: max_a Q(s, a) once expanded (cached, see refresh), else the leaf estimate."""
@@ -114,20 +158,50 @@ class DecisionNode:
         self.cached_value = max(edge.q for edge in self.edges)
 
 
-@dataclass
 class Edge:
-    """Action edge (s, a): expected reward, observation distribution, one child per kept o (section 6)."""
+    """Action edge (s, a): expected reward, observation distribution, one child per kept o (sections 6 and 7)."""
 
-    reward: float
-    observation_probs: np.ndarray
-    observations: np.ndarray
-    children: list[DecisionNode]
-    visits: int = 0
-    q: float = 0.0
+    __slots__ = ("reward", "observation_probs", "observations", "visits", "q", "_probs", "_leaf_values", "_children",
+                 "_source", "_row", "_cumulative")
+
+    def __init__(self, reward: float, observation_probs: np.ndarray, observations: np.ndarray, leaf_values: list[float],
+                 source: Tensor, row: tuple[int, int]):
+        self.reward = reward
+        self.observation_probs = observation_probs          # kept (renormalised) probabilities, np.float64
+        self.observations = observations                    # the kept observation indices
+        self.visits = 0
+        self.q = 0.0
+        self._probs: list[float] = observation_probs.tolist()
+        self._leaf_values = leaf_values
+        self._children: list[DecisionNode | None] = [None] * len(leaf_values)
+        self._source, self._row = source, row
+        self._cumulative: list[float] | None = None
+
+    def child(self, k: int) -> DecisionNode:
+        """The k-th kept child, created on first use (section 7a)."""
+        node = self._children[k]
+        if node is None:
+            node = self._children[k] = DecisionNode(None, self._leaf_values[k], self._source,
+                                                    (*self._row, int(self.observations[k])))
+        return node
+
+    @property
+    def children(self) -> list[DecisionNode]:
+        """Every kept child as a node (materialises the ones the search never visited)."""
+        return [self.child(k) for k in range(len(self._children))]
+
+    def cumulative(self) -> list[float]:
+        """Cumulative kept probabilities for sampling a branch (np.cumsum once per edge, then a list)."""
+        if self._cumulative is None:
+            self._cumulative = np.cumsum(self.observation_probs).tolist()
+        return self._cumulative
 
     def refresh(self, discount: float) -> float:
-        """Recomputes and caches Q = R(s, a) + gamma * sum_o P(o | s, a) V^(child_o)."""
-        self.q = self.reward + discount * sum(p * c.value() for p, c in zip(self.observation_probs, self.children))
+        """Recomputes and caches Q = R(s, a) + gamma * sum_o P(o | s, a) V^(child_o) (left-to-right, section 7)."""
+        acc = 0.0
+        for p, leaf, node in zip(self._probs, self._leaf_values, self._children):
+            acc += p * (leaf if node is None else node.value())
+        self.q = self.reward + discount * acc
         return self.q
 
 
@@ -206,22 +280,25 @@ class BeliefTreeSearch:
                     mass = kept_probs[kept].sum()
                     self._max_pruned_mass = max(self._max_pruned_mass, 1.0 - mass / kept_probs.sum())
                     kept_probs = kept_probs[kept] / mass
-                node.edges.append(Edge(reward=float(rewards[i, a]), observation_probs=kept_probs, observations=kept,
-                                       children=[DecisionNode(next_states[i, a, o], float(values[i, a, o]))
-                                                 for o in kept]))
+                node.edges.append(Edge(float(rewards[i, a]), kept_probs, kept, values[i, a][kept].tolist(),
+                                       next_states, (i, a)))
             for edge in node.edges:
                 node_stats.update(edge.refresh(self.model.discount))
             node.refresh()
 
-    def _select(self, node: DecisionNode, prior: np.ndarray, stats: MinMaxStats) -> int:
-        """PUCT action selection (module header, section 3)."""
-        total_visits = sum(edge.visits for edge in node.edges)
-        scores = [
-            stats.normalize(edge.q)
-            + self.c_puct * prior[a] * np.sqrt(total_visits + 1) / (1 + edge.visits)
-            for a, edge in enumerate(node.edges)
-        ]
-        return int(np.argmax(scores))
+    def _select(self, node: DecisionNode, c_prior: list[float], stats: MinMaxStats) -> int:
+        """PUCT action selection (module header, section 3); `c_prior` holds c_puct * P(a) (section 7c)."""
+        edges = node.edges
+        total_visits = 0
+        for edge in edges:
+            total_visits += edge.visits
+        root = math.sqrt(total_visits + 1)
+        best, best_score = 0, -math.inf
+        for a, edge in enumerate(edges):
+            score = stats.normalize(edge.q) + c_prior[a] * root / (1 + edge.visits)
+            if score > best_score:                        # strict: the first maximum, as np.argmax
+                best, best_score = a, score
+        return best
 
     @torch.no_grad()
     def search(self, root_states: Tensor, temperature: float) -> Tensor:
@@ -248,18 +325,21 @@ class BeliefTreeSearch:
             for _ in range(num_roots)
         ]
 
+        # c_puct * P(a) once per search, as Python floats (section 7c): the same product the score computed first.
+        c_uniform = [self.c_puct * p for p in uniform.tolist()]
+        c_priors = [[self.c_puct * p for p in prior.tolist()] for prior in priors]
+        random = self.rng.random
         depths = []
         for _ in range(self.num_simulations):
             paths, leaves = [], []
-            for root, prior, root_stats in zip(roots, priors, stats):
+            for root, c_prior, root_stats in zip(roots, c_priors, stats):
                 node, path = root, []
                 while node.edges is not None:
-                    edge = node.edges[self._select(node, prior if node is root else uniform, root_stats)]
-                    cumulative = np.cumsum(edge.observation_probs)
-                    observation = min(int(np.searchsorted(cumulative, self.rng.random() * cumulative[-1], side="right")),
-                                      len(edge.children) - 1)
+                    edge = node.edges[self._select(node, c_prior if node is root else c_uniform, root_stats)]
+                    cumulative = edge.cumulative()
+                    observation = min(bisect_right(cumulative, random() * cumulative[-1]), len(cumulative) - 1)
                     path.append((node, edge))
-                    node = edge.children[observation]
+                    node = edge.child(observation)
                 paths.append(path)
                 leaves.append(node)
                 depths.append(len(path))
