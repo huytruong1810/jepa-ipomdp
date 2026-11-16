@@ -11,6 +11,9 @@
 #   runs/week/aborted/ and the seed reruns from scratch after the gate (training is deterministic per seed). Any other
 #   failure is returned unchanged (fail loudly). At most 5 attempts per seed; every move is logged to
 #   runs/week/aborted.log.
+# - The WSL driver fault ("CUDA error: unknown error" in sweep.py's stderr) is handled the same way: a seed that was
+#   still training is moved to runs/week/aborted/ and rerun from scratch; if the seed was already trained, the
+#   analysis is retried. Both count towards the 5 attempts.
 # - The first call of every sweep has a one-seed prefix, and sweep.py's in-process aggregate refuses a Student-t
 #   interval over one seed ("needs at least 2 seeds") AFTER that seed has trained and been analysed (both stages 50 and
 #   60 failed on this, 2026-11-02 22:11). That one error is accepted, and only when the prefix is one seed and the seed
@@ -38,6 +41,20 @@ sweep_retry() {
          && [ -e "$d/TRAINED" ] && [ -e "$d/$out/report.json" ]; then
         echo "sweep_retry: one-seed prefix $prefix trained and analysed; aggregate deferred to the next seed" >&2
         ok=1; break
+      fi
+      # WSL driver fault ("CUDA error: unknown error", intermittent since 2026-11-14): not a property of the run.
+      # A seed that was still training is moved aside and rerun from scratch, like a guardrail abort; a seed that
+      # was already TRAINED (the fault hit the analysis) is simply analysed again by the next attempt.
+      if grep -q "CUDA error: unknown error" $errlog; then
+        d=runs/sweeps/$name/seed$seed
+        if [ -d "$d" ] && [ ! -e "$d/TRAINED" ]; then
+          local to=runs/week/aborted/${name}_$(basename $d)_cudafault_$(date +%Y%m%d_%H%M%S)
+          mv "$d" "$to"
+          echo "[$(date '+%F %T')] CUDA driver fault: moved $d -> $to (attempt $attempt)" >> runs/week/aborted.log
+        else
+          echo "[$(date '+%F %T')] CUDA driver fault after training of $d: retrying the analysis (attempt $attempt)" >> runs/week/aborted.log
+        fi
+        continue
       fi
       moved=0
       for d in runs/sweeps/$name/seed*; do
