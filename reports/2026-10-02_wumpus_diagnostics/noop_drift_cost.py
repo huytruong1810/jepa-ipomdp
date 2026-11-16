@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Question (2026-10-15, after noop_drift_diag.py found the current recipe's latent moving 4-7x more on
+# 1. Question (2026-10-15, after noop_drift_diag.py (removed 2026-11-15, recorded in REMOVED_DIAGNOSTICS.md) found the current recipe's latent moving 4-7x more on
 #    exact no-ops than the oracle recipe's): is that drift where the agent's cell/heading information goes,
 #    which would make a no-op consistency term an R1 arm?
 # 2. Method (usage: uv run python <this> <run dir>; GPU, ~25 s): the cached pool runs/wumpus/supervised_filter/

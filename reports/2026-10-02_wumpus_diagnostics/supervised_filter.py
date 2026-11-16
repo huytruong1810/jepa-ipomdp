@@ -6,7 +6,7 @@
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
 # 1. Question (design decision, 2026-10-03):
 #    - Neither JEPA nor the decoder makes the danger ahead decodable from the latent
-#      (danger_probe.py). Is that the TRAINING OBJECTIVE or the ARCHITECTURE / CAPACITY?
+#      (danger_probe.py; removed 2026-11-15, recorded in REMOVED_DIAGNOSTICS.md). Is that the TRAINING OBJECTIVE or the ARCHITECTURE / CAPACITY?
 #    - Train the very same BeliefFilter (the trained runs' latent_dim, hidden_dim, num_blocks)
 #      directly on privileged exact targets from the enumeration filter. If it learns them well,
 #      the architecture suffices and the objectives are the bottleneck; if it cannot, the

@@ -22,7 +22,7 @@
 #      b. the planning model's death prediction: P_hat(GAME_OVER | z, FORWARD) from the acting
 #         observation head against the exact danger ahead, overall and in the safe and
 #         certain-death bins. This is what the planner's step decisions depend on.
-#    - Output: "RESULT name value" lines after training (parsed by ab_summary.py), plus
+#    - Output: "RESULT name value" lines after training (once parsed by ab_summary.py, removed 2026-11-15 and recorded in REMOVED_DIAGNOSTICS.md), plus
 #      "RESULT@<updates> name value" lines at the --score-at update counts (learning curves).
 #
 # 2b. Overfitting A/B (design decision, 2026-10-06; head_shift.py found the jointly trained filter and

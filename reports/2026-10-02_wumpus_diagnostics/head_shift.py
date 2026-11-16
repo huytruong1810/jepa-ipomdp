@@ -5,7 +5,7 @@
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
 # 1. Question (design decision 2026-10-05, after the combined-fix run failed):
-#    - greedy_deaths.py showed that on the greedy planner's own histories the acting observation
+#    - greedy_deaths.py (removed 2026-11-15, recorded in REMOVED_DIAGNOSTICS.md) showed that on the greedy planner's own histories the acting observation
 #      head predicts P(GAME_OVER | z, FORWARD) ~ 0.01 at FORWARD steps that kill 57-97% of the
 #      time, while it reads 0.5-0.9 at such dangers on random/reference histories. Which of these
 #      explains it?
