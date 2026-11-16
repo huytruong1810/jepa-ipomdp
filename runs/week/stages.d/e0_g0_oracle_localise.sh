@@ -24,6 +24,9 @@ R0=runs/wumpus/u64_store_eval_eps_decoder_k5_privileged_double_seed0
 step smoke_seed0 "smoke seed 0" .venv/bin/python $D/exact_model_play.py $R0 smoke:EPR
 for s in 0 1 2; do
   R=runs/wumpus/u64_store_eval_eps_decoder_k5_privileged_double_seed$s
+  # Prerequisite of the next two scripts: they cross-check their declined states against macro_reach.npz (the first
+  # attempt of this stage failed on seed 0 because the oracle runs never had that file).
+  step macro_seed$s   "macro_reach seed $s"      .venv/bin/python $D/macro_reach_diag.py $R 512
   step fl_seed$s      "feature_localise seed $s" .venv/bin/python $D/feature_localise.py $R cuda
   step q_seed$s       "q_localise seed $s"       .venv/bin/python $D/q_localise_diag.py $R 512
   step learned_seed$s "learned play seed $s"     .venv/bin/python $D/exact_model_play.py $R learned
