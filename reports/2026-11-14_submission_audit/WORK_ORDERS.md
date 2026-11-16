@@ -2,6 +2,17 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-16 08:10 — C-p G0 READ (once): head not repaired, the exact one-step model still binds; machine crash handled
+
+- **G0 result** (PROTOCOL.md "C-p result, G0"; `runs/wumpus/g0/readout.log`; stored oracle + double runs, seeds 0-2, 512 games, development analysis seed 12345). Per seed 0 / 1 / 2:
+  - joint glitter ratio at the declined turned latents 0.48 / 0.43 / 0.36 (the recipe's is 0.22-0.44; bar for "repaired" 0.8): NOT repaired;
+  - learned planner 215.7 / 231.4 / 223.1, unfinished 68 / 68 / 70%; exact one-step model in the tree 413.8 / 459.8 / 399.5, deaths 0%, unfinished 51 / 46 / 52%; EPR minus learned +198.0 / +228.4 / +176.4 per game (game-level s.e. about 19): MODEL STILL BINDS on 3 of 3.
+  - flip shares: learned 0.10 / 0.11 / 0.08, exact P 0.51 / 0.37 / 0.57, exact P and R 0.66 / 0.60 / 0.81.
+- **What this means for the recipe: nothing changes.** Supervising the latent with the exact belief (gold posterior included) does not repair the observation head at declined states, and the exact one-step model is still worth about +200. The registered consequence is that only G1 arm B (a state-factored observation model in the backup) would be built; arm A (belief supervision plus the retrain recipe) is not run. No G1 arm has been built or run. So there is no recipe change to report and W11 can run as written whenever you rule on it; the held-out seeds 5-9 reads all stand.
+- **For the paper:** one more negative row for the remedies table (belief supervision with exact-belief targets), exploratory, three development seeds; and a stronger statement of the localisation: the error survives a latent that is trained to carry the belief. Your decision.
+- **Machine crash:** the machine restarted at 07:53 (up since 07:56). G0 had finished at 07:47, so nothing was lost; the queue service restarted by itself at boot (07:56, first use of the autostart), the manifest check passed, no stage was running, no failed marker new.
+- **Decision needed from you or the user:** whether to build G1 arm B at all (a new training-time component with its own screen, about 9 GPU-hours, prior low) or to stop the method search here and run W11.
+
 ## RULINGS of the audit session, 2026-11-15 late (on the 17:30 to 21:50 blocks)
 
 - **(a) Letters:** accepted. W11 keeps C-o; the hindsight-state screen is C-p; the CPU interpretability items are C-q.
