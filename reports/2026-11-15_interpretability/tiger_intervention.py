@@ -37,6 +37,13 @@
 #      the figure, the planner's action shares per bin of the written belief with the exact thresholds.
 #    - No pass rule (descriptive). Expectation stated before the run: write-in and replace flip the
 #      action on most of the flip set; the random direction does not.
+# 2b. Amendment after the smoke on seed 0 (2026-11-15, before the ten-seed run): the random direction
+#      "flipped" 48% of the flip set (write-in 83%, replace 100%). A perturbed latent falls back to
+#      LISTEN, and LISTEN is the optimal action of many written beliefs, so the pooled flip rate does
+#      not separate the control. The flip rate is therefore also reported on three subsets of the flip
+#      set: the written belief asks for LISTEN (to_listen), for a door (to_door), and for the other
+#      door than the source's (door_swap). The discriminating subsets are to_door and door_swap: a
+#      random direction should not open the right door. The pooled rate is still reported.
 #
 # 3. Usage (CPU, a few minutes for ten seeds):
 #      CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=4 nice -n 19 .venv/bin/python \
@@ -89,7 +96,7 @@ def fit_belief_to_latent(beliefs: torch.Tensor, latents: torch.Tensor, seed: int
         def forward(self, b: torch.Tensor) -> torch.Tensor:
             return net(log_odds(b) / 6.0) * std + mean
 
-    fitted = Map(); fitted.residual = float(loss)
+    fitted = Map(); fitted.residual = float(loss.detach())
     return fitted
 
 
@@ -122,8 +129,13 @@ def main() -> None:
         optimal_source = q_values(action_values, b).argmax(-1).numpy()
         optimal_target = q_values(action_values, target).argmax(-1).numpy()
         flip = optimal_source != optimal_target
+        listen = next(i for i, name in enumerate(names) if "listen" in name.lower())
+        # Section 2b: the flip set split by what the written belief asks for.
+        subsets = {"to_listen": flip & (optimal_target == listen), "to_door": flip & (optimal_target != listen),
+                   "door_swap": flip & (optimal_target != listen) & (optimal_source != listen)}
         model = run.eval_agent.model
-        result = {"rows": ROWS, "flip_set": int(flip.sum()), "mu_fit_mse": mu.residual, "arms": {}}
+        result = {"rows": ROWS, "flip_set": int(flip.sum()), "mu_fit_mse": mu.residual, "arms": {},
+                  "subset_sizes": {name: int(subset.sum()) for name, subset in subsets.items()}}
         saved = {"belief_source": b[:, 0].numpy(), "belief_target": target[:, 0].numpy(),
                  "optimal_source": optimal_source, "optimal_target": optimal_target}
         for arm, latents in arms.items():
@@ -135,6 +147,9 @@ def main() -> None:
                                    "stays_at_source": float((action[flip] == optimal_source[flip]).mean()),
                                    "agreement_with_target": float((action == optimal_target).mean()),
                                    "probe_l1_to_target": readback}
+            for name, subset in subsets.items():
+                result["arms"][arm][f"flip_rate_{name}"] = (float((action[subset] == optimal_target[subset]).mean())
+                                                            if subset.any() else float("nan"))
             saved[f"action_{arm}"] = action
         np.savez(OUT / f"{sweep}_seed{seed}.npz", **saved)
         summary[seed] = result
@@ -144,8 +159,10 @@ def main() -> None:
 
     aggregate = {}
     for arm in ("none", "write_in", "replace", "random"):
-        for key in ("flip_rate", "stays_at_source", "agreement_with_target", "probe_l1_to_target"):
+        for key in ("flip_rate", "flip_rate_to_listen", "flip_rate_to_door", "flip_rate_door_swap", "stays_at_source",
+                    "agreement_with_target", "probe_l1_to_target"):
             values = np.array([summary[s]["arms"][arm][key] for s in seeds])
+            values = values[~np.isnan(values)]
             half = float(stats.t.ppf(0.975, len(values) - 1) * values.std(ddof=1) / np.sqrt(len(values))) if len(values) > 1 else float("nan")
             aggregate[f"{arm}.{key}"] = {"mean": float(values.mean()), "t95": half, "min": float(values.min()), "max": float(values.max())}
     for key, value in aggregate.items():
