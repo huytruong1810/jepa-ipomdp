@@ -76,7 +76,7 @@ gate() {
     fi
     [ $said = 0 ] && { qlog "gate waiting ($why)"; said=1; }
     echo "$why" > $W/.gate
-    sleep $POLL
+    sleep $POLL 9>&-
   done
 }
 
@@ -102,6 +102,7 @@ export -f gate gstep qlog
 
 heartbeat() {
   local qpid=$1 n=0 stalled=0 st stage since exp spid mem gpu util load end busy
+  exec 9>&-   # the heartbeat must not hold the queue's lock: a killed queue frees it at once
   while kill -0 $qpid 2>/dev/null; do
     mem=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
     IFS=', ' read -r gpu util < <(nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv,noheader,nounits 2>/dev/null | head -1)
@@ -147,7 +148,7 @@ set_state() { echo "$1" > $W/.state; }
 
 set_state "idle||||"
 rm -f $W/.gate
-heartbeat $$ 9>&- &
+heartbeat $$ &
 qlog "queue start, pid $$, commit $(git log -1 --format=%h), poll ${POLL}s"
 idle_said=0
 while :; do
@@ -164,7 +165,7 @@ while :; do
     else
       rm -f $W/PAUSED_ACK
     fi
-    sleep $POLL
+    sleep $POLL 9>&-
     continue
   fi
   idle_said=0
@@ -185,7 +186,7 @@ while :; do
     deadline=$(( $(date +%s) + tmo * ${QUEUE_TIMEOUT_UNIT_SECONDS:-3600} ))
     timed_out=0
     while kill -0 $spid 2>/dev/null; do
-      sleep 5
+      sleep 5 9>&-
       now=$(date +%s)
       if [ $timed_out = 0 ] && [ $now -ge $deadline ]; then
         timed_out=1; kill_at=$((now + 600))
