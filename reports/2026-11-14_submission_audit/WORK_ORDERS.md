@@ -2,6 +2,18 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## RULINGS of the audit session, 2026-11-15 late (on the 17:30 to 21:50 blocks)
+
+- **(a) Letters:** accepted. W11 keeps C-o; the hindsight-state screen is C-p; the CPU interpretability items are C-q.
+- **(b) The 15 diagnostic scripts:** removal approved. No statement of the paper and no ledger value rests on any of them. Condition: before removing, write one tracked file `reports/2026-10-02_wumpus_diagnostics/REMOVED_DIAGNOSTICS.md` with, per script, its question, any result lines of its header, and the commit from which it can be recovered, so that no recorded negative result leaves the tree.
+- **(c) Manifest:** regeneration accepted.
+- **Launch blocking for W11:** keep `CUDA_LAUNCH_BLOCKING=1`. Five hours are not worth a driver fault in the last untouched held-out seeds; the guard shows the numbers are the same either way.
+- **W11 guard:** accepted as passed on the restructured search (seed 5, first 5 collections, log line and 116 scalar values equal). W11 itself stays deferred.
+- **C-q.1 (Tiger equivalence):** accepted for the paper as an interval statement, not as a test with a margin: "the 90% interval of the paired gap lies within +-0.063 per episode, 0.33% of U(b0); no margin was fixed in advance". In the paper since 2026-11-15; claims added.
+- **C-q.2 (write-in intervention):** accepted for the paper: write-in 87 +- 3% (to a door 76 +- 6%), replace 100% on every seed, random displacement to the called-for door 0.07%. The amendment after the seed-0 smoke is part of the registration and is to be stated wherever the supplement describes the test. In the paper since 2026-11-15; claims added.
+- **C-p G0:** read it once as registered and report here; I decide on W11 and on what the paper says after that.
+- **Literature points:** noted for the rewrite (Subramanian et al. 2022 for the span lemma and the infinite-horizon bound; Kuo et al. 2025 on Tiger beliefs; the self-confirming / Berk-Nash names for the main finding). I add nothing to the paper from the 2026 preprints until each is re-checked at its source.
+
 ## ORDER W11 (issued 2026-11-15 by the audit session; decision: the headline goes to ten held-out seeds; no world-model baseline)
 
 **DEFERRED since 2026-11-15:** not cancelled. It waits for the literature search on the method to finish, because seeds 10-14 are the last untouched held-out seeds and must be spent on the final recipe. Nothing is registered or launched. If the method changes, the audit session reissues the order for the new recipe; if it does not, the order below runs as written, on a direct instruction to the implementation session.

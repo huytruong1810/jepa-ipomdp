@@ -247,3 +247,11 @@
 - {id: dev.baseline.settings_tried, paper: 10, decimals: 0, where: "Reference agents"}
 - {id: dev.baseline.best_alternative_minus_defaults, paper: 4, decimals: 0, where: "Reference agents"}
 - {id: dev.baseline.n1_minus_defaults, paper: -11, decimals: 0, where: "Reference agents"}
+- {id: tiger.learned.gap_equivalence_margin, paper: 0.063, decimals: 3, where: "Results, Tiger paragraph"}
+- {id: tiger.learned.gap_equivalence_margin_pct_vstar, paper: 0.33, decimals: 2, where: "Results, Tiger paragraph"}
+- {id: tiger.intervention.write_in.flip_rate_pct, paper: 87, decimals: 0, where: "Results, Tiger paragraph"}
+- {id: tiger.intervention.write_in.flip_rate_pct_ci, paper: 3, decimals: 0, where: "Results, Tiger paragraph"}
+- {id: tiger.intervention.write_in.flip_rate_to_door_pct, paper: 76, decimals: 0, where: "Results, Tiger paragraph"}
+- {id: tiger.intervention.write_in.flip_rate_to_door_pct_ci, paper: 6, decimals: 0, where: "Results, Tiger paragraph"}
+- {id: tiger.intervention.replace.flip_rate_pct_min, paper: 100, decimals: 0, where: "Results, Tiger paragraph"}
+- {id: tiger.intervention.random.flip_rate_to_door_pct, paper: 0.07, decimals: 2, where: "Results, Tiger paragraph"}

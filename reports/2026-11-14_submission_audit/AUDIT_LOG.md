@@ -90,3 +90,11 @@ Four reviewers read the code without the audit's conclusions; every finding acte
 | F2 | FIXED | Nearest prior work missing from the related-work section: belief-space planning with learned policy and value (BetaZero), predictive state representations, belief decoding from recurrent agents (Guo et al. 2018; Gregor et al. 2019), the simulation lemma (Kearns and Singh 2002), resets at a high replay ratio (D'Oro et al. 2023). | six verified entries added and cited, one sentence each |
 | F3 | OPEN | IJCAI 2027 call: 7 pages of body plus 2 of references, anonymous, supplement of at most 50 MB that reviewers need not read; reproducibility checklist asks for the hyperparameter values tried and the selection criterion, and the computing infrastructure; the call restricts the use of language models to polishing text the authors wrote. | conversion to the IJCAI template; author to confirm compliance with the language-model policy |
 
+## H. Additions after the audit (2026-11-15)
+
+| # | Status | What | Evidence |
+|---|---|---|---|
+| H1 | IN PAPER | Tiger: the 90% interval of the learned planner's paired gap lies within +-0.063 per episode (0.33% of U(b0)); stated without a pre-declared margin. | ledger `tiger.learned.gap_equivalence_margin*` (`PROTOCOL.md` C-q.1) |
+| H2 | IN PAPER | Tiger: an intervention on the latent. Moving the belief-coded component to another belief changes the planner's action to the written belief's optimal action in 87 +- 3% of the cases where the actions differ (76 +- 6% when it opens a door); replacing the latent by the map's image, in all; a random displacement of the same length, 0.07% to the called-for door. The subsets were added after a one-seed smoke, before the ten-seed run. | ledger `tiger.intervention.*` (`PROTOCOL.md` C-q.2; `reports/2026-11-15_interpretability/tiger_intervention.py`) |
+| H3 | DEFERRED | The headline on ten held-out seeds (order W11, `PROTOCOL.md` C-o reserved). Waits for the method screen C-p to read out; the guard for the training code path has passed. | `WORK_ORDERS.md` |
+

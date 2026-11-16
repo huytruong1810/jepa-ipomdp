@@ -248,3 +248,11 @@
 | dev.baseline.settings_tried | 10 | 10.00 | Reference agents | runs/baselines/<setting>/seed{0,1,2}/analysis/games.npz (recurrent_dqn.return) | OK |
 | dev.baseline.best_alternative_minus_defaults | 4 | 3.92 | Reference agents | runs/baselines/<setting>/seed{0,1,2}/analysis/games.npz (recurrent_dqn.return) (best: r2d2_lr1e-4_n10) | OK |
 | dev.baseline.n1_minus_defaults | -11 | -10.75 | Reference agents | runs/baselines/<setting>/seed{0,1,2}/analysis/games.npz (recurrent_dqn.return) | OK |
+| tiger.learned.gap_equivalence_margin | 0.063 | 0.06316 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.learned.gap_equivalence_margin_pct_vstar | 0.33 | 0.3262 | Results, Tiger paragraph | runs/sweeps/polyak/seed{0..9}/analysis/report.json | OK |
+| tiger.intervention.write_in.flip_rate_pct | 87 | 87.40 | Results, Tiger paragraph | runs/interpretability/tiger_intervention/polyak.json | OK |
+| tiger.intervention.write_in.flip_rate_pct_ci | 3 | 2.88 | Results, Tiger paragraph | runs/interpretability/tiger_intervention/polyak.json | OK |
+| tiger.intervention.write_in.flip_rate_to_door_pct | 76 | 75.87 | Results, Tiger paragraph | runs/interpretability/tiger_intervention/polyak.json | OK |
+| tiger.intervention.write_in.flip_rate_to_door_pct_ci | 6 | 5.72 | Results, Tiger paragraph | runs/interpretability/tiger_intervention/polyak.json | OK |
+| tiger.intervention.replace.flip_rate_pct_min | 100 | 100.00 | Results, Tiger paragraph | runs/interpretability/tiger_intervention/polyak.json | OK |
+| tiger.intervention.random.flip_rate_to_door_pct | 0.07 | 0.0699 | Results, Tiger paragraph | runs/interpretability/tiger_intervention/polyak.json | OK |
