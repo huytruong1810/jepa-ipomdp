@@ -150,8 +150,3 @@ class FinitePOMDP:
         Used to size the two-hot value/reward bins (src/ipomdp/models/distributions.py).
         """
         return float(self.reward.abs().max()) / (1.0 - self.discount)
-
-    @property
-    def reward_range(self) -> tuple[float, float]:
-        """(min, max) immediate reward over all (s, a); used by value-error bounds."""
-        return float(self.reward.min()), float(self.reward.max())

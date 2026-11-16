@@ -51,7 +51,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="runs/wumpus/north50_seed0/.hydra/config.yaml")
+    parser.add_argument("--config", required=True,
+                        help="resolved Hydra config of the run whose recipe is trained, e.g. <run>/.hydra/config.yaml (no default: an implicit old run would be a hidden dependency)")
     parser.add_argument("--pool-cache", type=Path, required=True)
     parser.add_argument("--filter-steps", type=int, default=6000)
     parser.add_argument("--head-steps", type=int, default=6000)

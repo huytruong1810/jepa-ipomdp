@@ -138,7 +138,8 @@ class TransformerFilter(nn.Module):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="runs/wumpus/north50_seed0/.hydra/config.yaml")
+    parser.add_argument("--config", required=True,
+                        help="resolved Hydra config of the run whose recipe is trained, e.g. <run>/.hydra/config.yaml (no default: an implicit old run would be a hidden dependency)")
     parser.add_argument("--games", type=int, default=4096, help="Training games per behaviour policy.")
     parser.add_argument("--steps", type=int, default=3000)
     parser.add_argument("--batch", type=int, default=64)

@@ -12,7 +12,13 @@ __pycache__/
 runs/
 *.tmp
 
+# PNG previews written beside the paper figures (the PDFs are the figures).
+reports/2026-11-03_paper_figures/*.png
+
 # Claude Code working documents (local only, never committed).
 CLAUDE.md
 HANDOFF.md
 .claude/
+
+# Archive of historical HANDOFF sections (local only).
+HANDOFF_ARCHIVE.md
