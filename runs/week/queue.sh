@@ -110,7 +110,8 @@ heartbeat() {
     echo "$(date '+%F %T') mem_avail_mb=$mem gpu_used_mib=$gpu gpu_util_pct=$util load=$load" >> $W/machine.log
     IFS='|' read -r st stage since exp spid < $W/.state
     end=""
-    [ -n "$exp" ] && [ -n "$since" ] && end=$(date -d "$since + $(awk -v h="$exp" 'BEGIN {print int(h * 60)}') minutes" '+%F %T' 2>/dev/null)
+    # Epoch arithmetic: GNU date reads "<time> + 42 minutes" as a time-zone offset and fails.
+    [ -n "$exp" ] && [ -n "$since" ] && end=$(date -d "@$(( $(date -d "$since" +%s) + $(awk -v h="$exp" 'BEGIN {print int(h * 3600)}') ))" '+%F %T' 2>/dev/null)
     busy=none; [ -e $W/GPU_BUSY ] && busy=$(head -1 $W/GPU_BUSY)
     {
       echo "project=jepa_ipomdp"
