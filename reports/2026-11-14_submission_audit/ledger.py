@@ -102,6 +102,21 @@ def outcomes(returns: np.ndarray) -> dict[str, float]:
     return {"won": 100 * won.mean(), "died": 100 * died.mean(), "unfinished": 100 * (~won & ~died).mean()}
 
 
+def equivalence(values: list[float], margin: float) -> tuple[float, float]:
+    """Two one-sided tests (TOST; Schuirmann 1987, Lakens 2017) of |mean| < margin for per-seed values.
+
+    Returns (the smallest margin at which equivalence holds at alpha = 0.05, i.e. the larger absolute bound of the
+    90% Student-t interval; the TOST p-value at `margin`, i.e. the larger of the two one-sided p-values).
+    "Matches the optimum" is an equivalence claim: an interval that contains 0 does not support it by itself.
+    The margin is not chosen after the fact: the smallest margin is reported, and `margin` is a stated reference.
+    """
+    x = np.asarray(values, dtype=np.float64)
+    mean, se, dof = x.mean(), x.std(ddof=1) / math.sqrt(len(x)), len(x) - 1
+    half = stats.t.ppf(0.95, dof) * se
+    p = max(stats.t.sf((mean + margin) / se, dof), stats.t.sf((margin - mean) / se, dof))
+    return max(abs(mean - half), abs(mean + half)), float(p)
+
+
 class Ledger:
     def __init__(self):
         self.values: dict[str, float] = {}
@@ -144,6 +159,12 @@ def tiger(ledger: Ledger) -> None:
         gap = seed_statistic([v - o for v, o in zip(ret(polyak, agent), optimal)])
         ledger.put(f"tiger.{name}.gap", gap.mean, src)
         ledger.put(f"tiger.{name}.gap_ci", gap.ci95, src)
+    # PROTOCOL.md C-q.1: equivalence of the learned planner and the optimal agent; reference margin 1% of V*(b0).
+    v_star = polyak[0]["optimal_value_b0"]
+    margin, p = equivalence([v - o for v, o in zip(ret(polyak, "learned_planner"), optimal)], 0.01 * v_star)
+    ledger.put("tiger.learned.gap_equivalence_margin", margin, src)
+    ledger.put("tiger.learned.gap_equivalence_margin_pct_vstar", 100 * margin / v_star, src)
+    ledger.put("tiger.learned.gap_tost_p_1pct", p, src)
     mean = lambda path: float(np.mean([_dig(r, path) for r in polyak]))  # noqa: E731
     ledger.put("tiger.mlp_agent.l1", mean(("probes", "mlp/agent", "mean_l1")), src)
     ledger.put("tiger.linear_agent.l1", mean(("probes", "linear/agent", "mean_l1")), src)
@@ -162,6 +183,12 @@ def tiger(ledger: Ledger) -> None:
     gap = seed_statistic([v - o for v, o in zip(ret(decoder, "learned_planner"), ret(decoder, "optimal"))])
     ledger.put("tiger.decoder.gap", gap.mean, both)
     ledger.put("tiger.decoder.gap_ci", gap.ci95, both)
+    margin, p = equivalence([v - o for v, o in zip(ret(decoder, "learned_planner"), ret(decoder, "optimal"))], 0.01 * v_star)
+    ledger.put("tiger.decoder.gap_equivalence_margin", margin, both)
+    ledger.put("tiger.decoder.gap_tost_p_1pct", p, both)
+    margin, p = equivalence([d - q for d, q in zip(ret(decoder, "learned_planner"), ret(polyak, "learned_planner"))], 0.01 * v_star)
+    ledger.put("tiger.decoder_minus_jepa_equivalence_margin", margin, both)
+    ledger.put("tiger.decoder_minus_jepa_tost_p_1pct", p, both)
     diff = seed_statistic([d - p for d, p in zip(ret(decoder, "learned_planner"), ret(polyak, "learned_planner"))])
     ledger.put("tiger.decoder_minus_jepa", diff.mean, both)
     ledger.put("tiger.decoder_minus_jepa_ci", diff.ci95, both)
