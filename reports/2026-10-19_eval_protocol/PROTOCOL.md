@@ -307,6 +307,15 @@ Best-network return on the 512 development games (analysis seed 12345). Paired d
 - Across the three screens (C-c, C-f, C-n), ten settings have been tried; the R2D2 defaults remain the best on development.
 - Operational note: r2d2_n3 seed 1 died twice at collections 15-20 with a WSL GPU driver fault ("CUDA error: unknown error"). The registered run is the identical-condition rerun with CUDA_LAUNCH_BLOCKING=1, which uses the same kernels and numerics (`runs/baselines/screen_chain.log`).
 
+## C-q results (descriptive, development artifacts)
+- **C-q.1 (Tiger equivalence, computed 2026-11-15).** The learned planner is equivalent to the optimal agent within 0.063 per episode at alpha = 0.05 (0.33% of V*(b0)); TOST p = 3.3e-5 at a margin of 1% of V*(b0). Decoder: margin 0.061, p = 1.1e-4. Decoder minus JEPA: margin 0.104, p = 2.3e-3. Ledger ids `tiger.*.gap_equivalence_margin`, `tiger.*.gap_tost_p_1pct`.
+- **C-q.2 (Tiger write-in intervention, read 2026-11-15 19:10; log `runs/interpretability/tiger_intervention/polyak.log`, ten seeds, 2048 rows each, flip set 281 rows: 138 where the written belief asks for LISTEN, 143 for a door).** Mean over seeds with Student-t 95% [min, max]:
+  - replace (the belief manifold alone): the planner takes the optimal action of the written belief on 100.0% of all rows on every seed; flip rate 100.0%.
+  - write-in (belief component moved, residual kept): flip rate 87.4 +- 2.9% [82.9, 94.7]; to a door 75.9 +- 5.7% [66.4, 90.2]; to LISTEN 99.4%; agreement with the written belief's optimal action 97.9 +- 0.4%.
+  - random direction of the same length: to a door 0.07 +- 0.16% [0.0, 0.7]; to LISTEN 94.3% (a perturbed latent falls back to LISTEN); pooled 46.3%.
+  - no change: flip rate 0.5%.
+  - Reading: the planner's action is determined by the belief the latent encodes (replace 100%); a random move of the same size never opens a door. The residual of the latent beyond the belief matters: keeping it leaves about a quarter of the door flips undone. Ledger ids `tiger.intervention.*`.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 

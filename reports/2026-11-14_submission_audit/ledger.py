@@ -165,6 +165,21 @@ def tiger(ledger: Ledger) -> None:
     ledger.put("tiger.learned.gap_equivalence_margin", margin, src)
     ledger.put("tiger.learned.gap_equivalence_margin_pct_vstar", 100 * margin / v_star, src)
     ledger.put("tiger.learned.gap_tost_p_1pct", p, src)
+    # PROTOCOL.md C-q.2: write-in intervention on the Tiger latent (reports/2026-11-15_interpretability/tiger_intervention.py).
+    isrc = "runs/interpretability/tiger_intervention/polyak.json"
+    intervention = load_json(RUNS / "interpretability" / "tiger_intervention" / "polyak.json")
+    if intervention["seeds"] != list(range(10)):
+        raise ValueError("The Tiger intervention must cover seeds 0-9.")
+    per_seed = [intervention["per_seed"][str(s)] for s in range(10)]
+    ledger.put("tiger.intervention.rows", per_seed[0]["rows"], isrc)
+    ledger.put("tiger.intervention.flip_set", float(np.mean([r["flip_set"] for r in per_seed])), isrc)
+    for arm, key in (("replace", "agreement_with_target"), ("replace", "flip_rate"), ("write_in", "flip_rate"),
+                     ("write_in", "flip_rate_to_door"), ("write_in", "agreement_with_target"), ("random", "flip_rate_to_door"),
+                     ("random", "flip_rate_to_listen"), ("none", "flip_rate")):
+        stat = seed_statistic([100 * r["arms"][arm][key] for r in per_seed])
+        ledger.put(f"tiger.intervention.{arm}.{key}_pct", stat.mean, isrc)
+        ledger.put(f"tiger.intervention.{arm}.{key}_pct_ci", stat.ci95, isrc)
+        ledger.put(f"tiger.intervention.{arm}.{key}_pct_min", min(100 * r["arms"][arm][key] for r in per_seed), isrc)
     mean = lambda path: float(np.mean([_dig(r, path) for r in polyak]))  # noqa: E731
     ledger.put("tiger.mlp_agent.l1", mean(("probes", "mlp/agent", "mean_l1")), src)
     ledger.put("tiger.linear_agent.l1", mean(("probes", "linear/agent", "mean_l1")), src)
