@@ -2,6 +2,30 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-17 20:30 — new direction from the user: total code audit and contribution (2); three questions for you
+
+**From the user, 2026-11-16, in the implementation session:**
+1. The implementation session is now the manager of the jepa code and jobs. You keep claims, `claims.yaml`, the AUDIT_LOG verdicts, the PROTOCOL section after "## Change log" and the paper.
+2. Every file gets a bottom-up audit. The plan has phases 0-9: domain, filter, world model, planner, training, interpretability, experiments/scripts/runs, holistic. The per-file record is `reports/2026-11-16_code_audit/REVIEW.md`.
+3. **Contribution (2) is to be built in full.** That means a verified, finitely nested I-POMDP core on the two-agent Tiger of Gmytrasiewicz & Doshi (2005, Section 7.1), folded into a POMDP over S x (opponent controller nodes) x (opponent's last action), through policy graphs extracted from exact solutions. It is checked against canonical Tiger values, brute force, the ipomcp project's independent implementation and the published values of Doshi & Gmytrasiewicz (2009). Then the learned agent is trained and evaluated on it: E1 is levels 1 and 2 against the exact nested benchmark; E2 is learned recursion. Every run is registered in PROTOCOL.md before it starts, and you decide what the paper claims.
+4. Remedy options are isolated behind one seam (one module each). Each is proved bit-identical by its own fingerprint, so every negative result stays reproducible from main.
+5. Analysis or readout bugs are fixed and recomputed and reported here before any paper change. Training-path bugs go to the user with the retraining cost first.
+6. Unreferenced artifacts are deleted after a reference check, and every deletion is recorded.
+
+W11 and G1 arm B stay deferred until after the audit.
+
+**What can change for you: nothing numeric, unless a recorded bug fix says so.** Every src refactor must pass all of these:
+- the golden fingerprints: 27 CPU cases (Tiger, the baseline, and one case for each remedy option), plus GPU variants;
+- a load gate: all 140 stored runs reload strictly to the same parameter digest;
+- `ledger.py` exits 0 and the manifest verifies.
+
+Baseline at `5bea8c3`: ledger 254/254 OK, manifest OK, fast suite 261 passed.
+
+**Questions (nothing is removed or rewritten before your answer):**
+- **(a)** Can 26 of the 39 scripts in `reports/2026-10-02_wumpus_diagnostics/` be removed? None of them backs a ledger value, a PROTOCOL result or a stage; other script headers and src comments are their only references. The same question covers `reports/2026-11-09_audit/precision_check.py` and three orphans of the 2026-09-30 page (`depth.py`, `diagnose_heads.py`, `head_noise.py`, whose input `runs/sweeps/default` no longer exists). Each would get a `REMOVED_DIAGNOSTICS.md` entry as before. Only `main.tex` can show whether a sentence of the paper rests on one of them. The 26 are `counterfactual_diag`, `disagreement_screen`, `ensemble_disagreement`, `full_info_vi`, `fvi_screen`, `go_value_diag`, `grounding_screen`, `head_shift`, `head_swap_screen`, `noop_drift_cost`, `obs_fit_vs_latent`, `override_diag`, `pessimism_play`, `phantom_reward_diag`, `profile_recipe`, `q_head_screen`, `reward_diag`, `self_loop_diag`, `target_novelty_smoke`, `teacher_plugin_diag`, `teacher_robustness`, `tiger_acceptance_seed`, `turn_map_check`, `unfinished_diag`, `value_chain_diag` and `value_diag`.
+- **(b)** Which rows of the paper's remedies table rest on run directories that no ledger input or PROTOCOL result names? Candidates for deletion are `runs/sweeps/{wumpus_margin, wumpus_own_margin, wumpus_retrain_wd1_abs, wumpus_current}` and the `runs/wumpus/u64_*` directories that no symlink, ledger input or PROTOCOL result reaches. Name any the paper needs, and they stay.
+- **(c)** Can 45 MANIFEST-hashed `report.json` files receive a `settings` block, taken from their `sweep.json`? That would let the backward-compatibility branch in `sweep.py` (lines 132-142) go. No number changes, the ledger stays at 0 DIFF, and the manifest is regenerated. If you say no, the branch stays as the one documented exception.
+
 ## STATUS 2026-11-16 08:10 — C-p G0 READ (once): head not repaired, the exact one-step model still binds; machine crash handled
 
 - **G0 result** (PROTOCOL.md "C-p result, G0"; `runs/wumpus/g0/readout.log`; stored oracle + double runs, seeds 0-2, 512 games, development analysis seed 12345). Per seed 0 / 1 / 2:

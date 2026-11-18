@@ -25,10 +25,14 @@ dev = ["pytest>=9.1.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Tests marked `slow` (e.g. the certified infinite-horizon Tiger solve, ~2 min) are skipped
-# by default so the regular suite stays fast; run them with `uv run pytest -m slow`.
-addopts = "-m 'not slow'"
-markers = ["slow: long-running exact-solver checks; run with -m slow"]
+# Two opt-in markers are excluded from the default run:
+#   slow:   the certified infinite-horizon Tiger solve, the exact-model planner against the optimum and the GPU
+#           world-model acceptance tests (about 23 min); `uv run pytest -m slow`.
+#   golden: bit-identity fingerprints against tests/golden/fingerprints (about 1 min; torch-build and machine
+#           specific, so they gate code changes on the project machine); `uv run pytest -m golden`.
+addopts = "-m 'not slow and not golden'"
+markers = ["slow: long exact-solver checks and the GPU acceptance tests; run with -m slow",
+           "golden: bit-identity fingerprints of the training paths; run with -m golden"]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
