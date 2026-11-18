@@ -98,3 +98,14 @@ Four reviewers read the code without the audit's conclusions; every finding acte
 | H2 | IN PAPER | Tiger: an intervention on the latent. Moving the belief-coded component to another belief changes the planner's action to the written belief's optimal action in 87 +- 3% of the cases where the actions differ (76 +- 6% when it opens a door); replacing the latent by the map's image, in all; a random displacement of the same length, 0.07% to the called-for door. The subsets were added after a one-seed smoke, before the ten-seed run. | ledger `tiger.intervention.*` (`PROTOCOL.md` C-q.2; `reports/2026-11-15_interpretability/tiger_intervention.py`) |
 | H3 | DEFERRED | The headline on ten held-out seeds (order W11, `PROTOCOL.md` C-o reserved). Waits for the method screen C-p to read out; the guard for the training code path has passed. | `WORK_ORDERS.md` |
 
+## I. Open after 2026-11-18
+
+| # | Status | What | Next |
+|---|---|---|---|
+| I1 | OPEN | D11: the paragraph "Repairing the observation model" states results (fixed margin, ensemble disagreement, near-miss rule, pseudo-count, restored-branch dose) that have no ledger id; some rest on one seed or on a smoke run. | order W12 (2026-11-18); then check each sentence against the ids and weaken what the numbers do not carry |
+| I2 | OPEN | G0 (C-p, read 2026-11-16): belief supervision with exact-belief targets leaves the glitter ratio at 0.36-0.48 and the exact one-step model still worth +176 to +228 per game (three development seeds). Not yet in `tab:remedies` or the Discussion. | after W12: one row, one sentence ("the error survives a latent trained to carry the belief"); exploratory, development seeds |
+| I3 | OPEN | The deferral of W11 (headline on ten held-out seeds) and of G1 arm B was set by the user on 2026-11-16 until after the code audit. | user decision (handoff section 4) |
+| I4 | OPEN | Contribution (2), the I-POMDP core and the learned agent on it, is being built in the implementation session; its paper space and go / no-go date are undecided. Anything the paper says about interactive settings (Background, Discussion) must change with it, and every new number needs a ledger id. | user decision; audit of its claims when E1 reads out |
+| I5 | OPEN | Literature claims from `reports/2026-11-15_literature_review.md` (untracked) are tool-verified by search agents, not read at source. The paper adds none. | read each at its source before a citation or a priority claim enters the text |
+| I6 | OPEN | F3: IJCAI conversion (template zip not yet opened), anonymisation, supplement; the user rewrites the text. | after content freeze |
+

@@ -2,6 +2,23 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## RULINGS and ORDER W12 of the audit session, 2026-11-18 (on the 2026-11-17 20:30 block; the audit session is being replaced by a fresh one, which reads this block first)
+
+Answers to (a), (b), (c). Nothing numeric in the paper changes by any of them.
+- **(a) Scripts: remove 22 of the 26, keep 3, one needs no ruling.** Keep `disagreement_screen.py`, `ensemble_disagreement.py` and `target_novelty_smoke.py`: the paper's "Repairing the observation model" paragraph states results that come from them (ensemble disagreement tracks novelty; the pseudo-count of the turned latent rates the declined pairs as more common). They go only after W12 has put their numbers into the ledger and the paper sentence is checked against them. The other 22, `precision_check.py` and the three orphans of the 2026-09-30 page (`depth.py`, `diagnose_heads.py`, `head_noise.py`) may be removed with a `REMOVED_DIAGNOSTICS.md` entry each (question, method, the result lines of the header, recovery command), as before. `profile_recipe.py` is a tool, not a diagnostic: your call.
+- **(b) Runs:** the paper needs `runs/sweeps/wumpus_margin` and `runs/sweeps/wumpus_own_margin` (the sentence "a fixed margin on the predicted risk of stepping forward, applied only while planning, trades the deaths for more idling and lowers the return" rests on them). They stay, and W12 gives them ledger ids. `runs/sweeps/wumpus_current` and `runs/sweeps/wumpus_retrain_wd1_abs` are named by no paper sentence: they may go after their per-seed headline numbers are written into the deletion index. The `runs/wumpus/u64_*` directories that nothing references may go as you proposed (the ledger reads only the text file `agent_reference_probes.txt`, and PROTOCOL.md C-p names the three `..._privileged_double_seed{0,1,2}` runs: keep those).
+- **(c) `report.json` settings blocks: NO.** The 45 hashed reports are the byte-exact record of what the held-out and development reads saw; editing them to remove a compatibility branch trades evidence integrity for tidiness. Keep the branch in `sweep.py` as the one documented exception, with a comment that names the reason.
+
+**ORDER W12 (CPU, no GPU).** Every sentence of the paper's paragraph "Repairing the observation model" that states a result needs a ledger id computed from a raw artifact, or I weaken the sentence. Add ids (`dev.remedy.*` family; log-sourced ones marked as such), then tell me the values:
+1. **Fixed margin (in-agent screen):** per development seed, return, deaths and unfinished of `wumpus_margin` and `wumpus_own_margin` against the recipe's `best.pt` on the same games; the paired difference, with Student-t over the seeds read.
+2. **Ensemble disagreement:** from `runs/sweeps/wumpus_retrain/seed*/analysis/disagreement_screen.json` and the `ensemble_disagreement_c0_*`, `c1_*` json/npz files: the registered statistic and its value per seed for the head ensemble (E1), for the four coverage sets (C0) and for the bootstrap retrains (C1, seed 0 only, which was stopped).
+3. **Near-miss rule and pseudo-count:** declined decisions per game at each trial level for seeds 0-2 (`runs/wumpus/target/smoke_seed*.log`), the oracle's 1.3 per game (`games_cover_seed*.log`), and the pseudo-count medians (`novelty_seed0.log`: 4 against 2 visits, zero-visit share 19.5% against 40.8%). The paper says "between 0.2 and 0.65 ... on three seeds" at "about four trials per game": give the exact value at the trial level nearest four for each seed.
+4. **Restored branches:** declined decisions per game for the targeted and the random arm, seeds 0-4 (`games_branch_seed*.log`, `games_random_seed*.log`).
+5. **G0 (C-p):** from `runs/wumpus/g0/summary.json`: per seed the joint glitter ratio, the learned planner's and the exact-model arm's return, deaths, unfinished, and EPR minus learned; Student-t over the three seeds. These feed a new row of the remedies table that the next audit session writes.
+After W12 the three kept scripts may go. Report here with the ledger status.
+
+**Questions the audit session leaves open for the user (not for you):** whether to lift the deferral of W11 now; the go / no-go date for contribution (2) in this paper. They are in `runs/audit/AUDIT_SESSION_HANDOFF.md` section 4 of the checkout; the user decides.
+
 ## STATUS 2026-11-17 20:30 — new direction from the user: total code audit and contribution (2); three questions for you
 
 **From the user, 2026-11-16, in the implementation session:**
