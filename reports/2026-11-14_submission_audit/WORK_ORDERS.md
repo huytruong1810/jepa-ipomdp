@@ -2,6 +2,54 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-18 — W12 DONE: ledger ids for "Repairing the observation model" and for G0 (CPU only); rulings applied
+
+**Ledger:** 254 / 254 claims OK, 679 values (184 new under `dev.remedy.*` and `dev.g0.*`). `audit_w12` in `ledger.py`. The manifest is regenerated and verifies (312 artifacts). Log-sourced ids are marked "log", and their logs are copied to `logs/w12/`. No claim rows were added: `claims.yaml` is yours.
+
+1. **Fixed margin (in-agent; `wumpus_margin`, seeds 0-2, and `wumpus_own_margin`, seed 0).** best.pt is scored on the recipe's 512 development games, paired per game. The pairing is checked: the reference heuristic's and the random agent's returns equal the recipe report's exactly.
+
+   | seed | recipe return / died % / unfinished % | margin return / died % / unfinished % | margin minus recipe |
+   |---|---|---|---|
+   | 0 | 236.7 / 0.78 / 67.2 | 162.2 / 3.91 / 70.3 | -74.5 |
+   | 1 | 156.8 / 4.69 / 67.8 | 152.1 / 2.54 / 74.8 | -4.7 |
+   | 2 | 233.1 / 4.10 / 62.3 | 207.5 / 0.98 / 70.1 | -25.7 |
+
+   - Mean -34.9, Student-t [-123.9, +54.0] (`dev.remedy.margin_minus_recipe.*`).
+   - Own trials + margin, seed 0: 225.5 / 1.56 / 67.4, minus recipe -11.2.
+   - **For the sentence "trades the deaths for more idling and lowers the return":** unfinished goes up on 3 of 3 seeds. Deaths go down on seeds 1 and 2 but UP on seed 0 (0.78 to 3.91%). The return is lower on 3 of 3 seeds, but the interval includes 0. A wording that the numbers carry: "raises the share of unfinished games on all three seeds and lowers the return on all three (not significant over three seeds); deaths fall on two of the three".
+2. **Ensemble disagreement.**
+   - **E1 (head ensemble, seeds 0-4):** registered (V) AUC 0.56-0.77. Novelty-matched AUC 0.43-0.63. Rank correlation with the glitter error at the declined states -0.16 to +0.05. (R) Spearman of sd_O with the risk error -0.03 to 0.23.
+   - **C0 (coverage sets, exploratory):** union acting: rho_sd 0.46-0.65, rho_v -0.29 to +0.08. Cover acting: rho_sd -0.30 to 0.68, rho_v -0.21 to +0.07. Per seed `dev.remedy.ensemble.C0.*`.
+   - **C1 (bootstrapped retrains, seed 0, stopped):** control acting rho_sd 0.06, rho_v -0.13. Union acting rho_sd -0.30, rho_v -0.12.
+   - **Statistic for the sentence "tracks novelty rather than error":** the novelty-matched AUC (0.43-0.63) and the glitter-error correlation (-0.16 to +0.05).
+3. **Near-miss rule** (logs, seeds 0-2): declined decisions per game at the trial level nearest 4 per game are
+   - 0.35 (seed 0, 3.78 trials),
+   - 0.65 (seed 1, 4.13 trials),
+   - 0.26 (seed 2, 4.68 trials).
+
+   The paper's "between 0.2 and 0.65" fits; 0.26 is the minimum. The oracle's overrides per game are 1.29 / 1.32 / 1.22 / 1.54 / 1.37 over seeds 0-4, mean 1.35. Pseudo-count (seed 0, smoke): median visits 4 vs 2, zero-visit share 19.5% vs 40.8%, exactly as printed.
+4. **Restored branches:** declined decisions per game, seeds 0-4.
+   - Targeted: 0.97 / 1.23 / 1.25 / 1.19 / 1.67, mean 1.26.
+   - Random: 0.88 / 1.15 / 1.16 / 1.19 / 1.75, mean 1.23.
+5. **G0** (`dev.g0.*`, seeds 0-2):
+
+   | seed | glitter ratio | learned return / died % / unfinished % | EPR return / died % / unfinished % | EPR minus learned |
+   |---|---|---|---|---|
+   | 0 | 0.48 | 215.7 / 2.3 / 68.2 | 413.8 / 0.0 / 51.0 | +198.0 |
+   | 1 | 0.43 | 231.4 / 1.6 / 67.8 | 459.8 / 0.0 / 45.9 | +228.4 |
+   | 2 | 0.36 | 223.1 / 1.0 / 69.5 | 399.5 / 0.0 / 51.6 | +176.4 |
+
+   EPR minus learned: mean +200.9, Student-t [+136.1, +265.8].
+
+**Rulings applied (in the code audit's Phase 7, recorded in `REMOVED_DIAGNOSTICS.md` / `REMOVED_ARTIFACTS.md`):**
+- These are now removable, since W12 has put their numbers into the ledger: 22 diagnostics, `precision_check.py` and the three 2026-09-30 orphans. The kept three (`disagreement_screen`, `ensemble_disagreement`, `target_novelty_smoke`) can go once you have checked the sentence.
+- `wumpus_current` and `wumpus_retrain_wd1_abs` go after their per-seed numbers are in the deletion index.
+- The `sweep.py` compatibility branch stays, documented. `report.json` files are untouched.
+
+**Code audit progress:**
+- Phase 0 done: golden fingerprints, the load gate and GPU references, all at `5bea8c3`.
+- Phase 1 under way: two-agent Tiger Table 1, policy graphs, the fold, exact observation lumping, an HSVI bracket for the interactive benchmark. Separate commit and status block to follow.
+
 ## RULINGS and ORDER W12 of the audit session, 2026-11-18 (on the 2026-11-17 20:30 block; the audit session is being replaced by a fresh one, which reads this block first)
 
 Answers to (a), (b), (c). Nothing numeric in the paper changes by any of them.

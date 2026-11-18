@@ -1,0 +1,27 @@
+== seed1 best.pt (collection 55), arm cover, 4 x 512 games
+   [15:01:32] decision 10/50, 299 overrides, 125s
+   [15:03:23] decision 20/50, 561 overrides, 235s
+   [15:04:58] decision 30/50, 672 overrides, 330s
+   [15:06:35] decision 40/50, 716 overrides, 428s
+   [15:08:15] decision 50/50, 731 overrides, 528s
+  batch 0: 731 overrides; outcomes {'win_rate': 0.416, 'death_rate': 0.0918, 'unfinished_rate': 0.4922, 'mean_win_step': 18.0}
+   [15:10:00] decision 10/50, 285 overrides, 104s
+   [15:11:40] decision 20/50, 526 overrides, 204s
+   [15:13:17] decision 30/50, 618 overrides, 301s
+   [15:14:57] decision 40/50, 673 overrides, 401s
+   [15:16:35] decision 50/50, 698 overrides, 499s
+  batch 1: 698 overrides; outcomes {'win_rate': 0.3945, 'death_rate': 0.0859, 'unfinished_rate': 0.5195, 'mean_win_step': 18.2277}
+   [15:18:15] decision 10/50, 256 overrides, 100s
+   [15:19:53] decision 20/50, 521 overrides, 198s
+   [15:21:31] decision 30/50, 614 overrides, 296s
+   [15:23:08] decision 40/50, 649 overrides, 393s
+   [15:24:44] decision 50/50, 665 overrides, 489s
+  batch 2: 665 overrides; outcomes {'win_rate': 0.4043, 'death_rate': 0.0742, 'unfinished_rate': 0.5215, 'mean_win_step': 17.285}
+   [15:26:24] decision 10/50, 254 overrides, 99s
+   [15:28:21] decision 20/50, 480 overrides, 216s
+   [15:30:04] decision 30/50, 556 overrides, 319s
+   [15:31:43] decision 40/50, 596 overrides, 418s
+   [15:33:21] decision 50/50, 616 overrides, 516s
+  batch 3: 616 overrides; outcomes {'win_rate': 0.3535, 'death_rate': 0.0781, 'unfinished_rate': 0.5684, 'mean_win_step': 16.3812}
+  saved runs/wumpus/coverage/games_cover_seed1.pt: 2048 games, 2710 overrides, outcomes {'win_rate': 0.3921, 'death_rate': 0.0825, 'unfinished_rate': 0.5254, 'mean_win_step': 17.5081}
+DONE

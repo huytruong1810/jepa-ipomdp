@@ -25,6 +25,8 @@
 #      per-game returns of the retrain screens under runs/wumpus/{ve,da,qe}_screen, coverage and branch.
 #    - The untrained-filter probe control exists only as a log (copied to logs/); its claims are parsed
 #      from that copy and are marked "log" in the ledger.
+#    - W12 (2026-11-18): the near-miss trial rule, the oracle's overrides, the pseudo-counts and the restored branches
+#      exist only as logs, copied to logs/w12/; their ids are marked "log".
 #    - The retraining-schedule screens (objective_ab.py 2e-2g, 2026-10-15/16) exist only as logs, copied to
 #      logs/data_vs_objective/ (W5(d), 2026-11-14): MLP cell / heading probe accuracy of the uniform buffer, growing,
 #      pool, reset1 and reset3 arms (RESULT lines) and of the agents themselves (agent_reference_probes.txt, best.pt
@@ -501,6 +503,114 @@ def audit_w10(ledger: Ledger) -> None:
     ledger.put("heldout.probe.gold_error.max", max(gold), psrc)
 
 
+def _log_line(path: Path, pattern: str) -> re.Match:
+    """The first match of `pattern` in a tracked log (W12's log-sourced ids are marked "log")."""
+    match = re.search(pattern, _track(path).read_text(), re.MULTILINE)
+    if match is None:
+        raise ValueError(f"{path}: no line matches {pattern!r}")
+    return match
+
+
+def audit_w12(ledger: Ledger) -> None:
+    """W12 (2026-11-18): ids for every result sentence of the paper's "Repairing the observation model" paragraph,
+    and for the G0 row of the remedies table (PROTOCOL.md C-p)."""
+    # 1. Fixed planning-time margin (in-agent, development seeds as run): the sweep's best.pt on the recipe's 512
+    #    analysis games, paired per game. The games are the same: the reference heuristic's and the random agent's
+    #    mean returns must equal the recipe's report exactly, else the pairing is refused.
+    for sweep, seeds in (("wumpus_margin", (0, 1, 2)), ("wumpus_own_margin", (0,))):
+        arm = sweep.removeprefix("wumpus_")
+        diffs = []
+        for s in seeds:
+            games = load_npz(RUNS / "sweeps" / sweep / f"seed{s}" / "analysis" / "games.npz")
+            report = load_json(dev_dir(s) / "report.json")
+            for agent in ("reference_risk0.4", "random"):
+                if games[f"{agent}.return"].mean() != report["returns"][agent]["discounted_return"]:
+                    raise ValueError(f"{sweep} seed {s}: {agent} games differ from the recipe's; no pairing.")
+            recipe = load_npz(dev_dir(s) / "exact_play_learned.npz")["returns"]
+            ret, won, died = (games[f"learned_planner.{k}"] for k in ("return", "won", "died"))
+            src = f"runs/sweeps/{sweep}/seed{s}/analysis/games.npz vs runs/sweeps/wumpus_retrain/seed{s}/analysis/exact_play_learned.npz"
+            ledger.put(f"dev.remedy.{arm}.seed{s}.return", ret.mean(), src)
+            ledger.put(f"dev.remedy.{arm}.seed{s}.died_pct", 100 * died.mean(), src)
+            ledger.put(f"dev.remedy.{arm}.seed{s}.unfinished_pct", 100 * (~won & ~died).mean(), src)
+            if arm == "margin":
+                ledger.put(f"dev.remedy.recipe.seed{s}.return", recipe.mean(), src)
+                for k, v in outcomes(recipe).items():
+                    ledger.put(f"dev.remedy.recipe.seed{s}.{k}_pct", v, src)
+            diffs.append(float((ret - recipe).mean()))
+            ledger.put(f"dev.remedy.{arm}_minus_recipe.seed{s}", diffs[-1], src)
+        if len(seeds) > 1:
+            mean, low, high = t_interval(diffs)
+            src = f"runs/sweeps/{sweep}/seed{{{','.join(map(str, seeds))}}} (paired per game; Student-t over seeds)"
+            for suffix, value in (("mean", mean), ("t_lo", low), ("t_hi", high)):
+                ledger.put(f"dev.remedy.{arm}_minus_recipe.{suffix}", value, src)
+    # 2. Ensemble disagreement: the registered statistics of disagreement_screen.py (E1, head ensemble) and
+    #    ensemble_disagreement.py (C0 coverage sets, exploratory; C1 bootstrapped retrains, seed 0, stopped).
+    for s in DEV:
+        e1 = load_json(dev_dir(s) / "disagreement_screen.json")
+        src = f"runs/sweeps/wumpus_retrain/seed{s}/analysis/disagreement_screen.json (disagreement_screen.py)"
+        for key in ("auc_v", "auc_v_novel", "rho_glitter", "rho_r_sd", "rho_r_mi"):
+            ledger.put(f"dev.remedy.ensemble.E1.seed{s}.{key}", e1[key], src)
+        for act in ("union", "cover"):
+            c0 = load_json(dev_dir(s) / f"ensemble_disagreement_c0_{act}.json")
+            src = f"runs/sweeps/wumpus_retrain/seed{s}/analysis/ensemble_disagreement_c0_{act}.json"
+            for key in ("rho_sd", "rho_v", "cover_fatal_b1", "phantom_b1", "cover_fatal_act_b1"):
+                ledger.put(f"dev.remedy.ensemble.C0.{act}.seed{s}.{key}", c0[key], src)
+    for key in ("auc_v", "auc_v_novel", "rho_glitter", "rho_r_sd"):
+        values = [ledger.values[f"dev.remedy.ensemble.E1.seed{s}.{key}"] for s in DEV]
+        ledger.put(f"dev.remedy.ensemble.E1.{key}.min", min(values), "E1 over seeds 0-4")
+        ledger.put(f"dev.remedy.ensemble.E1.{key}.max", max(values), "E1 over seeds 0-4")
+    for act in ("control", "union"):
+        c1 = load_json(dev_dir(0) / f"ensemble_disagreement_c1_{act}.json")
+        src = f"runs/sweeps/wumpus_retrain/seed0/analysis/ensemble_disagreement_c1_{act}.json (C1, seed 0 only)"
+        for key in ("rho_sd", "rho_v", "cover_fatal_b1", "phantom_b1", "cover_fatal_act_b1", "fatal_forward"):
+            ledger.put(f"dev.remedy.ensemble.C1.{act}.seed0.{key}", c1[key], src)
+    # 3. Near-miss trial rule (target_rule_smoke.py, seeds 0-2; log) at the trial level nearest four per game, the
+    #    oracle's overrides per game (coverage_games.py; log) and the pseudo-counts (target_novelty_smoke.py; log).
+    line = re.compile(r"delta\s+([\d.]+): trials\s+([\d.]+)/game, declined ([\d.]+)/game")
+    for s in range(3):
+        path = HERE / "logs" / "w12" / f"smoke_seed{s}.log"
+        rows = [tuple(map(float, m.groups())) for m in line.finditer(_track(path).read_text())]
+        delta, trials, declined = min(rows, key=lambda r: abs(r[1] - 4.0))
+        src = f"logs/w12/smoke_seed{s}.log (log; copy of runs/wumpus/target/)"
+        ledger.put(f"dev.remedy.nearmiss.seed{s}.delta", delta, src)
+        ledger.put(f"dev.remedy.nearmiss.seed{s}.trials_per_game", trials, src)
+        ledger.put(f"dev.remedy.nearmiss.seed{s}.declined_per_game", declined, src)
+    overrides = []
+    for s in DEV:
+        m = _log_line(HERE / "logs" / "w12" / f"games_cover_seed{s}.log", r"saved \S+: (\d+) games, (\d+) overrides")
+        overrides.append(int(m.group(2)) / int(m.group(1)))
+        ledger.put(f"dev.remedy.oracle.seed{s}.overrides_per_game", overrides[-1], f"logs/w12/games_cover_seed{s}.log (log; copy of runs/wumpus/coverage/)")
+    ledger.put("dev.remedy.oracle.overrides_per_game", float(np.mean(overrides)), "logs/w12/games_cover_seed{0..4}.log (log)")
+    novelty = HERE / "logs" / "w12" / "novelty_seed0.log"
+    for group in ("declined", "other"):
+        m = _log_line(novelty, rf"^\s*{group}: n_sa median ([\d.]+) \(zero ([\d.]+)\)")
+        ledger.put(f"dev.remedy.novelty.{group}.median_visits", float(m.group(1)), "logs/w12/novelty_seed0.log (log; copy of runs/wumpus/target/)")
+        ledger.put(f"dev.remedy.novelty.{group}.zero_visit_pct", 100 * float(m.group(2)), "logs/w12/novelty_seed0.log (log; copy of runs/wumpus/target/)")
+    # 4. Restored branches (branch_games.py): declined decisions per game reached by the targeted and the random arm.
+    for arm, stem in (("targeted", "branch"), ("random", "random")):
+        values = []
+        for s in DEV:
+            m = _log_line(HERE / "logs" / "w12" / f"games_{stem}_seed{s}.log", r"declined per game ([\d.]+);")
+            values.append(float(m.group(1)))
+            ledger.put(f"dev.remedy.branch.{arm}.seed{s}.declined_per_game", values[-1], f"logs/w12/games_{stem}_seed{s}.log (log; copy of runs/wumpus/branch/)")
+        ledger.put(f"dev.remedy.branch.{arm}.declined_per_game", float(np.mean(values)), f"logs/w12/games_{stem}_seed{{0..4}}.log (log)")
+    # 5. G0 (PROTOCOL.md C-p): belief-supervised oracle + double networks, development seeds 0-2, 512 games.
+    g0 = load_json(RUNS / "wumpus" / "g0" / "summary.json")
+    src = "runs/wumpus/g0/summary.json (g0_readout.py)"
+    gains = []
+    for s in range(3):
+        row = g0[str(s)]
+        ledger.put(f"dev.g0.seed{s}.glitter_ratio", row["glitter_ratio_fl"], src)
+        for arm in ("learned", "EPR"):
+            for k, v in zip(("return", "died_pct", "unfinished_pct"), row[arm]):
+                ledger.put(f"dev.g0.seed{s}.{arm.lower()}.{k}", v, src)
+        ledger.put(f"dev.g0.seed{s}.epr_minus_learned", row["epr_minus_learned"], src)
+        gains.append(row["epr_minus_learned"])
+    mean, low, high = t_interval(gains)
+    for suffix, value in (("mean", mean), ("t_lo", low), ("t_hi", high)):
+        ledger.put(f"dev.g0.epr_minus_learned.{suffix}", value, src + " (Student-t over seeds 0-2)")
+
+
 def main() -> None:
     ledger = Ledger()
     tiger(ledger)
@@ -509,6 +619,7 @@ def main() -> None:
     retrain_schedule(ledger)
     audit_measurements(ledger)
     audit_w10(ledger)
+    audit_w12(ledger)
 
     claims = yaml.safe_load((HERE / "claims.yaml").read_text())
     lines = ["| id | paper | recomputed | where | source | |", "|---|---|---|---|---|---|"]

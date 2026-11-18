@@ -1,0 +1,27 @@
+== seed0 best.pt (collection 100), arm random, 4 x 512 games
+   [16:20:37] replay decision 10/50, 71s
+   [16:21:46] replay decision 20/50, 140s
+   [16:22:56] replay decision 30/50, 210s
+   [16:24:06] replay decision 40/50, 280s
+   [16:25:14] replay decision 50/50, 348s
+  batch 0: 6761 branches (13.21 per game); per game: declined 0.99, unvisited 4.94, risky 2.60, wall 4.69; branch deaths 851 (12.6%); 33090 live steps; control outcomes {'win_rate': 0.291, 'death_rate': 0.0078, 'unfinished_rate': 0.7012, 'mean_win_step': 14.7181}
+   [16:31:17] replay decision 10/50, 71s
+   [16:32:34] replay decision 20/50, 148s
+   [16:33:51] replay decision 30/50, 225s
+   [16:35:04] replay decision 40/50, 299s
+   [16:36:15] replay decision 50/50, 370s
+  batch 1: 6078 branches (11.87 per game); per game: declined 0.79, unvisited 4.72, risky 2.58, wall 4.00; branch deaths 800 (13.2%); 29796 live steps; control outcomes {'win_rate': 0.2969, 'death_rate': 0.0078, 'unfinished_rate': 0.6953, 'mean_win_step': 14.5526}
+   [16:41:44] replay decision 10/50, 68s
+   [16:42:51] replay decision 20/50, 135s
+   [16:43:58] replay decision 30/50, 202s
+   [16:45:06] replay decision 40/50, 270s
+   [16:46:14] replay decision 50/50, 338s
+  batch 2: 6010 branches (11.74 per game); per game: declined 0.87, unvisited 4.91, risky 2.56, wall 3.85; branch deaths 870 (14.5%); 29485 live steps; control outcomes {'win_rate': 0.3047, 'death_rate': 0.0059, 'unfinished_rate': 0.6895, 'mean_win_step': 14.7372}
+   [16:51:36] replay decision 10/50, 68s
+   [16:52:46] replay decision 20/50, 137s
+   [16:53:50] replay decision 30/50, 202s
+   [16:54:58] replay decision 40/50, 270s
+   [16:56:06] replay decision 50/50, 338s
+  batch 3: 6103 branches (11.92 per game); per game: declined 0.86, unvisited 4.84, risky 2.72, wall 3.91; branch deaths 891 (14.6%); 29891 live steps; control outcomes {'win_rate': 0.2891, 'death_rate': 0.0117, 'unfinished_rate': 0.6992, 'mean_win_step': 15.2432}
+  saved runs/wumpus/branch/games_random_seed0.pt: 24952 branches over 2048 control games; declined per game 0.878; dose {'wall': 8424, 'unvisited': 9938, 'risky': 5356, 'declined': 1799}; 122262 environment steps
+DONE

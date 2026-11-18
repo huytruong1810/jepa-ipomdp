@@ -1,0 +1,26 @@
+== seed2 best.pt (collection 80), 512 games, control stream k = 0
+   [13:45:08] decision 10/50, 2735 rows, 97s
+   [13:46:48] decision 20/50, 5373 rows, 197s
+   [13:48:27] decision 30/50, 8135 rows, 296s
+   [13:50:05] decision 40/50, 10786 rows, 394s
+   [13:51:46] decision 50/50, 13492 rows, 495s
+  outcomes {'win_rate': 0.3281, 'death_rate': 0.041, 'unfinished_rate': 0.6309, 'mean_win_step': 14.6786}
+  replay identical to runs/wumpus/coverage/games_control_seed2.pt batch 0
+  13492 non-FORWARD decisions (26.4/game); declined 1.39/game (unvisited 5.89, risky 3.38, wall 0.648); gap median declined +34.0, others +14.0
+  delta     0: trials  0.00/game, declined 0.00/game (precision 0.000), unvisited 0.00, risky 0.00, wall 0.00
+  delta     1: trials  0.38/game, declined 0.01/game (precision 0.036), unvisited 0.03, risky 0.00, wall 0.29
+  delta     2: trials  0.65/game, declined 0.04/game (precision 0.057), unvisited 0.08, risky 0.00, wall 0.43
+  delta     3: trials  0.94/game, declined 0.07/game (precision 0.073), unvisited 0.12, risky 0.00, wall 0.61
+  delta     5: trials  2.56/game, declined 0.13/game (precision 0.050), unvisited 0.19, risky 0.00, wall 2.01
+  delta   7.5: trials  4.68/game, declined 0.26/game (precision 0.056), unvisited 0.34, risky 0.01, wall 3.79
+  delta    10: trials 10.35/game, declined 0.36/game (precision 0.034), unvisited 0.44, risky 0.01, wall 9.14
+  delta    15: trials 13.25/game, declined 0.46/game (precision 0.035), unvisited 0.57, risky 0.02, wall 11.38
+  delta    20: trials 15.03/game, declined 0.55/game (precision 0.037), unvisited 0.73, risky 0.05, wall 12.77
+  delta    25: trials 16.45/game, declined 0.58/game (precision 0.035), unvisited 0.87, risky 0.09, wall 13.83
+  delta    30: trials 17.17/game, declined 0.64/game (precision 0.037), unvisited 1.06, risky 0.12, wall 14.20
+  delta    40: trials 18.67/game, declined 0.79/game (precision 0.042), unvisited 1.35, risky 0.17, wall 15.13
+  delta    50: trials 19.67/game, declined 0.86/game (precision 0.044), unvisited 1.59, risky 0.24, wall 15.66
+  delta    75: trials 21.01/game, declined 1.02/game (precision 0.049), unvisited 2.00, risky 0.30, wall 16.28
+  delta   100: trials 21.64/game, declined 1.08/game (precision 0.050), unvisited 2.32, risky 0.35, wall 16.45
+  NO delta meets D >= 1.3 at T <= 3.0 (section 3)
+DONE
