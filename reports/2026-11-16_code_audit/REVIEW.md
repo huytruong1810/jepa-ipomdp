@@ -18,6 +18,50 @@ Bottom-up review of every tracked source, test, configuration and script file, o
 - Golden fingerprints: 27 CPU cases recorded (`tests/golden/fingerprints/`, 51 golden tests pass in 31 s). The Tiger case reproduces the earlier Tiger fingerprint's output byte for byte when run on that tool's two CPU threads; the golden files pin one thread, because one CPU reduction rounds differently with two.
 - Load gate: 140 stored runs (105 training runs, 35 baseline runs) reload strictly; none fails.
 
+## Phase 1 (domain layer and the I-POMDP core): in progress, 2026-11-18
+
+**New modules** (`src/ipomdp/domain/`):
+
+| Module | What it holds |
+|---|---|
+| `multiagent_tiger.py` | The joint tables of the two-agent tiger game (Gmytrasiewicz & Doshi 2005, Table 1) |
+| `policy_graph.py` | Finite-state controllers: exact plan trees, stationary extraction, exact evaluation |
+| `interactive.py` | The fold of the other agent's controller into a FinitePOMDP over S x N_j x A_j; the paper's level-0 noise model; the nested recursion |
+| `reduction.py` | Exact lumping of observations with proportional likelihoods |
+| `bounds.py` | HSVI2 brackets whose lower bound is an executable controller |
+
+The solver's witness LP becomes public; nothing numeric changes.
+
+**Checks** (`tests/test_interactive.py`, 17 tests, CPU, seconds):
+
+| Check | Result |
+|---|---|
+| Table 1 entries and per-agent views | Equal entry by entry |
+| Other agent always listens | The fold equals the canonical Tiger (tables to 1e-15, V_h to 1e-9) |
+| Other agent always opens | V_h = -sum gamma^t exactly |
+| Uniformly random other agent | Q_2(b0) = -1.95 / -45.95 |
+| Folded Bayes filter against brute-force enumeration over the other agent's nodes, actions and observations | Equal to 1e-12 |
+| Folded simulator against a direct two-agent simulation | Within 5 s.e. |
+| Plan graphs | Reproduce their plans' values |
+| Uniform prior over the level-0 agent's belief | Gives the paper's noise 0.1 / 0.8 / 0.1 exactly |
+| The paper's Fig. 4 thresholds (level-0 noise POMDP, horizon 3, undiscounted) | Within 0.003 |
+| Observation lumping | Exact (1e-12) |
+| HSVI on the canonical Tiger | Its bracket contains the certified V*, and its controller attains the lower bound |
+| Level-1 problem | Folds the certified level-0 controller |
+
+**Cross-check against an independent implementation** of the same game (`ipomcp_crosscheck.py`, log beside it):
+- tables exact;
+- Q_h to 2.8e-14 for three opponent laws, four beliefs and four horizons;
+- PASSED.
+
+**Not reproduced:** the level-1 action probabilities of the paper's Section 7.3 (L 0.96591). Ours are 0.87-0.90, and an independent brute force over a grid of the other agent's beliefs agrees with our fold to 1e-6.
+
+**Open:**
+- a tight certified bracket for the folded level-1 problem. The sawtooth upper bound stalls on the 26-state fold, so the options are being evaluated;
+- the Fig. 11 thresholds (a slow test);
+- deduplication of the seeded generators and of the Wumpus heading logic;
+- a test for `belief.predict_state`.
+
 ## Files
 
 | Phase | File | Findings | Change | Check |

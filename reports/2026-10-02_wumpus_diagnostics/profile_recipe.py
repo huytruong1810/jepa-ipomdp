@@ -19,7 +19,7 @@
 #    - It replaces profile_train_step.py (2026-10-04), which timed one update of an older
 #      configuration with six jobs sharing the GPU (950 ms per update; no longer representative).
 # 2. Usage (GPU, about 3 minutes; through the queue contract):
-#      bash .claude/tools/gpu_run.sh "profile recipe" .venv/bin/python \
+#      bash tools/fingerprint/gpu_run.sh "profile recipe" .venv/bin/python \
 #          reports/2026-10-02_wumpus_diagnostics/profile_recipe.py runs/sweeps/wumpus_retrain/seed0 [updates]
 # ==============================================================================
 

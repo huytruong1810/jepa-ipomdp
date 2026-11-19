@@ -33,13 +33,11 @@
 #      (0, 1), unique names) is checked in __post_init__ and raises ValueError. There is no
 #      silent renormalisation: a malformed model is a bug in the domain definition.
 #
-# 4. Extension Path to I-POMDPs:
-#    - A finitely nested I-POMDP_{i,l} whose opponent model set M_j is finite (e.g. a
-#      fixed level-0 policy, or a finite set of level-(l-1) solved models) is equivalent
-#      to a POMDP over the interactive state space IS_i = S x M_j. Folding the opponent's
-#      policy into T and O yields a FinitePOMDP, so the same env, filter, and exact solver
-#      serve as benchmark infrastructure from single-agent Tiger up through nested levels.
-#      The single-agent canonical Tiger is the degenerate case where M_j is empty.
+# 4. I-POMDPs Are FinitePOMDPs Over Interactive States:
+#    - A finitely nested I-POMDP_{i,l} whose models of the other agent are the nodes of a finite controller is a
+#      POMDP over the interactive states IS_i = S x N_j x A_j (domain/interactive.py folds the controller into the
+#      joint tables of domain/multiagent_tiger.py). The same env, filter, solvers and learned agent therefore serve
+#      every nesting level; the canonical Tiger is the single-agent case.
 # ==============================================================================
 
 from dataclasses import dataclass

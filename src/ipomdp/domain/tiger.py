@@ -25,11 +25,11 @@
 #    - The problem is continuing (infinite horizon, discounted). Opening a door is not a
 #      terminal event; any episode boundary used for training is an artificial truncation.
 #
-# 3. Multi-Agent Tiger Is Deliberately Absent:
-#    - The two-agent Tiger of Gmytrasiewicz & Doshi (2005) adds creak observations (90%
-#      accurate) that depend on the other agent's action. Its exact joint tables will be
-#      added, verified against the paper, when the interactive setting is studied. Until
-#      then the single-agent canonical model is the only Tiger in the codebase.
+# 3. The Two-Agent Game Lives Elsewhere:
+#    - The multi-agent tiger game of Gmytrasiewicz & Doshi (2005) adds creak observations that depend on the other
+#      agent's action. Its joint tables are domain/multiagent_tiger.py (Table 1 of the paper, entry by entry); this
+#      module stays the canonical single-agent model. The two are tied by a test: folding an always-listening other
+#      agent into the two-agent tables reproduces this model's values (tests/test_interactive.py).
 # ==============================================================================
 
 from enum import IntEnum

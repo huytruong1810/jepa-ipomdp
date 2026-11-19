@@ -45,7 +45,9 @@ from omegaconf import DictConfig, OmegaConf
 import torch
 
 from ..agents import PlanningAgent, UniformRandomAgent
-from ..domain import (BatchedPOMDPEnv, FinitePOMDP, WumpusBeliefTracker, WumpusSimulator, WumpusWorld,
+from ..domain.interactive import TIGER_LEVEL_ZERO_NOISE, nested_problem
+from ..domain.multiagent_tiger import Agent, build_multiagent_tiger
+from ..domain import (BatchedPOMDPEnv, FinitePOMDP, TigerAction, WumpusBeliefTracker, WumpusSimulator, WumpusWorld,
                       action_value_functions, build_tiger_pomdp, game_outcomes, solve_infinite_horizon)
 from ..domain.wumpus import DEATH_REWARD, GAME_OVER, NUM_CELLS, STEP_COST, Percept, WumpusAction, ego_map_targets
 from ..interpretability import BeliefAnalysis, analyze_beliefs, build_probe_dataset, build_wumpus_dataset, plot_latent_pca
@@ -97,8 +99,22 @@ def wumpus_setup(device: torch.device, discount: float) -> DomainSetup:
 
 
 # Domains selectable through conf/env/<name>.yaml (section 2).
+def itiger_setup(device: torch.device, level: int, discount: float, bracket_epsilon: float) -> DomainSetup:
+    """
+    Two-agent tiger: agent i's level-`level` problem, the fold of agent j's certified level-(level-1) controller
+    (domain/interactive.py; conf/env/itiger.yaml). The fold is an exact FinitePOMDP, so it trains and simulates
+    exactly like the canonical Tiger; no extra episode summary.
+    """
+    problem = nested_problem(build_multiagent_tiger(discount), Agent.I, level, TIGER_LEVEL_ZERO_NOISE,
+                             bracket_epsilon, int(TigerAction.LISTEN))
+    pomdp = problem.pomdp
+    return DomainSetup(pomdp, lambda batch, steps, seed, dev: BatchedPOMDPEnv(pomdp, batch, steps, seed, dev),
+                       lambda episodes: {})
+
+
 DOMAIN_BUILDERS = {"tiger": lambda env, device: tiger_setup(device),
-                   "wumpus": lambda env, device: wumpus_setup(device, env.discount)}
+                   "wumpus": lambda env, device: wumpus_setup(device, env.discount),
+                   "itiger": lambda env, device: itiger_setup(device, env.level, env.discount, env.bracket_epsilon)}
 
 
 def build_run_config(cfg: DictConfig) -> RunConfig:

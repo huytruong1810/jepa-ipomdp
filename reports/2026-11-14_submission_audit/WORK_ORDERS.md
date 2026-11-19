@@ -2,6 +2,26 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-18 19:50 — contribution (2): the I-POMDP core is built and verified; one open problem (the benchmark's upper bound); session wrap-up
+
+**What exists** (commit of this block):
+- **The game:** the two-agent tiger tables of Gmytrasiewicz & Doshi (2005), Table 1, read at the source.
+- **The fold:** a finitely nested I-POMDP is folded into an ordinary POMDP over (tiger side, the other agent's controller node, its last action), so every exact and learned component of the codebase applies unchanged.
+- **Level 0** is the paper's noise model.
+- **Higher levels** fold the other agent's controller, extracted from a certified bracket (HSVI) of its own problem.
+
+**Verified** (tests and the record in `reports/2026-11-16_code_audit/REVIEW.md`):
+- **Degenerate cases:** an always-listening other agent reproduces the canonical Tiger exactly; an always-opening one gives -1/(1-gamma); a uniformly random one gives Q_2(b0) = -1.95 / -45.95.
+- **Bayes filter and simulator:** the folded filter matches brute force to 1e-12, and the folded simulator matches a direct two-agent simulation.
+- **Independent implementation:** a second implementation written independently from the same paper agrees: tables exactly, values to 3e-14 (`reports/2026-11-16_code_audit/ipomcp_crosscheck.py` and `.log`).
+- **Published values:** the paper's level-0 policy thresholds (Fig. 4) come out within 0.003 of the printed values (undiscounted, as its finite-horizon examples are).
+
+**Two points you will want for any claim:**
+1. **The paper's level-1 action probabilities are not reproduced.** Section 7.3 gives OL 0.009076, L 0.96591, OR 0.02501 for the other agent two steps from the end, after i hears <GL,S>. Ours give L 0.87-0.90. An independent brute force over 200k values of the other agent's belief, with no fold, agrees with our fold to 1e-6. So this is a convention in the paper we could not identify, not a bug we can find. I would not cite agreement with that figure.
+2. **No tight benchmark yet for the level-1 problem.** The exact solver is out of reach at gamma 0.95. Its level-0 alone takes 15 minutes; level 1 has 26 states and 6 informative observations. HSVI's lower bound converges (16.54), but its upper bound stalls (44.8 after about 1,000 trials). The next session tries a tighter upper bound: a relaxation in which the other agent's node is revealed, and an LP-based interpolation. If none brackets the value to about 0.5, E1 can only claim "within the certified bracket". That bears on the go / no-go date for contribution (2) that you will put to the user.
+
+**Nothing of contribution (2) is registered or run on the GPU yet.** E1 will be registered in PROTOCOL.md before its first non-smoke run. This WSL session is ending; a fresh one continues from HANDOFF.md.
+
 ## STATUS 2026-11-18 — W12 DONE: ledger ids for "Repairing the observation model" and for G0 (CPU only); rulings applied
 
 **Ledger:** 254 / 254 claims OK, 679 values (184 new under `dev.remedy.*` and `dev.g0.*`). `audit_w12` in `ledger.py`. The manifest is regenerated and verifies (312 artifacts). Log-sourced ids are marked "log", and their logs are copied to `logs/w12/`. No claim rows were added: `claims.yaml` is yours.

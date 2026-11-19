@@ -1,0 +1,27 @@
+# @package _global_
+# ABSOLUTE PATH: conf/env/itiger.yaml
+# ==============================================================================
+# TWO-AGENT TIGER AS A FINITELY NESTED I-POMDP (Gmytrasiewicz & Doshi 2005, Section 7.1)
+# ==============================================================================
+#
+# DESIGN DECISIONS:
+# 1. The Learning Agent Is Agent i at a Declared Level:
+#    - The joint tables are Table 1 of the paper (src/ipomdp/domain/multiagent_tiger.py); configuration only picks
+#      agent i's strategy level and the discount. Agent i's problem is the fold of agent j's level-(level-1)
+#      controller into i's view (src/ipomdp/domain/interactive.py): a FinitePOMDP over (tiger side, j's controller
+#      node, j's last action), whose sizes the training run derives at start-up like every other domain.
+#    - Level 0 is the paper's noise model (the other agent opens each door with probability 0.1, listens with 0.8),
+#      and every lower level is solved by a certified bracket (src/ipomdp/domain/bounds.py) to bracket_epsilon;
+#      its controller is extracted from the bracket and is part of the definition of agent i's problem, so
+#      bracket_epsilon is a domain parameter, saved with every run.
+# 2. Episodes and Discount as in the Canonical Tiger:
+#    - 100-step windows and gamma = 0.95, so returns compare with the single-agent benchmark's protocol; the game
+#      continues after a door is opened (the tiger is re-placed), as in Table 1.
+# ==============================================================================
+
+env:
+  name: itiger
+  max_steps: 100              # Steps per episode window, as the canonical Tiger
+  discount: 0.95              # gamma of agent i's problem and of every level below it
+  level: 1                    # agent i's strategy level l >= 1; j is modelled at l - 1
+  bracket_epsilon: 0.05       # certified bracket width of every level below l (defines j's controller)

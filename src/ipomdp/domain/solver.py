@@ -5,10 +5,12 @@
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
 # 1. Role in the Project:
-#    - This is the exact benchmark. The learned JEPA + MCTS agent must reproduce its
-#      values and actions on the canonical Tiger before any larger experiment is run.
-#      Through the S x M_j reduction documented in pomdp.py it also serves as the exact
-#      benchmark for finitely nested I-POMDPs with finite opponent model sets.
+#    - This is the exact benchmark of the canonical Tiger: the learned agent must reproduce its values and
+#      actions there before any larger experiment is run. It also certifies small folded interactive problems
+#      (domain/interactive.py), but its linear programs grow with the number of states and observations: a
+#      level-0 noise model of the two-agent tiger (2 states, 2 merged observations) takes about 15 minutes at
+#      gamma = 0.95, and the folded levels above (tens of states, 6 observations) are out of reach. Those are
+#      bracketed by domain/bounds.py (HSVI), whose interval this solver's values must fall inside on the Tiger.
 #
 # 2. Representation:
 #    - The optimal h-step value function is piecewise-linear and convex (Sondik, 1971):
@@ -52,8 +54,8 @@
 #      The sup-norm distance between two PWLC functions is computed EXACTLY by LPs
 #      (max over the simplex of each one minus the other), so the reported bound is a
 #      proof, not an estimate. Iteration stops once the bound is below `tolerance`.
-#    - On the canonical Tiger, eps = 1e-6 certifies V* to 1e-4 in well under a minute,
-#      whereas eps = 1e-9 keeps many vectors with negligible advantage mid-horizon.
+#    - On the canonical Tiger, eps = 1e-6 certifies V* to 0.01 in about 2.5 minutes on one CPU thread (and to 1e-4
+#      in the slow test), whereas eps = 1e-9 keeps many vectors with negligible advantage mid-horizon.
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -138,7 +140,7 @@ def _simplex_lp(cost: np.ndarray, a_ub: np.ndarray) -> np.ndarray:
     return result.x
 
 
-def _witness(candidate: np.ndarray, envelope: np.ndarray) -> tuple[float, np.ndarray]:
+def witness(candidate: np.ndarray, envelope: np.ndarray) -> tuple[float, np.ndarray]:
     """
     Largest margin by which `candidate` beats every vector of `envelope` at a single belief.
 
@@ -191,7 +193,7 @@ def prune(vectors: Tensor, actions: Tensor, epsilon: float) -> tuple[Tensor, Ten
     candidates = list(np.flatnonzero(~in_envelope))
     while candidates:
         idx = candidates.pop()
-        delta, belief = _witness(vecs[idx], vecs[in_envelope])
+        delta, belief = witness(vecs[idx], vecs[in_envelope])
         if delta <= epsilon:
             continue
         pool = candidates + [idx]
