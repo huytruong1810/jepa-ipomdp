@@ -65,6 +65,8 @@
 #      lookup, so a term on P can see outcomes paid through the reward (training/trainer.py, section 2i).
 #    - Same residual stack and zero-initialised projection as RewardHead. Off (the default and canonical Tiger)
 #      builds the plain RewardHead.
+#    - Verdict: not adopted (reports/2026-10-02_wumpus_diagnostics/objective_ab.py 2p, retrain screen: -45.9 / +20.6 /
+#      -42.8 per game against the control alone, -91.0 / +41.7 / +40.1 with the Q-equivalent term; FAIL on both rules).
 #
 # 3. Observation Head (the planning model):
 #    - P(o_{t+1} | z_t, a_t). The planner branches over its outcomes and steps the belief

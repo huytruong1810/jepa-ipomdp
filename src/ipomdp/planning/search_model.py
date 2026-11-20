@@ -49,6 +49,8 @@
 #      through the truncation and values a wasted step at only about 1 + (1 - gamma) * V
 #      (reports/2026-10-02_wumpus_diagnostics/unfinished_diag.py).
 #    - horizon=None (the default and canonical Tiger) leaves every computation unchanged.
+#    - Verdict: not adopted (training/run.py, section 9: 200 / 108 / 143 per game against 186 / 166 / 215 on three
+#      paired seeds, about 69% of games still unfinished).
 #
 # 6. Fixed Planning-Time Risk Margin (RiskMarginModel; mcts.risk_margin, 2026-10-22; training/run.py, 16):
 #    - A domain with a fatal outcome describes it by a RiskSpec: the step action whose outcome can be fatal
@@ -86,6 +88,10 @@
 #      objective_ab.py 2m). Q(GRAB at the gold) = r + gamma V(go) then decides whether the agent ends the game: at
 #      V(go) = -50 the agent stood on the gold and did not grab it (GRAB the argmax on 3.9% of GLITTER steps).
 #    - A domain without an absorbing percept (Tiger) is never wrapped.
+#    - Verdict: not adopted. The anchor alone, in training and planning, does not help the recipe offline
+#      (reports/2026-10-02_wumpus_diagnostics/objective_ab.py 2n, PASS-A: -44.5 / +11.6 / +5.7 per game). Combined
+#      with the strong-weight-decay retrain in-agent (training/run.py, section 14, sweep wumpus_retrain_wd1_abs) it
+#      fails the registered mean bar: +22.1 per game over three seeds against +30.
 #
 # 8. Observation-Conditioned Reward (LearnedSearchModel with an ObservationRewardHead; model.observation_reward,
 #    2026-10-27; models/heads.py, section 2d):
@@ -97,6 +103,8 @@
 #      the protocol and every wrapper read rewards (N, A) exactly as before. branch_rewards is read by the trainer's
 #      Q-equivalent term (training/trainer.py, section 2i) and is None for every other model.
 #    - Not combined with a finite horizon (raises).
+#    - Verdict: not adopted (objective_ab.py 2p, retrain screen: the restructured reward alone plays -45.9 / +20.6 /
+#      -42.8 per game against the control, and with the Q-equivalent term -91.0 / +41.7 / +40.1; FAIL on both rules).
 #
 # 9. Planner-Consistent Pruning (PrunedModel; model.target_prune, 2026-11-10; training/trainer.py, 3h):
 #    - The tree search drops observation branches with P(o | s, a) < delta and renormalises the rest (planning/mcts.py,
@@ -107,6 +115,8 @@
 #      > delta, so the sum is never 0. Rewards, successor states and values are unchanged, as in the tree (an
 #      observation-conditioned reward keeps its unpruned expectation, exactly as the tree's edge reward does).
 #    - Used only for the trainer's targets; the planners prune in the tree. delta = 0 is never wrapped.
+#    - Verdict: not adopted. Screened only together with the absorbing codec bound (PROTOCOL.md, C-h, arm CBP): +5.7 /
+#      +41.9 / +9.8 per game against the control, mean +19.2, below the registered +20.
 #
 # 10. History-Token States (TokenSearchModel; model.filter=transformer, 2026-11-11; models/history_filter.py):
 #    - A history filter has no step(z, a, o): its state is the history. A state is an int64 vector
@@ -119,6 +129,9 @@
 #      target reads instead of next_states.
 #    - Not combined with a finite horizon or an observation-conditioned reward (raises). The tree search, the planning
 #      agent and every wrapper (sections 6, 7, 9) work unchanged: they only pass states through.
+#    - Verdict: not adopted (PROTOCOL.md, C-j, arm TR: -487.6 / -408.1 / -425.0 per game against the control, deaths
+#      54-56%; FAIL on both rules). The history filter learns a weaker latent in the recipe's 6400 updates, without
+#      tuning of its own; the token-state search itself reproduces the filter's unroll to 1e-6.
 # ==============================================================================
 
 from dataclasses import dataclass, replace

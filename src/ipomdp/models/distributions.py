@@ -18,7 +18,7 @@
 #      |r| <= max|R| and |V| <= max|R| / (1 - gamma) (2000 for canonical Tiger).
 #    - Why bounded: DreamerV3's fixed R = 20 puts bins at +-4.85e8. In real space the mean
 #      is then dominated by the residual softmax mass on those bins (1e-7 of probability on
-#      4.85e8 shifts the mean by 48), measured as a -3.8 bias on the -100/+10 test below and
+#      4.85e8 shifts the mean by 48), measured as a -3.8 bias on the -100/+10 test (tests/test_models.py) and
 #      a 0.5 offset for uniform logits in float32. Bounding the grid by the domain's value
 #      bound removes both effects without introducing any tunable range.
 #

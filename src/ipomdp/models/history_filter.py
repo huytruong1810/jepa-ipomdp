@@ -13,6 +13,10 @@
 #      to the same history tokens as before the turn, plus one new token, so the visited cells stay addressable
 #      instead of being re-encoded by a recurrence. It is the history-based information state of POMDP theory
 #      (the history is a sufficient statistic; the belief is its compression).
+#    - Verdict: not adopted (reports/2026-10-19_eval_protocol/PROTOCOL.md, C-j, arm TR: -487.6 / -408.1 / -425.0 per
+#      game against the control, deaths 54-56%; FAIL on both rules). With the recipe's optimiser and 6400 updates it
+#      learns a weaker latent (MLP cell / heading 0.69 / 0.65-0.69 against the control's 0.82-0.88 / 0.86-0.93); it
+#      had no tuning of its own (learning rate, warm-up, depth), which limits the claim.
 #
 # 2. Contract (identical to BeliefFilter.unroll, so heads, probes and every loss are unchanged):
 #    - unroll(actions (B, T, A) one-hot, observations (B, T, O) one-hot, initial (B, O) one-hot or None) ->
