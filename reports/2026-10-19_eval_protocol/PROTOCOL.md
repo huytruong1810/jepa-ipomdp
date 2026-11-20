@@ -335,7 +335,11 @@ Networks: best.pt of the three stored oracle + double runs (exact-belief targets
 
   - Per-seed values are in the log. Seeds 1 and 6 carry most of the gap: -0.33 and -0.32 at N = 128. Seed 9 is +0.198 at N = 1 and at N >= 50.
   - Reading, by the registered rule: the interval contains 0 at every N >= 16, in fact at every N. The learned value is accurate enough that the search budget does not change Tiger play, and the Wumpus search-budget result (C-g) is attributed to the Wumpus model.
-  - Comparison: on the exact model, zero leaves lose 5.4 per episode at N = 2 and 5.9 at N = 4, recovering to -2.9 at N = 16, while V8 leaves are optimal from N = 32 (`reports/2026-11-16_code_audit/planner_budget.log`). The learned leaves behave like accurate leaves, not like zero leaves.
+  - Comparison, on the exact model with the same paired episodes (`reports/2026-11-16_code_audit/planner_budget.log`, minus optimal per episode, +- s.e.):
+    - zero leaves: -5.44 at N = 2 and -5.93 at N = 4, back to -0.65 at N = 64, then -4.26 +- 2.81 at N = 128;
+    - V3 leaves: optimal at N <= 2, -4.13 at N = 4, -0.01 at N = 64, -0.23 at N = 128;
+    - V8 leaves: optimal at every N except N = 8 (-0.75 +- 1.10).
+    - So with biased leaves the return oscillates with the budget (the horizon effect) instead of improving monotonically. The learned leaves behave like accurate leaves, not like zero leaves.
 
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
