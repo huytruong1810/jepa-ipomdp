@@ -106,13 +106,16 @@
 #    - Not guaranteed: the decision at a finite budget. PUCT deepens the promising action first, so actions are
 #      compared on subtrees of different depths, and with biased leaves the comparison can flip as N grows (the
 #      horizon effect of best-first search). On the exact canonical Tiger with zero leaves, the greedy agent plays
-#      the optimal actions at N = 1, then loses 5.4 per episode at N = 2 and 5.9 at N = 4 (paired over 256
-#      episodes, 95% half-widths about 3) and recovers to -1.1 at N = 32; with V_8 leaves the root decision is
-#      optimal at every budget tested. The bound tightens slowly: after 4096 simulations d_a is 2 or 3 at every root.
+#      the optimal actions at N = 1, loses 5.4 per episode at N = 2 and 5.9 at N = 4, comes back to -0.6 at N = 64
+#      and falls again to -4.3 at N = 128 (paired over 256 episodes, 95% half-widths about 3). V_3 leaves dip to
+#      -4.1 at N = 4; V_8 leaves play optimally except -0.75 +- 1.10 at N = 8. The bound tightens slowly: after 4096
+#      simulations d_a is 2 or 3 at every root.
 #    - Consequence: at practical budgets the leaf value and the model set the decision quality, not the number of
 #      simulations, and more search converges to the optimal policy of the MODEL it is given. With a learned model
 #      that policy exploits the model's errors (the optimizer's curse), so a learned planner need not improve with
-#      its budget (PROTOCOL.md: C-g on Wumpus; C-q.3 measures the learned Tiger planner).
+#      its budget. Measured: the learned Tiger planner is flat in the budget (PROTOCOL.md, C-q.3: the gap to the
+#      optimal agent contains 0 at every N from 1 to 128, ten seeds), so its leaves behave like accurate ones; on
+#      Wumpus more search brings more deaths (C-g), which C-q.3's registered rule attributes to the Wumpus model.
 # ==============================================================================
 
 from bisect import bisect_right

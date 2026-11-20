@@ -74,18 +74,22 @@ The solver's witness LP becomes public; nothing numeric changes.
   - A from-scratch expectimax of the final tree reproduces every cached value exactly, with and without pruning.
 - **Not guaranteed: the decision.**
   - PUCT deepens the promising action first, so with biased leaves the actions are compared on subtrees of unequal depth (the horizon effect).
-  - With zero leaves, the greedy agent plays the optimal actions on all 256 episodes at N = 1. It is worse at every budget from 2 to 16 and has nearly recovered by 32-64. Table below: paired per episode with the optimal agent, mean +- 1.96 s.e.
-  - With V8 leaves, the root decision is optimal at every budget at all six beliefs (part A).
+  - With zero leaves, the greedy agent plays the optimal actions on all 256 episodes at N = 1. It is worse at every larger budget, comes back to -0.65 at N = 64 and falls again to -4.26 at N = 128: the return oscillates with the budget, it does not converge monotonically.
+  - V3 leaves dip at N = 4 (-4.13) and approach the optimum from 16 on. V8 leaves are optimal except at N = 8 (-0.75 +- 1.10).
+  - Table: paired per episode with the optimal agent (22.375 on these episodes), mean +- 1.96 s.e. over the 256 episodes.
+  - Part A agrees at fixed beliefs: with V8 leaves the root decision is optimal at every budget at all six beliefs, while zero and V1 leaves flip it back and forth.
   - The search deepens slowly: d_a is 2-3 at every root after 4096 simulations.
 
-  | Leaves | N = 1 | 2 | 4 | 8 | 16 | 32 | 64 |
-  |---|---|---|---|---|---|---|---|
-  | zero | +0.00 | -5.44 +- 2.88 | -5.93 +- 3.06 | -3.67 +- 2.92 | -2.89 +- 2.79 | -1.06 +- 1.99 | -0.65 +- 1.62 |
+  | Leaves | N = 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 |
+  |---|---|---|---|---|---|---|---|---|
+  | zero | +0.00 | -5.44 +- 2.88 | -5.93 +- 3.06 | -3.67 +- 2.92 | -2.89 +- 2.79 | -1.06 +- 1.99 | -0.65 +- 1.62 | -4.26 +- 2.81 |
+  | V3 | +0.00 | +0.00 | -4.13 +- 2.88 | -1.88 +- 1.73 | -0.60 +- 1.17 | -0.42 +- 0.76 | -0.01 +- 0.81 | -0.23 +- 0.46 |
+  | V8 | +0.00 | +0.00 | +0.00 | -0.75 +- 1.10 | -0.01 +- 0.68 | +0.00 | +0.00 | +0.00 |
+- **The learned Tiger planner** (PROTOCOL C-q.3, read once; ten JEPA seeds on the same 256 episodes) is flat in the budget. Its mean gap to the optimal agent is between -0.07 and -0.28 per episode at every N from 1 to 128, and every Student-t interval over the ten seeds contains 0 (N = 128: -0.076 [-0.198, +0.046]). Its learned leaves behave like the accurate V8 leaves, not like zero leaves.
 - **Reading:**
-  - At practical budgets the leaf value and the model set the decision quality, not the number of simulations.
-  - More search converges to the optimal policy of the model it is given, so with a learned model it can exploit the model's errors. That is the paper's more-search-more-deaths result on Wumpus (PROTOCOL C-g).
+  - At practical budgets the leaf value and the model set the decision quality, not the number of simulations. With poor leaves the decision is not monotone in the budget even on an exact model.
+  - More search converges to the optimal policy of the model it is given, so with a learned model it can exploit the model's errors. That fits the paper's more-search-more-deaths result on Wumpus (PROTOCOL C-g), which C-q.3's registered rule attributes to the Wumpus model.
   - With the exact Wumpus model the planner does improve with the budget: 335 / 424 / 476 per game at 50 / 200 / 1000 simulations (`wumpus_exact_model.py`, section 4).
-  - The learned Tiger planner is measured against its budget by C-q.3 (registered at edb2483, running).
 
 **Reference agent at the paper's threshold (risk 0.4; `tests/test_wumpus_agents.py`, slow).** Against an independent exact filter, every gamble had an exact danger <= 0.4. Over 64 games, only 6 of its steps were gambles; the largest danger taken was 1/3, and no game ended in a death. It won 68.8% of the games against 59.4% at risk 0.
 
