@@ -2,6 +2,31 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-20 12:20 — BA-POMCP's design (user rulings); C-q.3 corrected; E1's benchmark file
+
+**BA-POMCP** (Katt, Oliehoek & Amato 2017; code `src/ipomdp/baselines/ba_pomcp.py`, ab7934a, by the reviewer session). User rulings of 2026-11-19 and 2026-11-20, taken via AskUserQuestion after two findings of the reviewer:
+- **Rollouts:** the paper names none. With POMCP's uniform default, BA-POMCP fails even on the true model in our continuing Tiger: at P = 0.9999 it still listens at 10,000 simulations, because random continuations are worth about -380 and a door only brings them sooner.
+  - Main arm: rollouts follow the optimal policy of its own posterior-mean MDP with the known reward.
+  - The uniform rollout is a reported arm, with that reason.
+- **Priors:**
+  - Tiger main arm: the paper's prior (T known, LISTEN's O at 5 / 3 counts).
+  - Sensitivity arm: an oriented 1.25 / 0.75 prior. A symmetric uninformed prior is degenerate, because BA-POMCP never observes rewards and cannot learn which growl is which (its belief stays at 1/2).
+  - I-Tiger main arm: T over the 26-state fold uninformed, i's own O oriented. Upper reference: T known.
+  - BA-POMCP is told the state space, which on I-Tiger reveals the structure of j's controller. That is stated.
+- **Experience and compute:**
+  - 200 learning episodes x 100 steps (10 runs), then the 256 paired episodes;
+  - 1,000 simulations (main) and 50 (compute matched to our planner);
+  - learning curves against environment steps beside ours.
+- **Statistics:** each arm's gap to the optimal agent is paired per episode, with Student-t over 10 runs. BA-POMCP minus ours uses Welch's two-sample t.
+- Registered as C-r by the reviewer session before any run.
+
+**C-q.3 comparison corrected** (0827bab). On the exact model with biased leaves, the return oscillates with the search budget (zero leaves fall again to -4.26 at N = 128 after -0.65 at N = 64); my earlier "recovers" was wrong.
+
+**E1's benchmark file:**
+- The 1,000-trial lower-bound run that backed up corners did not finish in 11 hours (corner sweeps grow with the stored points); it was stopped, and its partial log is kept.
+- `runs/benchmarks/itiger_level1.pt` is being written by unseeded HSVI (1,000 trials, hsvi()'s trials), with U = 19.6692 from the delay-2 relaxation.
+- The analysis plumbing (`experiments/interactive_analysis.py`, 859e612, by the reviewer session) reads that file, checks the fold digest, and plays the reference agent (the best lower-bound vector's action, value >= L).
+
 ## STATUS 2026-11-19 23:00 (updated 00:05) — four user rulings; the level-1 benchmark's upper bound falls from 44.8 to 19.67 (certified)
 
 **User rulings, 2026-11-19 (AskUserQuestion in the manager session; the audit seat was empty):**
