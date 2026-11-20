@@ -150,6 +150,29 @@ class TestPlanning:
         assert first[0] == again[0] and np.array_equal(first[1], again[1]) and first[2] == again[2]
 
 
+def test_simulator_rows_do_not_depend_on_other_rows_actions(tiger):
+    # The C-r evaluation plays the 256 paired episodes in chunks of live agents, the other rows taking a fixed action
+    # (reports/2026-10-19_eval_protocol/ba_pomcp_baseline.py, section 4). That is exact only if a row's trajectory is a
+    # function of its own actions: BatchedPOMDPEnv draws its random numbers independently of the actions.
+    def trajectories(mixed: bool):
+        env = BatchedPOMDPEnv(tiger, 64, 30, 11, torch.device("cpu"))
+        env.reset()
+        draws = torch.Generator().manual_seed(5)
+        observations, states = [], []
+        for _ in range(30):
+            action = torch.randint(0, 3, (64,), generator=draws)
+            if mixed:
+                action[:16] = LISTEN                                # rows outside the chunk act differently
+                action[48:] = OPEN_LEFT
+            out = env.step(action)
+            observations.append(out.observation)
+            states.append(env.state.clone())
+        return torch.stack(observations, 1), torch.stack(states, 1)
+    (full_o, full_s), (mixed_o, mixed_s) = trajectories(False), trajectories(True)
+    assert torch.equal(full_o[16:48], mixed_o[16:48]) and torch.equal(full_s[16:48], mixed_s[16:48])
+    assert not torch.equal(full_o[:16], mixed_o[:16])               # the other rows did change
+
+
 @pytest.mark.slow
 def test_point_mass_prior_plays_the_optimal_return(tiger):
     """
