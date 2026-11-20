@@ -10,10 +10,13 @@
 #      agent i's strategy level and the discount. Agent i's problem is the fold of agent j's level-(level-1)
 #      controller into i's view (src/ipomdp/domain/interactive.py): a FinitePOMDP over (tiger side, j's controller
 #      node, j's last action), whose sizes the training run derives at start-up like every other domain.
-#    - Level 0 is the paper's noise model (the other agent opens each door with probability 0.1, listens with 0.8),
-#      and every lower level is solved by a certified bracket (src/ipomdp/domain/bounds.py) to bracket_epsilon;
-#      its controller is extracted from the bracket and is part of the definition of agent i's problem, so
-#      bracket_epsilon is a domain parameter, saved with every run.
+#    - Level 0 is the paper's noise model (the other agent opens each door with probability 0.1, listens with 0.8).
+#      Every lower level's controller is extracted from a bracket of width controller_epsilon and certified by a
+#      bracket of width bracket_epsilon (src/ipomdp/domain/interactive.py, section 6). The controller is part of the
+#      definition of agent i's problem, so both are domain parameters, saved with every run.
+#    - controller_epsilon 0.5 (design decision for the interactive experiments): j's level-0 controller has 11
+#      reachable, minimal nodes, and i's level-1 fold has 26 states. It is certified within 0.050 of j's optimum.
+#      Extraction at 0.05 gives a 38-node controller with a slightly lower value and an 80-state fold.
 # 2. Episodes and Discount as in the Canonical Tiger:
 #    - 100-step windows and gamma = 0.95, so returns compare with the single-agent benchmark's protocol; the game
 #      continues after a door is opened (the tiger is re-placed), as in Table 1.
@@ -24,4 +27,5 @@ env:
   max_steps: 100              # Steps per episode window, as the canonical Tiger
   discount: 0.95              # gamma of agent i's problem and of every level below it
   level: 1                    # agent i's strategy level l >= 1; j is modelled at l - 1
-  bracket_epsilon: 0.05       # certified bracket width of every level below l (defines j's controller)
+  bracket_epsilon: 0.05       # certified bracket width of every level below l (certifies j's controller)
+  controller_epsilon: 0.5     # bracket width j's controller is extracted from (defines j's controller)

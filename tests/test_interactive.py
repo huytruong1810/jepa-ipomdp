@@ -22,8 +22,9 @@ import torch
 
 from ipomdp.domain import (BatchedPOMDPEnv, FinitePOMDP, TigerAction, TigerState, action_value_functions, belief_update,
                            build_tiger_pomdp, solve_finite_horizon)
-from ipomdp.domain.bounds import hsvi
-from ipomdp.domain.interactive import TIGER_LEVEL_ZERO_NOISE, fold, nested_problem, noise_model
+from ipomdp.domain.bounds import _HSVI, hsvi, hsvi_budget, revealed_upper_bound
+from ipomdp.domain.interactive import (TIGER_LEVEL_ZERO_NOISE, fold, nested_problem, noise_model,
+                                       relaxation_reveal)
 from ipomdp.domain.multiagent_tiger import (CREAK_ACCURACY, CREAK_ERROR, OBSERVATIONS, Agent, Creak, Growl,
                                             build_multiagent_tiger)
 from ipomdp.domain.policy_graph import (constant_policy, envelope, evaluate, node_law_on_segment, plan_graph,
@@ -40,6 +41,11 @@ def onehot(i: int, n: int) -> torch.Tensor:
     v = torch.zeros(n, dtype=F64)
     v[i] = 1.0
     return v
+
+
+def hsvi_corners(model: FinitePOMDP) -> torch.Tensor:
+    """The fast informed bound's corner values (bounds.py, section 3)."""
+    return torch.from_numpy(_HSVI(model).corner)
 
 
 def value_at_b0(model: FinitePOMDP, horizon: int) -> list[float]:
@@ -289,10 +295,75 @@ class TestBracket:
 class TestHierarchy:
 
     def test_level_one_problem_folds_the_certified_level_zero_controller(self):
-        problem = nested_problem(build_multiagent_tiger(0.95), Agent.I, 1, TIGER_LEVEL_ZERO_NOISE, 2.0, L)
+        problem = nested_problem(build_multiagent_tiger(0.95), Agent.I, 1, TIGER_LEVEL_ZERO_NOISE, 2.0, 2.0, L)
         (zero,) = problem.below
         assert zero.agent == Agent.J and zero.level == 0
         assert zero.problem.num_observations == 2 and zero.controller.num_observations == 6    # merged, then expanded
         assert problem.interactive.other is zero.controller and problem.pomdp.num_observations == 6
         assert zero.bracket.lower <= zero.bracket.upper <= zero.bracket.lower + 2.0
         assert zero.controller_value <= zero.bracket.upper + 1e-9
+
+
+class TestRelaxedBound:
+    """bounds.revealed_upper_bound and interactive.relaxation_reveal (bounds.py and interactive.py, section 5)."""
+
+    def test_an_empty_revelation_gives_the_certified_tiger_optimum(self):
+        # A constant symbol carries no information, so the relaxed problem is the canonical Tiger, whose beliefs
+        # (growl-count differences, merged once a coordinate rounds to zero) form a finite graph.
+        bound = revealed_upper_bound(build_tiger_pomdp(), lambda action, history: 0, 1)
+        assert 19.3713 - 1e-4 <= bound.upper <= 19.3713 + 1e-4 + bound.merge_slack   # certified V*(b0) to 1e-4
+        assert bound.merge_slack < 1e-5
+
+    def test_revealing_the_state_gives_the_fully_observable_value(self):
+        # Knowing the arrival state, the agent listens once and then opens the treasure door every step:
+        # V(b0) = -1 + gamma * 10 / (1 - gamma) = 189.
+        bound = revealed_upper_bound(build_tiger_pomdp(), lambda action, history: history[-1], 1)
+        assert bound.upper == pytest.approx(189.0, abs=1e-6)
+
+    def test_a_listening_other_agent_reveals_nothing(self):
+        # j always listens: its previous action is always LISTEN and its node never changes, so the relaxation of
+        # section 5 adds no information to the canonical Tiger with an uninformative creak.
+        folded = fold(build_multiagent_tiger(0.95).view(Agent.I), constant_policy(onehot(L, 3), 6, "listen"), L)
+        for delay in (0, 1, 2):
+            reveal, memory = relaxation_reveal(folded, delay, (OL, OR))
+            bound = revealed_upper_bound(folded.pomdp, reveal, memory)
+            assert 19.3713 - 1e-4 <= bound.upper <= 19.3713 + 1e-4 + bound.merge_slack
+
+    def test_seeded_budget_bracket_starts_from_the_relaxed_values(self):
+        # An empty revelation's values are V* itself, so seeded with them the bracket's upper end is V*(b0) after a
+        # single trial, the corners come from the relaxed corners, and the lower end stays below it.
+        model = build_tiger_pomdp()
+        relaxed = revealed_upper_bound(model, lambda action, history: 0, 1, extra_roots=torch.eye(2, dtype=F64))
+        bracket = hsvi_budget(model, 0.5, 1, corners=relaxed.root_values[1:], points=(relaxed.beliefs, relaxed.values))
+        assert bracket.trials == 1
+        assert bracket.lower <= 19.3713 <= bracket.upper <= relaxed.upper + 1e-9
+        # Unseeded, it reaches the requested width on the canonical Tiger and the bracket still contains V*(b0).
+        unseeded = hsvi_budget(model, 0.5, 100_000)
+        assert unseeded.upper - unseeded.lower <= 0.5 and unseeded.lower <= 19.3713 <= unseeded.upper
+
+    @pytest.mark.slow
+    def test_level_one_relaxation_tightens_with_delay_and_dominates_a_feasible_controller(self):
+        # E1's level-1 problem (conf/env/itiger.yaml: j's 11-node controller extracted at 0.5, certified at 0.05;
+        # 26 states; about 1.5 min to build and 2.5 min for the two bounds).
+        problem = nested_problem(build_multiagent_tiger(0.95), Agent.I, 1, TIGER_LEVEL_ZERO_NOISE, 0.05, 0.5, L)
+        (zero,) = problem.below
+        assert problem.pomdp.num_states == 26 and zero.bracket.upper - zero.controller_value <= 0.051
+        bounds = []
+        for delay in (0, 1):
+            reveal, memory = relaxation_reveal(problem.interactive, delay, (OL, OR))
+            bounds.append(revealed_upper_bound(problem.pomdp, reveal, memory))
+        # Delay 0 reveals a superset of what delay 1 reveals, so its bound cannot be lower.
+        assert bounds[1].upper <= bounds[0].upper + bounds[0].merge_slack + bounds[1].merge_slack
+        # Below the fast informed bound, above the exact value of a feasible controller: the canonical Tiger's
+        # compact controller, deaf to creaks (growl-major columns, multiagent_tiger.OBSERVATIONS).
+        fib = float(problem.pomdp.initial_belief @ hsvi_corners(problem.pomdp))
+        canonical = build_tiger_pomdp()
+        bracket = hsvi(canonical, 0.5)
+        compact = stationary_graph(canonical, AlphaVectorSet(bracket.lower_vectors,
+                                                             bracket.controller.action_law.argmax(-1)), 0.05)
+        deaf = expand_observations(compact, torch.tensor([0, 0, 0, 1, 1, 1]))
+        feasible = float(deaf.initial_law @ (evaluate(problem.pomdp, deaf) @ problem.pomdp.initial_belief))
+        assert feasible <= bounds[1].upper <= bounds[0].upper < fib
+        # The returned points are upper bounds at their marginals: b0's marginal is b0 itself.
+        assert torch.equal(bounds[1].beliefs[0], problem.pomdp.initial_belief)
+        assert float(bounds[1].values[0]) == bounds[1].upper

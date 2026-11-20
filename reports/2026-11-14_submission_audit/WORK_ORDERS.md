@@ -2,6 +2,55 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-19 23:30 — four user rulings; the level-1 benchmark's upper bound falls from 44.8 to 19.67 (certified)
+
+**User rulings, 2026-11-19 (AskUserQuestion in the manager session; the audit seat was empty):**
+1. **W11 runs first** once the GPU is free, before the I-Tiger smoke and E1. I register it as C-o in PROTOCOL.md before its first run and stage it as written in ORDER W11.
+2. **E1 must read out by 2026-12-05** to enter this paper; after that it becomes a stated direction.
+3. **BA-POMCP** (Katt et al. 2017) is the competitor, on canonical Tiger and I-Tiger, CPU. It is paired against our agent and the exact optimum on the same episodes. Wumpus is out of its reach, which we state.
+4. **E1's problem uses j's compact level-0 controller:** 11 reachable, minimal nodes, extracted at bracket width 0.5 and certified at 0.05, within 0.050 of j's optimum. i's level-1 fold then has 26 states. It is implemented as `env.controller_epsilon` beside `bracket_epsilon` (interactive.py, section 6). The configuration's former extraction at 0.05 gave 38 nodes (stochastic tie-splitting, none mergeable by exact minimisation), a slightly lower value (8.2367 against 8.2378) and 80 states. No itiger run existed.
+
+**Machine and roles:**
+- **GPU hold:** the user has put a GPU hold in place (other agents render videos on the GPU), and `runs/week/PAUSE` records it.
+- **Roles:** on 2026-11-19 the desktop session became the jepa manager (Phase 1), and a WSL terminal session reviewed Phases 2-4: pushed 463f008, with C-q.3 registered at edb2483.
+- **Hand-over:** that session ran out of usage at about 22:45, and the manager picked up its work. C-q.3 is still running (seeds 0-5 of 10 done at 22:41) and is read out once, when it finishes.
+
+**The level-1 benchmark** (E1's problem: agent i against j's compact level-0 controller; 26 states):
+
+| bound at b0 | value | what it is |
+|---|---|---|
+| fast informed bound | 77.51 | HSVI's starting corners |
+| HSVI sawtooth after about 1,000 trials | 44.8 | stalls: no reachable belief nears a corner, and stored points rarely fit inside a new belief's support |
+| LP (convex-hull) interpolation, one sweep of backups | 53.4 (from 55.3) | no remedy |
+| relaxation: i sees j's node every step | 43.73 | leaks j's growls |
+| relaxation: j's action at once, j's node after the step at i's openings | 22.79 | finite belief graph (5,961 beliefs) |
+| same, j's node BEFORE the step at i's openings (delay 0) | 20.92 | 31,420 beliefs |
+| same, j's action one step late (delay 1) | 19.96 | 52,224 beliefs |
+| same, two steps late (delay 2) | **19.67** | 368,396 beliefs, 4.5 GB, 27 min |
+| HSVI lower bound | **16.54** | attained by its pointer controller |
+| threshold policies on the exact belief (Monte Carlo, not a bound) | 16.62 +- 0.20 | best theta 0.95 |
+
+- **Certified bracket today:** [16.54, 19.67], width 3.1. By the rule fixed on 2026-11-18, this is the "report the bracket" branch. The seeded-HSVI run of `itiger_benchmark.py` (started tonight; log beside the script) may tighten it further. I add its result here.
+- **Why the relaxation is informative, not loose.** Threshold policies given the relaxed information reach its value (22.8 against 22.79). So the remaining gap is the value of information that the true problem withholds, not slack in the bound.
+  - Revealing j's node after the step leaks one growl about the re-placed tiger (Table 1: a listener's growl reads the arrival state, whoever opened), worth about 4.6.
+  - The perfect creak is worth about 1.6.
+  - Each further step of delay costs about 1.7 to 7 times more beliefs, for 0.96 and then 0.29 of tightening.
+- **Method:**
+  - `bounds.revealed_upper_bound` is generic: an extra observation emitted on transitions, put in standard form by history augmentation, merged at a rounding tolerance with a span-Holder slack, and solved by value iteration from above.
+  - `interactive.relaxation_reveal` chooses that observation for the two-agent tiger.
+  - `bounds.hsvi_budget` is HSVI seeded with the relaxed corners and points, with corner backups. `hsvi()` is unchanged, because the controllers that define the folds come from it.
+- **Tests:**
+  - fast closed forms: an empty revelation on canonical Tiger gives 19.3713; revealing the state gives 189 = -1 + 0.95 x 200; a listening j reveals nothing; the seeded budget bracket starts at the relaxed V*;
+  - slow, on E1's problem: the bound falls with delay, lies below the fast informed bound and lies above the exact value of a feasible controller;
+  - the relaxed belief graph is finite only with a compact j. With the 12-node controller extracted at 2.0, j listens for long stretches and the graph exceeded 200,000 beliefs at delay 0.
+- **What E1 can claim with a bracket near 3:** the learned agent's return against [L, U], and against L, the value of the best certified controller. It cannot claim "optimal" beyond the bracket. Canonical Tiger keeps the optimality claim.
+
+**Not changed:** no paper number, no ledger value, no stored run.
+- golden: 51 identical;
+- load gate: 140 runs, 0 differ;
+- domain, interactive and experiments tests: 78 passed;
+- fast suite at 3deb4d7, CPU: 279 passed.
+
 ## STATUS 2026-11-18 19:50 — contribution (2): the I-POMDP core is built and verified; one open problem (the benchmark's upper bound); session wrap-up
 
 **What exists** (commit of this block):

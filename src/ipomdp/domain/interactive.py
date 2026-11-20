@@ -48,8 +48,45 @@
 #    - Before the first step there is no previous action of j; the initial belief puts it on one declared action.
 #      Nothing reads it (T~ and R~ ignore it, and no observation precedes the first action), so values are
 #      unaffected, but it is part of the joint belief; probes therefore read the S x N_j marginal.
+#
+# 5. The Benchmark's Upper Bound: What the Relaxation Reveals (relaxation_reveal; bounds.py, section 5):
+#    - The relaxed agent receives two extra symbols:
+#      * j's previous action, `delay` steps late. The creak is a garbling of it (independent noise given that
+#        action, multiagent_tiger.py, section 2), so it is more information than the creak.
+#      * On the agent's own door openings, j's node BEFORE the step.
+#    - Why before the step: when i opens and j listens, j's growl in that step names the re-placed tiger's side
+#      (Table 1: a listener's growl reads the arrival state, whoever opened). j's node after the step therefore
+#      carries one growl about the new tiger. Revealing it was measured to leak about 4.6 of value.
+#    - Why the reachable beliefs are finite:
+#      * After i's opening, the belief is a fixed function of the revealed node: the tiger is re-placed uniformly,
+#        j moves on one growl of it, and i's own observation in an opening step is uniform.
+#      * After j's opening, once revealed, the tiger is re-placed and j's next node has a known law.
+#      * Between openings, the belief depends only on the last reset, i's growl count, the time since the reset, and
+#        the observations of the last `delay` steps.
+#    - Measured on the level-1 fold (26 states, the 11 reachable nodes of the 17-node level-0 controller extracted
+#      at epsilon 0.5), against L(b0) = 16.54. U(b0) is 22.79 when j's node after the step is revealed, 20.92 with
+#      delay 0, and 19.96 with delay 1. Threshold policies that are given the relaxed information reach the relaxed
+#      value (22.8 against 22.79), so what remains is information value, not slack in the bound; a longer delay
+#      shrinks it.
+#
+# 6. The Other Agent's Controller Is Extracted Coarse and Certified Tight (nested_problem):
+#    - A controller extracted from a tight bracket inherits the bracket's many lower-bound vectors. On the level-0
+#      tiger problem, extraction at epsilon 0.05 gives 38 nodes, with stochastic tie-splitting successors that
+#      exact minimisation cannot merge, and a level-1 fold of 80 states. Extraction at epsilon 0.5 gives 17 nodes,
+#      11 of them reachable and minimal, and a 26-state fold. Its exact value is in fact higher: 8.2378 against
+#      8.2367, with level-0 V* in [8.2380, 8.2879]. The size tracks the number of HSVI vectors, not the policy's
+#      complexity.
+#    - So each level below the top is bracketed twice. The controller comes from the bracket of width
+#      controller_epsilon. The bracket of width epsilon certifies it: bracket.upper - controller_value bounds its
+#      suboptimality (0.050 at level 0 with 0.5 and 0.05).
+#    - A compact controller also keeps the relaxation of section 5 finite. With the 12-node controller extracted at
+#      epsilon 2.0, j can listen for long stretches without opening, its node law never repeats exactly, and the
+#      relaxed belief graph exceeded 200,000 beliefs at delay 0. With the 11-node one it has 31,420.
+#    - Design decision for the interactive experiments: controller_epsilon 0.5, epsilon 0.05
+#      (conf/env/itiger.yaml).
 # ==============================================================================
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import torch
@@ -66,9 +103,9 @@ from .solver import AlphaVectorSet
 # agent listens with probability 0.8 and opens each door with probability 0.1, in TigerAction order (L, OL, OR).
 TIGER_LEVEL_ZERO_NOISE = (0.8, 0.1, 0.1)
 
-# A lower level's controller is extracted from its bracket's lower-bound vectors pruned at this fraction of the
-# bracket width (policy_graph.stationary_graph): small enough to fold one level up, and its exact value stays
-# within the bracket's scale of the lower bound. The controller is certified by U - V_controller in either case.
+# A lower level's controller is extracted from the lower-bound vectors of a bracket of width controller_epsilon,
+# pruned at this fraction of that width (policy_graph.stationary_graph), and certified by the upper end of a
+# separate, tighter bracket of width epsilon (section 6).
 CONTROLLER_PRUNE_FRACTION = 0.1
 
 
@@ -105,6 +142,30 @@ class InteractiveModel:
         index = self.other_node.to(belief.device).expand_as(belief)
         return torch.zeros(belief.shape[0], self.other.num_nodes, dtype=belief.dtype, device=belief.device
                            ).scatter_add_(1, index, belief)
+
+
+def relaxation_reveal(interactive: InteractiveModel, delay: int,
+                      node_actions: tuple[int, ...]) -> tuple[Callable[[int, tuple[int, ...]], int], int]:
+    """
+    The extra symbol of section 5, for bounds.revealed_upper_bound. It is j's previous action at the state `delay`
+    steps before the arrival, plus j's node at the departure state when the agent's action is in `node_actions`.
+
+    Returns:
+        (reveal, memory): the function of (action, history) and the history length it needs.
+    """
+    if delay < 0:
+        raise ValueError(f"delay must be >= 0, got {delay}.")
+    previous = interactive.other_previous_action.tolist()
+    node = interactive.other_node.tolist()
+    num_other_actions = interactive.other.num_actions
+
+    def reveal(action: int, history: tuple[int, ...]) -> int:
+        symbol = previous[history[-1 - delay]]
+        if action in node_actions:
+            symbol += num_other_actions * (1 + node[history[-2]])
+        return symbol
+
+    return reveal, max(delay, 1)
 
 
 def noise_model(view: AgentView, noise: tuple[float, ...]) -> FinitePOMDP:
@@ -178,11 +239,11 @@ class Level:
         agent: Whose problem this is.
         problem: This agent's decision problem: the paper's noise model at level 0 (its uninformative creaks merged,
             domain/reduction.py), the fold of the other agent's level-(l-1) controller above.
-        bracket: Certified [L, U] of this problem's V*(b0) (domain/bounds.py).
+        bracket: Certified [L, U] of this problem's V*(b0), of width at most epsilon (domain/bounds.py).
         controller: This agent's compact stationary controller over its own six observations: the model of this
             agent that the other agent folds one level up.
         controller_value: The controller's exact value at b0; bracket.upper - controller_value bounds its
-            suboptimality.
+            suboptimality (section 6).
     """
 
     level: int
@@ -215,23 +276,31 @@ class NestedProblem:
         return self.interactive.pomdp
 
 
-def _certified_level(level: int, agent: Agent, problem: FinitePOMDP, group: Tensor | None, epsilon: float) -> Level:
-    """Bracket the problem, extract the agent's compact controller from it and evaluate it exactly (section 2)."""
-    bracket = hsvi(problem, epsilon)
-    compact = stationary_graph(problem, AlphaVectorSet(bracket.lower_vectors, bracket.controller.action_law.argmax(-1)),
-                               CONTROLLER_PRUNE_FRACTION * epsilon)
+def _certified_level(level: int, agent: Agent, problem: FinitePOMDP, group: Tensor | None, epsilon: float,
+                     controller_epsilon: float) -> Level:
+    """
+    Extract the agent's compact controller from a bracket of width controller_epsilon, evaluate it exactly, and
+    certify it with a bracket of width epsilon (sections 2 and 6).
+    """
+    if controller_epsilon < epsilon:
+        raise ValueError(f"controller_epsilon ({controller_epsilon}) must be at least epsilon ({epsilon}).")
+    coarse = hsvi(problem, controller_epsilon)
+    compact = stationary_graph(problem, AlphaVectorSet(coarse.lower_vectors, coarse.controller.action_law.argmax(-1)),
+                               CONTROLLER_PRUNE_FRACTION * controller_epsilon)
     value = float(compact.initial_law @ (evaluate(problem, compact) @ problem.initial_belief))
+    bracket = coarse if controller_epsilon == epsilon else hsvi(problem, epsilon)
     controller = expand_observations(compact, group) if group is not None else compact
     return Level(level, agent, problem, bracket, controller, value)
 
 
 def nested_problem(physics: TwoAgentModel, agent: Agent, level: int, noise: tuple[float, ...], epsilon: float,
-                   initial_previous_action: int) -> NestedProblem:
+                   controller_epsilon: float, initial_previous_action: int) -> NestedProblem:
     """
     `agent`'s level-`level` problem by the recursion of section 2, bottom-up: level 0 is the noise model of the agent
     at the bottom of the chain, and each level folds the controller of the level below into the other agent's view.
-    Each level below is bracketed to `epsilon` and contributes its compact controller; the top problem itself is
-    not bracketed here (the benchmark of an experiment brackets it once, and training needs only the problem).
+    Each level below contributes the compact controller extracted at `controller_epsilon` and is certified by a
+    bracket of width `epsilon` (section 6). The top problem itself is not bracketed here: the benchmark of an
+    experiment brackets it once, and training needs only the problem.
     """
     if level < 1:
         raise ValueError(f"a nested problem has level >= 1 (level 0 is noise_model), got {level}.")
@@ -241,9 +310,9 @@ def nested_problem(physics: TwoAgentModel, agent: Agent, level: int, noise: tupl
         view = physics.view(rung_agent)
         if rung == 0:
             lumped = lump_observations(noise_model(view, noise))
-            below.append(_certified_level(rung, rung_agent, lumped.model, lumped.group, epsilon))
+            below.append(_certified_level(rung, rung_agent, lumped.model, lumped.group, epsilon, controller_epsilon))
         else:
             folded = fold(view, below[-1].controller, initial_previous_action)
-            below.append(_certified_level(rung, rung_agent, folded.pomdp, None, epsilon))
+            below.append(_certified_level(rung, rung_agent, folded.pomdp, None, epsilon, controller_epsilon))
     interactive = fold(physics.view(agent), below[-1].controller, initial_previous_action)
     return NestedProblem(agent, level, interactive, tuple(below))

@@ -1,0 +1,114 @@
+V*: 196 iterations, certified error 9.81e-04, 9 vectors, V*(b0) = 19.3705 (413 s)
+eps = ||leaf - V*||_inf + delta: zero 28.403, V1 23.574, V3 20.255, V8 14.193, V12 11.434
+Q*(b, a) [LISTEN, OPEN_LEFT, OPEN_RIGHT] at P(left) = 0.5: [19.371, -26.598, -26.598]; 0.85: [21.443, -65.098, 11.902]; 0.9: [22.573, -70.598, 17.402]; 0.95: [23.788, -76.098, 22.902]; 0.97: [24.384, -78.298, 25.102]; 0.99: [25.122, -80.498, 27.302]
+
+PART A: root Q against Q* (exact model; no root noise; seed 0)
+
+leaves zero (eps 28.403)
+  N=    1  max|Q-Q*|  26.1219  max bound   26.984  d_a 1..1  non-optimal at P(left) = [0.95]
+  N=    2  max|Q-Q*|  25.5187  max bound   26.984  d_a 1..1  non-optimal at P(left) = [0.95, 0.97]
+  N=    4  max|Q-Q*|  25.0161  max bound   26.984  d_a 1..2  non-optimal at P(left) = [0.95, 0.97]
+  N=    8  max|Q-Q*|  19.8032  max bound   26.984  d_a 1..2  non-optimal at P(left) = []
+  N=   16  max|Q-Q*|  20.2544  max bound   26.984  d_a 1..2  non-optimal at P(left) = []
+  N=   32  max|Q-Q*|  19.8032  max bound   26.984  d_a 1..2  non-optimal at P(left) = [0.95]
+  N=   64  max|Q-Q*|  20.0835  max bound   25.635  d_a 2..3  non-optimal at P(left) = []
+  N=  128  max|Q-Q*|  20.1381  max bound   25.635  d_a 2..3  non-optimal at P(left) = []
+  N=  256  max|Q-Q*|  20.2544  max bound   25.635  d_a 2..3  non-optimal at P(left) = [0.97]
+  N=  512  max|Q-Q*|  20.2544  max bound   25.635  d_a 2..3  non-optimal at P(left) = [0.95]
+  N= 1024  max|Q-Q*|  18.3559  max bound   25.635  d_a 2..3  non-optimal at P(left) = []
+  N= 2048  max|Q-Q*|  18.3069  max bound   25.635  d_a 2..3  non-optimal at P(left) = []
+  N= 4096  max|Q-Q*|  18.3875  max bound   25.635  d_a 2..3  non-optimal at P(left) = []
+  decisions over the budgets where they change (0 LISTEN, 1 OPEN_LEFT, 2 OPEN_RIGHT): {0.95: [2, 2, 2, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0], 0.97: [2, 0, 0, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2]}
+
+leaves V1 (eps 23.574)
+  N=    1  max|Q-Q*|  19.8032  max bound   22.396  d_a 1..1  non-optimal at P(left) = []
+  N=    2  max|Q-Q*|  19.8032  max bound   22.396  d_a 1..1  non-optimal at P(left) = [0.97, 0.99]
+  N=    4  max|Q-Q*|  20.2544  max bound   22.396  d_a 1..2  non-optimal at P(left) = [0.97]
+  N=    8  max|Q-Q*|  19.8032  max bound   22.396  d_a 1..2  non-optimal at P(left) = [0.97]
+  N=   16  max|Q-Q*|  20.2544  max bound   22.396  d_a 1..2  non-optimal at P(left) = [0.95]
+  N=   32  max|Q-Q*|  20.2544  max bound   22.396  d_a 1..2  non-optimal at P(left) = []
+  N=   64  max|Q-Q*|  19.2427  max bound   21.276  d_a 2..2  non-optimal at P(left) = []
+  N=  128  max|Q-Q*|  19.2947  max bound   21.276  d_a 2..3  non-optimal at P(left) = [0.97]
+  N=  256  max|Q-Q*|  18.3715  max bound   21.276  d_a 2..3  non-optimal at P(left) = []
+  N=  512  max|Q-Q*|  18.3715  max bound   21.276  d_a 2..3  non-optimal at P(left) = []
+  N= 1024  max|Q-Q*|  17.4300  max bound   21.276  d_a 2..3  non-optimal at P(left) = []
+  N= 2048  max|Q-Q*|  17.6309  max bound   21.276  d_a 2..3  non-optimal at P(left) = []
+  N= 4096  max|Q-Q*|  17.6828  max bound   21.276  d_a 2..3  non-optimal at P(left) = []
+  decisions over the budgets where they change (0 LISTEN, 1 OPEN_LEFT, 2 OPEN_RIGHT): {0.95: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0], 0.97: [2, 0, 0, 0, 2, 2, 2, 0, 2, 2, 2, 2, 2], 0.99: [2, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]}
+
+leaves V3 (eps 20.255)
+  N=    1  max|Q-Q*|  18.9585  max bound   19.244  d_a 1..1  non-optimal at P(left) = [0.95]
+  N=    2  max|Q-Q*|  18.8232  max bound   19.244  d_a 1..1  non-optimal at P(left) = [0.95]
+  N=    4  max|Q-Q*|  18.8597  max bound   19.244  d_a 1..2  non-optimal at P(left) = [0.97]
+  N=    8  max|Q-Q*|  16.4664  max bound   19.244  d_a 1..2  non-optimal at P(left) = [0.97]
+  N=   16  max|Q-Q*|  16.6962  max bound   19.244  d_a 1..2  non-optimal at P(left) = [0.97]
+  N=   32  max|Q-Q*|  16.6962  max bound   19.244  d_a 1..2  non-optimal at P(left) = []
+  N=   64  max|Q-Q*|  16.4664  max bound   19.244  d_a 1..3  non-optimal at P(left) = []
+  N=  128  max|Q-Q*|  16.4945  max bound   19.244  d_a 1..3  non-optimal at P(left) = []
+  N=  256  max|Q-Q*|  16.2366  max bound   19.244  d_a 1..3  non-optimal at P(left) = []
+  N=  512  max|Q-Q*|  15.6113  max bound   18.281  d_a 2..3  non-optimal at P(left) = []
+  N= 1024  max|Q-Q*|  15.4205  max bound   18.281  d_a 2..3  non-optimal at P(left) = []
+  N= 2048  max|Q-Q*|  15.0249  max bound   18.281  d_a 2..3  non-optimal at P(left) = []
+  N= 4096  max|Q-Q*|  15.0920  max bound   18.281  d_a 2..3  non-optimal at P(left) = []
+  decisions over the budgets where they change (0 LISTEN, 1 OPEN_LEFT, 2 OPEN_RIGHT): {0.95: [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 0.97: [2, 2, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2]}
+
+leaves V8 (eps 14.193)
+  N=    1  max|Q-Q*|  13.3441  max bound   13.485  d_a 1..1  non-optimal at P(left) = []
+  N=    2  max|Q-Q*|  13.3441  max bound   13.485  d_a 1..1  non-optimal at P(left) = []
+  N=    4  max|Q-Q*|  13.3441  max bound   13.485  d_a 1..2  non-optimal at P(left) = []
+  N=    8  max|Q-Q*|  13.3441  max bound   13.485  d_a 1..2  non-optimal at P(left) = []
+  N=   16  max|Q-Q*|  12.8218  max bound   13.485  d_a 1..2  non-optimal at P(left) = []
+  N=   32  max|Q-Q*|  12.7577  max bound   13.485  d_a 1..2  non-optimal at P(left) = []
+  N=   64  max|Q-Q*|  12.6937  max bound   13.485  d_a 1..3  non-optimal at P(left) = []
+  N=  128  max|Q-Q*|  12.1714  max bound   12.810  d_a 2..3  non-optimal at P(left) = []
+  N=  256  max|Q-Q*|  12.1714  max bound   12.810  d_a 2..3  non-optimal at P(left) = []
+  N=  512  max|Q-Q*|  11.9990  max bound   12.810  d_a 2..3  non-optimal at P(left) = []
+  N= 1024  max|Q-Q*|  11.8709  max bound   12.810  d_a 2..3  non-optimal at P(left) = []
+  N= 2048  max|Q-Q*|  11.7274  max bound   12.810  d_a 2..3  non-optimal at P(left) = []
+  N= 4096  max|Q-Q*|  11.4876  max bound   12.810  d_a 2..3  non-optimal at P(left) = []
+  decisions over the budgets where they change (0 LISTEN, 1 OPEN_LEFT, 2 OPEN_RIGHT): {}
+
+leaves V12 (eps 11.434)
+  N=    1  max|Q-Q*|  10.7977  max bound   10.863  d_a 1..1  non-optimal at P(left) = []
+  N=    2  max|Q-Q*|  10.6983  max bound   10.863  d_a 1..1  non-optimal at P(left) = []
+  N=    4  max|Q-Q*|  10.6277  max bound   10.863  d_a 1..2  non-optimal at P(left) = []
+  N=    8  max|Q-Q*|  10.6277  max bound   10.863  d_a 1..2  non-optimal at P(left) = []
+  N=   16  max|Q-Q*|  10.4666  max bound   10.863  d_a 1..2  non-optimal at P(left) = []
+  N=   32  max|Q-Q*|  10.3147  max bound   10.863  d_a 1..2  non-optimal at P(left) = []
+  N=   64  max|Q-Q*|  10.1536  max bound   10.320  d_a 2..2  non-optimal at P(left) = []
+  N=  128  max|Q-Q*|  10.0376  max bound   10.320  d_a 2..3  non-optimal at P(left) = []
+  N=  256  max|Q-Q*|   9.9832  max bound   10.320  d_a 2..3  non-optimal at P(left) = []
+  N=  512  max|Q-Q*|   9.8672  max bound   10.320  d_a 2..3  non-optimal at P(left) = []
+  N= 1024  max|Q-Q*|   9.6793  max bound   10.320  d_a 2..3  non-optimal at P(left) = []
+  N= 2048  max|Q-Q*|   9.5275  max bound   10.320  d_a 2..3  non-optimal at P(left) = []
+  N= 4096  max|Q-Q*|   9.2770  max bound   10.320  d_a 2..3  non-optimal at P(left) = []
+  decisions over the budgets where they change (0 LISTEN, 1 OPEN_LEFT, 2 OPEN_RIGHT): {}
+
+largest (error - bound) over every case: -1.49e-02 (the bound holds if <= 0)
+
+PART B: discounted return, 256 episodes x 100 steps, simulator seed 11, paired per episode with the optimal agent
+optimal agent (V* leaves, 1 simulation): 22.375 +- 3.407
+  leaves zero N=   1: return   22.375   minus optimal   +0.000 +- 0.000   (12 s)
+  leaves zero N=   2: return   16.933   minus optimal   -5.442 +- 2.881   (13 s)
+  leaves zero N=   4: return   16.449   minus optimal   -5.925 +- 3.056   (17 s)
+  leaves zero N=   8: return   18.704   minus optimal   -3.671 +- 2.923   (36 s)
+  leaves zero N=  16: return   19.488   minus optimal   -2.887 +- 2.788   (85 s)
+  leaves zero N=  32: return   21.310   minus optimal   -1.064 +- 1.993   (166 s)
+  leaves zero N=  64: return   21.729   minus optimal   -0.645 +- 1.620   (315 s)
+  leaves zero N= 128: return   18.117   minus optimal   -4.257 +- 2.810   (1093 s)
+  leaves V3   N=   1: return   22.375   minus optimal   +0.000 +- 0.000   (3 s)
+  leaves V3   N=   2: return   22.375   minus optimal   +0.000 +- 0.000   (5 s)
+  leaves V3   N=   4: return   18.249   minus optimal   -4.126 +- 2.877   (8 s)
+  leaves V3   N=   8: return   20.500   minus optimal   -1.875 +- 1.732   (40 s)
+  leaves V3   N=  16: return   21.778   minus optimal   -0.596 +- 1.170   (49 s)
+  leaves V3   N=  32: return   21.958   minus optimal   -0.416 +- 0.764   (71 s)
+  leaves V3   N=  64: return   22.369   minus optimal   -0.006 +- 0.807   (141 s)
+  leaves V3   N= 128: return   22.143   minus optimal   -0.231 +- 0.461   (293 s)
+  leaves V8   N=   1: return   22.375   minus optimal   +0.000 +- 0.000   (3 s)
+  leaves V8   N=   2: return   22.375   minus optimal   +0.000 +- 0.000   (5 s)
+  leaves V8   N=   4: return   22.375   minus optimal   +0.000 +- 0.000   (12 s)
+  leaves V8   N=   8: return   21.624   minus optimal   -0.751 +- 1.101   (16 s)
+  leaves V8   N=  16: return   22.363   minus optimal   -0.012 +- 0.680   (32 s)
+  leaves V8   N=  32: return   22.375   minus optimal   +0.000 +- 0.000   (69 s)
+  leaves V8   N=  64: return   22.375   minus optimal   +0.000 +- 0.000   (148 s)
+  leaves V8   N= 128: return   22.375   minus optimal   +0.000 +- 0.000   (298 s)

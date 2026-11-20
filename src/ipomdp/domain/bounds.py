@@ -36,11 +36,48 @@
 #      belief. Each trial improves the bounds at b0 or at a belief whose excess gap is positive, which bounds the
 #      number of trials (Smith & Simmons 2004, Theorem 1). A cap on trials raises instead of returning an
 #      uncertified result.
+#
+# 5. An Upper Bound by Information Relaxation over a Finite Belief Graph (revealed_upper_bound):
+#    - Why: on folded interactive problems the sawtooth stalls. On the level-1 two-agent tiger fold (26 states),
+#      U(b0) is still 44.8 after about 1,000 trials, while L(b0) = 16.54. Two causes: the fold's beliefs spread over
+#      the other agent's nodes, so a stored point rarely fits inside a new belief's support; and the corners keep their
+#      fast-informed values (about 77) because no reachable belief comes near a corner. LP (convex-hull)
+#      interpolation over the same points moved U(b0) only from 55.3 to 53.4 in one sweep of backups.
+#    - The relaxation: on every transition c -> c' the agent receives an extra symbol y = reveal(a, history). Any
+#      policy of the original problem is a policy of the relaxed one (it can ignore y), so V*_relaxed >= V* at every
+#      belief. With a well-chosen y, the beliefs reachable from b0 in the relaxed problem form a finite set, because
+#      every reset lands on one of finitely many beliefs. Value iteration on that finite graph then gives
+#      V*_relaxed(b0), with no interpolation (domain/interactive.py, section 5, chooses y for the tiger game).
+#    - Standard form: y may read the departure state and earlier states, while FinitePOMDP emits observations from
+#      the arrival state. So the state is augmented with the last `memory` states (a history). This leaves the
+#      problem unchanged, because the past never enters T, O or R, and makes y a function of the arrival history.
+#    - Certification:
+#      * Beliefs are merged when they agree after rounding to `rounding`. Let delta be the largest L1 distance of a
+#        merge and span = (max R - min R) / (1 - gamma). Merging costs at most (span / 2) delta / (1 - gamma), by the
+#        span-Holder lemma (every alpha vector's components lie in [min R, max R] / (1 - gamma)), and that slack is
+#        added.
+#      * Value iteration starts at max R / (1 - gamma), which is >= its own Bellman image, so every iterate lies above
+#        the merged graph's fixed point.
+#      * The result is a proof whatever the enumeration's size; a cap on beliefs raises instead of truncating.
+#    - Each enumerated belief's marginal over the original states, with its relaxed value, is an upper-bound point of
+#      the original problem: the past components of the history never enter the original problem's future. The
+#      values at the roots (b0 and any extra beliefs) are returned for that use.
+#
+# 6. Seeding HSVI with the Relaxation (hsvi_budget):
+#    - The relaxed values at the corners and at the enumerated beliefs are valid upper-bound points of the original
+#      problem, so they replace the fast-informed corners and seed the sawtooth. HSVI's own backups on the original
+#      problem then tighten the bound below the relaxation (the relaxation ignores the cost of the noise it removes).
+#    - Corners are backed up after every trial (_SeededHSVI). hsvi() itself is unchanged: the controllers that
+#      define the interactive problems (interactive.py, section 2) are extracted from it, so its arithmetic must stay
+#      identical.
 # ==============================================================================
 
+import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
+import scipy.sparse as sparse
 import torch
 
 from .policy_graph import PolicyGraph
@@ -188,6 +225,11 @@ def hsvi(model: FinitePOMDP, epsilon: float, max_trials: int = 100_000) -> Brack
             break
     else:
         raise RuntimeError(f"HSVI did not reach a bracket of {epsilon} within {max_trials} trials.")
+    return _bracket(search, b0, trial)
+
+
+def _bracket(search: "_HSVI", b0: np.ndarray, trials: int) -> Bracket:
+    """The bracket at b0 and the lower bound's pointer controller (section 2)."""
     vectors = search.vectors.rows.copy()
     k, z = len(vectors), search.Z
     action_law = torch.zeros(k, search.A, dtype=torch.float64)
@@ -201,4 +243,216 @@ def hsvi(model: FinitePOMDP, epsilon: float, max_trials: int = 100_000) -> Brack
     initial[int((vectors @ b0).argmax())] = 1.0
     controller = PolicyGraph(action_law, successor, initial, tuple(f"l{i}" for i in range(k)))
     return Bracket(float(search.lower(b0[None])[0]), float(search.upper(b0[None])[0]), controller,
-                   torch.from_numpy(vectors), trial)
+                   torch.from_numpy(vectors), trials)
+
+
+class _SeededHSVI(_HSVI):
+    """
+    HSVI whose upper bound starts from given corner values and points (section 6), and whose corners are backed up
+    after every trial. A corner backup max_a Q_U(e_s, a) is an upper bound of V*(e_s), and the sawtooth stays valid
+    for any corner values that are upper bounds, so the excess of every stored point is recomputed from its value.
+    """
+
+    def __init__(self, model: FinitePOMDP, corners: np.ndarray | None, beliefs: np.ndarray | None,
+                 values: np.ndarray | None):
+        super().__init__(model)
+        self.values: list[float] = []
+        if corners is not None:
+            self.corner = np.minimum(self.corner, corners)
+        if beliefs is not None:
+            for belief, value in zip(beliefs, values):
+                if value < self.upper(belief[None])[0] - 1e-12:
+                    self._store(belief, float(value))
+
+    def _store(self, belief: np.ndarray, value: float) -> None:
+        self.points.append(belief)
+        self.inverse.append(np.where(belief > 0, 1.0 / np.where(belief > 0, belief, 1.0), 0.0))
+        self.values.append(value)
+        self.excess.append(value - float(belief @ self.corner))
+
+    def update(self, belief: np.ndarray) -> None:
+        size = self.points.size
+        super().update(belief)
+        if self.points.size > size:
+            self.values.append(self.excess[-1] + float(belief @ self.corner))
+
+    def back_up_corners(self) -> None:
+        # Every backup reads the same, consistent bound; the new corners are applied together and the excesses
+        # recomputed at once. Applying one corner while the stored excesses still refer to the old corners would mix
+        # the two, and since corners only decrease, that mix can fall below the sawtooth (an invalid bound).
+        backed_up = np.empty(self.S)
+        for s in range(self.S):
+            corner = np.zeros(self.S)
+            corner[s] = 1.0
+            backed_up[s] = float(self.upper_q(corner, *self.children(corner)).max())
+        if (backed_up < self.corner - 1e-12).any():
+            self.corner = np.minimum(self.corner, backed_up)
+            if self.points.size:
+                self.excess = list(np.asarray(self.values) - self.points.rows @ self.corner)
+
+
+def hsvi_budget(model: FinitePOMDP, epsilon: float, trials: int, corners: torch.Tensor | None = None,
+                points: tuple[torch.Tensor, torch.Tensor] | None = None) -> Bracket:
+    """
+    The certified bracket after at most `trials` HSVI trials toward width `epsilon` (sections 4 and 6). Unlike
+    hsvi(), the width is whatever the budget reached: both ends are proofs either way, and the caller reports the
+    width. It stops early once the width is at most epsilon.
+
+    Args:
+        model: Exact POMDP specification.
+        epsilon: Target width; it also sets the trials' depth and gap thresholds, as in hsvi().
+        trials: The trial budget.
+        corners: Optional float64 (S,) upper bounds of V* at the corners (e.g. RelaxedBound.root_values).
+        points: Optional (beliefs (K, S), values (K,)) upper bounds of V* (e.g. RelaxedBound.beliefs, .values).
+    """
+    search = _SeededHSVI(model, None if corners is None else corners.numpy(),
+                         None if points is None else points[0].numpy(), None if points is None else points[1].numpy())
+    span = (search.R.max() - search.R.min()) / (1 - search.gamma)
+    search.max_depth = int(np.ceil(np.log(epsilon / span) / np.log(search.gamma))) + 1
+    b0 = model.initial_belief.numpy()
+    trial = 0
+    for trial in range(1, trials + 1):
+        search.explore(b0, epsilon, 0)
+        search.back_up_corners()
+        if float(search.upper(b0[None])[0] - search.lower(b0[None])[0]) <= epsilon:
+            break
+    return _bracket(search, b0, trial)
+
+
+@dataclass(frozen=True)
+class RelaxedBound:
+    """
+    A certified upper bound of V* from an information relaxation over a finite belief graph (section 5).
+
+    Attributes:
+        upper: The bound at b0 (merge slack included).
+        root_values: The bound at every root, b0 first, then the extra roots in the order given (slack included).
+        beliefs: float64 (K, S), every enumerated belief's marginal over the original states.
+        values: float64 (K,), an upper bound of V* at each of those marginals (slack included).
+        merge_slack: The slack added for merged beliefs (section 5).
+    """
+
+    upper: float
+    root_values: torch.Tensor
+    beliefs: torch.Tensor
+    values: torch.Tensor
+    merge_slack: float
+
+
+def revealed_upper_bound(model: FinitePOMDP, reveal: Callable[[int, tuple[int, ...]], int], memory: int,
+                         extra_roots: torch.Tensor | None = None, rounding: float = 1e-10,
+                         max_beliefs: int = 1_000_000) -> RelaxedBound:
+    """
+    V*_relaxed at b0 (and at extra roots) when the agent also observes reveal(a, history) on every transition
+    (section 5). An upper bound of V* of `model`.
+
+    Args:
+        model: Exact POMDP specification.
+        reveal: The extra symbol emitted when action a arrives at history[-1]; history holds the last memory + 1
+            states, oldest first (at the first step the past is padded with the initial state itself).
+        memory: How many past states reveal may read (>= 1).
+        extra_roots: Optional float64 (k, S) beliefs whose bounds are wanted as well (e.g. the corners).
+        rounding: Merge tolerance of the enumeration (section 5).
+        max_beliefs: Exceeding it raises: the bound is never computed on a truncated graph.
+    """
+    if memory < 1:
+        raise ValueError(f"memory must be >= 1, got {memory}.")
+    T, O, R = model.transition.numpy(), model.observation.numpy(), model.reward.numpy()
+    gamma, (num_a, num_s), num_o = model.discount, model.reward.shape, model.observation.shape[2]
+    starts = [model.initial_belief.numpy()] + ([] if extra_roots is None else list(extra_roots.numpy()))
+    # Histories reachable from every root's support (standard form, section 5).
+    histories: dict[tuple[int, ...], int] = {}
+    queue = []
+    for start in starts:
+        for c in np.nonzero(start > 0)[0]:
+            h = (int(c),) * (memory + 1)
+            if h not in histories:
+                histories[h] = len(histories)
+                queue.append(h)
+    successors = [np.nonzero(T[:, c].sum(axis=0) > 0)[0] for c in range(num_s)]
+    while queue:
+        h = queue.pop()
+        for c2 in successors[h[-1]]:
+            h2 = h[1:] + (int(c2),)
+            if h2 not in histories:
+                histories[h2] = len(histories)
+                queue.append(h2)
+    num_x = len(histories)
+    keys = list(histories)
+    last = np.array([h[-1] for h in keys])
+    rows, cols = zip(*[(x, histories[h[1:] + (int(c2),)]) for h, x in histories.items() for c2 in successors[h[-1]]])
+    rows, cols = np.array(rows), np.array(cols)
+    transition = [sparse.csr_matrix((T[a, last[rows], last[cols]], (rows, cols)), shape=(num_x, num_x))
+                  for a in range(num_a)]
+    observation = O[:, last, :]                                                        # (A, X, O)
+    labels = np.array([[reveal(a, h) for h in keys] for a in range(num_a)])           # (A, X)
+    masks = [[(labels[a] == y).astype(np.float64) for y in np.unique(labels[a])] for a in range(num_a)]
+
+    def augment(belief: np.ndarray) -> np.ndarray:
+        x = np.zeros(num_x)
+        for c in np.nonzero(belief > 0)[0]:
+            x[histories[(int(c),) * (memory + 1)]] = belief[c]
+        return x
+
+    # Breadth-first enumeration with merging (section 5).
+    store, index, merge = _Rows(num_x), {}, 0.0
+    edges: list[list[tuple[np.ndarray, np.ndarray, np.ndarray]]] = [[] for _ in range(num_a)]
+
+    def insert(beliefs: np.ndarray) -> tuple[np.ndarray, list[int]]:
+        nonlocal merge
+        rounded = np.round(beliefs / rounding).astype(np.int64)
+        found, fresh = np.empty(len(beliefs), dtype=np.int64), []
+        for r in range(len(beliefs)):
+            digest = hashlib.blake2b(rounded[r].tobytes(), digest_size=16).digest()
+            j = index.get(digest)
+            if j is None:
+                j = store.size
+                index[digest] = j
+                store.append(beliefs[r])
+                fresh.append(j)
+            else:
+                if not np.array_equal(np.round(store.data[j] / rounding).astype(np.int64), rounded[r]):
+                    raise RuntimeError("belief digest collision.")
+                merge = max(merge, float(np.abs(store.data[j] - beliefs[r]).sum()))
+            found[r] = j
+        return found, fresh
+
+    roots, frontier = insert(np.stack([augment(s) for s in starts]))
+    frontier = np.array(sorted(set(frontier)), dtype=np.int64)
+    while frontier.size:
+        parents, fresh = store.data[frontier], []
+        for a in range(num_a):
+            moved = np.asarray(transition[a].T @ parents.T).T                           # (F, X): b T_a
+            for mask in masks[a]:
+                part = moved * mask
+                for o in range(num_o):
+                    joint = part * observation[a, :, o]
+                    probs = joint.sum(axis=1)
+                    live = np.nonzero(probs > 0)[0]
+                    if live.size == 0:
+                        continue
+                    children, new = insert(joint[live] / probs[live, None])
+                    fresh += new
+                    edges[a].append((frontier[live], children, probs[live]))
+        if store.size > max_beliefs:
+            raise RuntimeError(f"the relaxed belief graph exceeds {max_beliefs} beliefs.")
+        frontier = np.array(fresh, dtype=np.int64)
+    num_b = store.size
+    beliefs = store.rows
+    step = [sparse.csr_matrix((np.concatenate([e[2] for e in edges[a]]),
+                               (np.concatenate([e[0] for e in edges[a]]), np.concatenate([e[1] for e in edges[a]]))),
+                              shape=(num_b, num_b)) for a in range(num_a)]
+    reward = beliefs @ R[:, last].T                                                   # (K, A)
+    value = np.full(num_b, R.max() / (1 - gamma))
+    while True:
+        new = np.max(np.stack([reward[:, a] + gamma * (step[a] @ value) for a in range(num_a)], axis=1), axis=1)
+        change = float(np.abs(new - value).max())
+        value = new
+        if change < 1e-10:
+            break
+    span = (R.max() - R.min()) / (1 - gamma)
+    slack = span / 2 * merge / (1 - gamma)
+    marginal = sparse.csr_matrix((np.ones(num_x), (np.arange(num_x), last)), shape=(num_x, num_s))
+    bounded = torch.from_numpy(value + slack)
+    return RelaxedBound(float(bounded[roots[0]]), bounded[torch.from_numpy(roots)],
+                        torch.from_numpy(np.asarray(beliefs @ marginal)), bounded, slack)

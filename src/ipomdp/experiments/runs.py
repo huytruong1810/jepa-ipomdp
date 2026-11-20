@@ -99,14 +99,15 @@ def wumpus_setup(device: torch.device, discount: float) -> DomainSetup:
 
 
 # Domains selectable through conf/env/<name>.yaml (section 2).
-def itiger_setup(device: torch.device, level: int, discount: float, bracket_epsilon: float) -> DomainSetup:
+def itiger_setup(device: torch.device, level: int, discount: float, bracket_epsilon: float,
+                 controller_epsilon: float) -> DomainSetup:
     """
     Two-agent tiger: agent i's level-`level` problem, the fold of agent j's certified level-(level-1) controller
     (domain/interactive.py; conf/env/itiger.yaml). The fold is an exact FinitePOMDP, so it trains and simulates
     exactly like the canonical Tiger; no extra episode summary.
     """
     problem = nested_problem(build_multiagent_tiger(discount), Agent.I, level, TIGER_LEVEL_ZERO_NOISE,
-                             bracket_epsilon, int(TigerAction.LISTEN))
+                             bracket_epsilon, controller_epsilon, int(TigerAction.LISTEN))
     pomdp = problem.pomdp
     return DomainSetup(pomdp, lambda batch, steps, seed, dev: BatchedPOMDPEnv(pomdp, batch, steps, seed, dev),
                        lambda episodes: {})
@@ -114,7 +115,8 @@ def itiger_setup(device: torch.device, level: int, discount: float, bracket_epsi
 
 DOMAIN_BUILDERS = {"tiger": lambda env, device: tiger_setup(device),
                    "wumpus": lambda env, device: wumpus_setup(device, env.discount),
-                   "itiger": lambda env, device: itiger_setup(device, env.level, env.discount, env.bracket_epsilon)}
+                   "itiger": lambda env, device: itiger_setup(device, env.level, env.discount, env.bracket_epsilon,
+                                                             env.controller_epsilon)}
 
 
 def build_run_config(cfg: DictConfig) -> RunConfig:
