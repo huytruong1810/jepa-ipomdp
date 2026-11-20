@@ -62,6 +62,33 @@ The solver's witness LP becomes public; nothing numeric changes.
 - deduplication of the seeded generators and of the Wumpus heading logic;
 - a test for `belief.predict_state`.
 
+## Phases 2-4 (belief filter, world model, planner): in progress, 2026-11-19
+
+**Rules during the user's GPU hold (2026-11-19).** Every code change the review finds is on the Wumpus recipe path, and its proof of bit-identity needs `wumpus_gpu` and the CUDA option fingerprints. So only tests, findings and comment or docstring edits are committed now. Each edit is shown code-identical by an AST comparison against 3deb4d7 with docstrings stripped, plus golden (51 identical). The code changes are listed per file below as "Deferred", to be applied in one batch per phase once the GPU is back.
+
+**Does the search get better with more simulations?** This was checked on the exact canonical Tiger model, so no learned component is involved (`planner_budget.py`, log beside it; CPU).
+- **Guaranteed, and verified:**
+  - Let eps = ||leaf - V*||_inf. Then every root edge satisfies |Q_tree - Q*| <= gamma^{d_a} eps, where d_a = 1 + the shallowest positive-probability frontier depth below the edge.
+  - Checked at 6 beliefs, 5 leaf qualities (zero, V1, V3, V8, V12) and budgets 1-4096. The bound is never exceeded; the largest error minus bound is -0.015.
+  - The tree after N simulations is a prefix of the tree after N' > N, so d_a never decreases and the bound is non-increasing in N.
+  - A from-scratch expectimax of the final tree reproduces every cached value exactly, with and without pruning.
+- **Not guaranteed: the decision.**
+  - PUCT deepens the promising action first, so with biased leaves the actions are compared on subtrees of unequal depth (the horizon effect).
+  - With zero leaves, the greedy agent plays the optimal actions on all 256 episodes at N = 1. It is worse at every budget from 2 to 16 and has nearly recovered by 32-64. Table below: paired per episode with the optimal agent, mean +- 1.96 s.e.
+  - With V8 leaves, the root decision is optimal at every budget at all six beliefs (part A).
+  - The search deepens slowly: d_a is 2-3 at every root after 4096 simulations.
+
+  | Leaves | N = 1 | 2 | 4 | 8 | 16 | 32 | 64 |
+  |---|---|---|---|---|---|---|---|
+  | zero | +0.00 | -5.44 +- 2.88 | -5.93 +- 3.06 | -3.67 +- 2.92 | -2.89 +- 2.79 | -1.06 +- 1.99 | -0.65 +- 1.62 |
+- **Reading:**
+  - At practical budgets the leaf value and the model set the decision quality, not the number of simulations.
+  - More search converges to the optimal policy of the model it is given, so with a learned model it can exploit the model's errors. That is the paper's more-search-more-deaths result on Wumpus (PROTOCOL C-g).
+  - With the exact Wumpus model the planner does improve with the budget: 335 / 424 / 476 per game at 50 / 200 / 1000 simulations (`wumpus_exact_model.py`, section 4).
+  - The learned Tiger planner is measured against its budget by C-q.3 (registered at edb2483, running).
+
+**Reference agent at the paper's threshold (risk 0.4; `tests/test_wumpus_agents.py`, slow).** Against an independent exact filter, every gamble had an exact danger <= 0.4. Over 64 games, only 6 of its steps were gambles; the largest danger taken was 1/3, and no game ended in a death. It won 68.8% of the games against 59.4% at risk 0.
+
 ## Files
 
 | Phase | File | Findings | Change | Check |
@@ -75,24 +102,24 @@ The solver's witness LP becomes public; nothing numeric changes.
 | 1 domain and I-POMDP core | `src/ipomdp/domain/wumpus.py` | | | |
 | 1 domain and I-POMDP core | `tests/test_domain.py` | | | |
 | 1 domain and I-POMDP core | `tests/test_wumpus.py` | | | |
-| 2 belief filter | `src/ipomdp/models/__init__.py` | | | |
-| 2 belief filter | `src/ipomdp/models/ema.py` | | | |
-| 2 belief filter | `src/ipomdp/models/history_filter.py` | | | |
-| 2 belief filter | `src/ipomdp/models/layers.py` | | | |
-| 2 belief filter | `src/ipomdp/models/world_model.py` | | | |
-| 2 belief filter | `tests/test_history_filter.py` | | | |
-| 2 belief filter | `tests/test_models.py` | | | |
-| 3 world model, heads, losses | `src/ipomdp/models/distributions.py` | | | |
-| 3 world model, heads, losses | `src/ipomdp/models/heads.py` | | | |
-| 4 planner and agents | `src/ipomdp/agents/__init__.py` | | | |
-| 4 planner and agents | `src/ipomdp/agents/planning_agent.py` | | | |
-| 4 planner and agents | `src/ipomdp/agents/uniform_agent.py` | | | |
-| 4 planner and agents | `src/ipomdp/agents/wumpus_reference.py` | | | |
-| 4 planner and agents | `src/ipomdp/planning/__init__.py` | | | |
-| 4 planner and agents | `src/ipomdp/planning/mcts.py` | | | |
-| 4 planner and agents | `src/ipomdp/planning/search_model.py` | | | |
-| 4 planner and agents | `src/ipomdp/planning/wumpus_exact_model.py` | | | |
-| 4 planner and agents | `tests/test_planner_and_agent.py` | | | |
+| 2 belief filter | `src/ipomdp/models/__init__.py` | Re-exports every model class except `CausalTransformerFilter`, which callers import from its module (default-off option). | None. | Imported by the fast suite. |
+| 2 belief filter | `src/ipomdp/models/ema.py` | Correct: one in-place rule for the three uses (JEPA target, value target, acting copies). The filter and heads hold parameters only, so averaging parameters averages the whole state. | None. | `test_target_filter_is_frozen_copy_and_ema_updates`. |
+| 2 belief filter | `src/ipomdp/models/history_filter.py` | Correct: causal mask, and the KV-cached append equals a full re-encode. `nan_to_num(0.0)` after the attention softmax (line 76) never acts on valid input: with every length >= 1 each query sees key 0, so no row is fully masked. It can only hide a NaN produced upstream, which the project's rules forbid. Header: dated narrative; no verdict line (C-j arm TR: FAIL on both rules). | Deferred (code under autocast, GPU gate owed): `encode` raises on a length < 1 and the `nan_to_num` goes (bit-identical on valid input); a verdict line. | Existing: unroll is causal and equals `encode` at every prefix; the KV cache is invariant; token-state children equal update and re-encode. |
+| 2 belief filter | `src/ipomdp/models/layers.py` | Correct: RMSNorm computes in float32 (eps 1e-6); a SwiGLU block is the identity at initialisation (zero `w3`). `build_residual_stack`'s default `num_blocks=2` is unused (every caller in `src/` passes it). `typing.List`. Section 3 of the header is history. | Deferred: drop the unused default (after a check of the report scripts); `list[...]`. | `test_swiglu_block_is_identity_at_initialisation`, `test_residual_stack_shapes`. |
+| 2 belief filter | `src/ipomdp/models/world_model.py` | Correct: the filter has the exact filter's signature, and the hoisted input network keeps unroll equal to stepping. Header: section 7 dated. Section 2 still says slots return "when the interactive state gives them semantics", but the I-POMDP fold (`domain/interactive.py`) is one FinitePOMDP, so the interactive agent uses the same single latent. | Header to rewrite in single-version voice. | Added `test_unroll_from_an_initial_observation_equals_start_then_steps`: the Wumpus o_0 path had no test. |
+| 2 belief filter | `tests/test_history_filter.py` | Covers the plan's unroll and KV-cache checks. | None. | Passes. |
+| 2 belief filter | `tests/test_models.py` | Covered the codec, the EMA and unroll against stepping, but not the o_0 path. | One test added (`world_model.py` row). | 62 passed over this file, `test_history_filter.py` and `test_planner_and_agent.py`. |
+| 3 world model, heads, losses | `src/ipomdp/models/distributions.py` | Correct: encode and decode are linear in real space, so the mean is exact; out-of-bound and non-finite targets raise. Header section 2 cites "the -100/+10 test below", which is in `tests/test_models.py`. | Header pointer to fix. | `test_encoding_has_exact_mean`, `test_mean_is_unbiased_for_multimodal_targets`, `test_bound_targets_are_encoded_exactly`, `test_invalid_targets_raise`. |
+| 3 world model, heads, losses | `src/ipomdp/models/heads.py` | Correct. The header was never closed, section 3b followed section 4, and the options had no verdict lines. | DONE, comment only: 3b moved before 4, header closed, and verdict lines for 2b (`training/run.py` section 9), 2c (PROTOCOL C-e arm 1), 3b (C-j arm CH) and 4 (recipe). Open: the verdict of 2d (`model.observation_reward`), and the single-version rewrite. | AST-identical to 3deb4d7 (docstrings stripped); golden 51 identical. |
+| 4 planner and agents | `src/ipomdp/agents/__init__.py` | Fine. | None. | |
+| 4 planner and agents | `src/ipomdp/agents/planning_agent.py` | Correct. Section 4 gave the offline gain of the own trials but not their in-agent result. Constructor defaults (`epsilon`, `trial`, `trial_prob`). One of the seven generator copies (line 88; the Phase 1 helper). | DONE, comment only: verdict line (in-agent -11.2 per game, ledger `dev.remedy.own_margin_minus_recipe.seed0`; the registered bar is not met). Deferred: required keyword arguments; trials as an action-override wrapper that keeps the `state_dict` keys. | AST-identical; `TestPlanningAgent`, `TestOwnTrials`. |
+| 4 planner and agents | `src/ipomdp/agents/uniform_agent.py` | Fine; a generator copy (line 27). | None (the Phase 1 helper). | `test_actions_are_uniform_and_seeded`. |
+| 4 planner and agents | `src/ipomdp/agents/wumpus_reference.py` | Correct as read. `_DELTA` and `_ahead` duplicate the heading table of `domain/wumpus.py` (the Phase 1 heading owner). Header dated. | After the heading owner lands: use it. | New `tests/test_wumpus_agents.py` (slow): at risk 0.4 every gamble has an exact danger <= 0.4 against an independent filter, and it wins more games than risk 0 (section above). |
+| 4 planner and agents | `src/ipomdp/planning/__init__.py` | Fine. | None. | |
+| 4 planner and agents | `src/ipomdp/planning/mcts.py` | Verified: cached Q and V^ equal a from-scratch expectimax of the final tree, with and without pruning; the tree only grows with the budget; the convergence bound holds. Finding: the bound is monotone in the budget, the decision is not ("Phases 2-4" section above). Constructor default `observation_prune=0.0`; the analysis planner of `experiments/runs.py` relies on it (the copy the plan names). No code writes extra attributes on nodes, so `__dict__` in `DecisionNode.__slots__` serves nothing. Header sections 2 and 3 are history. | Header section 8 on what more simulations do and do not guarantee (comment only). Deferred: `observation_prune` required; `__dict__` out of the slots. | New: `test_cached_values_equal_the_expectimax_of_the_final_tree` (prune 0 and 0.2), `test_the_tree_only_grows_with_the_simulation_budget`; slow `test_root_error_is_bounded_by_the_frontier_depth` (passed, 474 s). |
+| 4 planner and agents | `src/ipomdp/planning/search_model.py` | Correct: the wrappers' maths re-derived (the renormalised branches sum to 1; the reward shift follows the implied risk). Section 6 gave only the offline +33 of the risk margin, which the in-agent screen does not reproduce. `TokenSearchModel.horizon = None` is the duck-typing shim (Phase 7). Constructor defaults (`horizon`, `chunk`). | DONE, comment only: section 6 verdict (in-agent -34.9 per game, Student-t [-123.9, +54.0], ledger `dev.remedy.margin_minus_recipe.*`). Deferred: required arguments; verdict lines for sections 5 and 7-10. | AST-identical; existing tests. |
+| 4 planner and agents | `src/ipomdp/planning/wumpus_exact_model.py` | Correct as read. With the exact model the planner improves with the budget on development games: 335 / 424 / 476 per game at 50 / 200 / 1000 simulations, 1000 minus 200 paired +51 +- 14 (header section 4). `_exact` is read by report scripts (it becomes public in Phase 7). A generator copy (line 178). | None now. | `tests/test_wumpus.py` (per-node reference). |
+| 4 planner and agents | `tests/test_planner_and_agent.py` | Covered the exact one-step lookahead, the expectimax backup and greedy optimality with exact leaves, but nothing with inexact leaves or on growth with the budget. | Three fast tests and one slow test added; the two slow tests share one certified solve (`certified` fixture). | Fast: passes. Slow: the new test passes. |
 | 5 training loop, remedies, baseline | `src/ipomdp/baselines/__init__.py` | | | |
 | 5 training loop, remedies, baseline | `src/ipomdp/baselines/recurrent_dqn.py` | | | |
 | 5 training loop, remedies, baseline | `src/ipomdp/training/__init__.py` | | | |

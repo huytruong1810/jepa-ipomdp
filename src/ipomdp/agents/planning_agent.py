@@ -43,6 +43,10 @@
 #      drawn. Pending steps are cleared by reset(); collections play whole episodes, so none is pending at a
 #      checkpoint and the agent's state_dict is unchanged.
 #    - trials counts the trials started since the last reset_trial_count() (a dose metric).
+#    - Verdict: not adopted. In-agent, together with the risk margin (runs/sweeps/wumpus_own_margin,
+#      agent.trial_prob = 0.2 and mcts.risk_margin = 2, development seed 0, paired per game with the recipe; ledger id
+#      dev.remedy.own_margin_minus_recipe.seed0) it plays -11.2 per game, short of the registered bar
+#      (training/run.py, section 17: +50 per game on 2 of 3 seeds).
 # ==============================================================================
 
 import torch

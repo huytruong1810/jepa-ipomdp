@@ -34,6 +34,8 @@
 #    - Only the value depends on time: the dynamics (reward and observation heads) are
 #      stationary and get no k. The terminal rule V(z, 0) = 0 is applied by the callers
 #      (planning/search_model.py, section 5; training/trainer.py, section 3b), never learned.
+#    - Verdict: not adopted (training/run.py, section 9: 200 / 108 / 143 per game against 186 / 166 / 215 on three
+#      paired seeds, about 69% of games still unfinished).
 #
 # 2c. Value Pair for Double and Clipped-Double Estimation (optional, model.value_estimator; 2026-10-15):
 #    - Two independent value heads A and B read as one value: their mean (double, van Hasselt 2010) or
@@ -47,6 +49,8 @@
 #      oracle-latent networks (fvi_screen.py, section 4).
 #    - Every value head exposes value(latent, codec), the decoded V, so the search model reads one
 #      head or a pair the same way. A pair has no horizon variant (it raises in training/run.py).
+#    - Verdict: the double estimator is part of the Wumpus recipe. Its held-out leave-one-out arm (PROTOCOL.md, C-e,
+#      arm 1, abl_max) found no detectable contribution: recipe minus max backup +33.5 [-25.5, +94.4] per game.
 #
 # 2d. Observation-Conditioned Reward Head (optional, model.observation_reward; 2026-10-27):
 #    - r(z_t, a_t, o_{t+1}) as two-hot logits: the reward head also reads the one-hot NEXT observation. The model is
@@ -68,17 +72,6 @@
 #      shapes the representation. On canonical Tiger it reaches a mean KL to the exact
 #      P(o' | b, a) of 0.001-0.007 nats (LISTEN) and < 0.0002 (door actions).
 #
-# 4. Multi-Step Observation Predictor (optional representation term, model.observation_horizon):
-#    - P(o_{t+j} | z_t, a_t..a_{t+j-1}) for j = 1..k, by an open-loop action-conditioned
-#      rollout h_0 = z_t, h_j = GRUCell(a_{t+j-1}, h_{j-1}), read out by a residual MLP. Its
-#      cross-entropy flows INTO the belief filter (training/trainer.py, section 2c).
-#    - Why: on Wumpus World neither JEPA nor one-step observation prediction makes the latent
-#      track the hunter's cell, heading and the danger ahead, although the same filter learns
-#      them almost perfectly from privileged supervision (2026-10-03).
-#      Predicting future percepts under arbitrary future actions requires exactly that
-#      information. It is a self-supervised, non-privileged signal: actions and observations only.
-#    - It is not a planning model: the planner never reads it. With k = 0 it is not built at all.
-#
 # 3b. Chain-Factored Observation Head (optional, model.observation_head=chain; 2026-11-10, Stage B of the
 #     2026-11-09 audit plan):
 #    - A domain whose percept is a set of binary channels plus an absorbing marker (Wumpus: stench, breeze, glitter,
@@ -94,6 +87,21 @@
 #      on [e, prefix bits b_<i (padded to n)] gives one logit, evaluated at the 2^i distinct prefixes (31 evaluations
 #      for n = 5); the terminal logit is a linear read of e. forward returns NORMALISED log-probabilities (N, |O|), a
 #      drop-in for the joint head's logits: softmax and cross_entropy of them are exact.
+#    - Verdict: not adopted. Its development screen (reports/2026-10-19_eval_protocol/PROTOCOL.md, C-j, arm CH) passed
+#      neither the mechanism nor the play rule, and Stage B was closed.
+#
+# 4. Multi-Step Observation Predictor (optional representation term, model.observation_horizon):
+#    - P(o_{t+j} | z_t, a_t..a_{t+j-1}) for j = 1..k, by an open-loop action-conditioned
+#      rollout h_0 = z_t, h_j = GRUCell(a_{t+j-1}, h_{j-1}), read out by a residual MLP. Its
+#      cross-entropy flows INTO the belief filter (training/trainer.py, section 2c).
+#    - Why: on Wumpus World neither JEPA nor one-step observation prediction makes the latent
+#      track the hunter's cell, heading and the danger ahead, although the same filter learns
+#      them almost perfectly from privileged supervision (2026-10-03).
+#      Predicting future percepts under arbitrary future actions requires exactly that
+#      information. It is a self-supervised, non-privileged signal: actions and observations only.
+#    - It is not a planning model: the planner never reads it. With k = 0 it is not built at all.
+#    - Verdict: part of the Wumpus recipe (k = 5; PROTOCOL.md, "Frozen choices").
+# ==============================================================================
 
 from enum import StrEnum
 

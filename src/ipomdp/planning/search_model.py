@@ -68,6 +68,11 @@
 #      networks gained +33 on 5 of 5 seeds, deaths 0.2-4.1%.
 #    - Used by the PLANNER only (collection and evaluation). The trainer's Bellman value targets keep the
 #      unwrapped model: the value must stay an unbiased backup of the learned model.
+#    - Verdict: not adopted. In-agent (runs/sweeps/wumpus_margin, k = 2, development seeds 0-2, best.pt paired per game
+#      with the recipe on its 512 analysis games; ledger ids dev.remedy.margin_minus_recipe.*) the return is lower on
+#      all three seeds (-74.5 / -4.7 / -25.7 per game, Student-t [-123.9, +54.0]), unfinished games rise on all three
+#      and deaths fall on two. The registered bar (training/run.py, section 17: +50 per game on 2 of 3 seeds) is not
+#      met: the offline gain on frozen networks does not survive training with the margin acting in collection.
 #
 # 7. Anchored Absorbing Value (AbsorbingValueModel, 2026-10-25; reports/2026-10-02_wumpus_diagnostics/retrain_play.py, 6):
 #    - A domain whose games end in an absorbing state that the agent PERCEIVES (Wumpus: the GAME_OVER percept, emitted

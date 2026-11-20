@@ -118,6 +118,23 @@ class TestBeliefFilter:
             latent = model.step(latent, actions[:, t], observations[:, t])
             assert torch.allclose(unrolled[:, t + 1], latent, atol=1e-6)
 
+    def test_unroll_from_an_initial_observation_equals_start_then_steps(self):
+        # world_model.py, section 1: a domain with o_0 (Wumpus) folds it in with an all-zero action before the first
+        # decision, and every latent sequence begins at that start latent. unroll's hoisted input network (section 7)
+        # must reproduce start() followed by step() on that path too.
+        model = _world_model().belief_filter
+        actions = F.one_hot(torch.randint(0, A, (5, 6)), A).float()
+        observations = F.one_hot(torch.randint(0, O, (5, 6)), O).float()
+        initial = F.one_hot(torch.randint(0, O, (5,)), O).float()
+        unrolled = model.unroll(actions, observations, initial)
+        latent = model.start(5, initial)
+        assert torch.allclose(latent, model.step(model.initial(5), torch.zeros(5, A), initial))
+        assert not torch.allclose(latent, model.initial(5))                     # o_0 is folded in, not ignored
+        assert torch.equal(unrolled[:, 0], latent)
+        for t in range(6):
+            latent = model.step(latent, actions[:, t], observations[:, t])
+            assert torch.allclose(unrolled[:, t + 1], latent, atol=1e-6)
+
     def test_latent_depends_on_history(self):
         # Different observation histories must yield different latents (no collapse at init).
         model = _world_model().belief_filter

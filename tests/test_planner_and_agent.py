@@ -17,7 +17,7 @@ import torch.nn.functional as F
 
 from ipomdp.agents import PlanningAgent
 from ipomdp.domain import (BatchedPOMDPEnv, TigerAction, belief_update, build_tiger_pomdp, observation_distribution,
-                           solve_finite_horizon, solve_infinite_horizon)
+                           solve_finite_horizon, solve_infinite_horizon, sup_norm_distance)
 from ipomdp.models import BeliefFilter, HorizonValueHead, ObservationHead, ObservationRewardHead, RewardHead, TwoHotSymlog, ValueHead
 from ipomdp.planning import (AbsorbingValueModel, BeliefTreeSearch, ExactSearchModel, Expansion, LearnedSearchModel, MinMaxStats, RiskMarginModel,
                              RiskSpec, SearchStatistics)
@@ -52,6 +52,46 @@ def _exact_q(tiger, leaf, beliefs):
             q = q + tiger.discount * probs[:, o] * leaf.value(posterior)
         rows.append(q)
     return torch.stack(rows, dim=-1)
+
+
+def _recomputed_q(edge, discount):
+    """Q of an edge recomputed from scratch over the final tree, in Edge.refresh's own order of operations."""
+    acc = 0.0
+    for p, leaf, child in zip(edge._probs, edge._leaf_values, edge._children):
+        acc += p * (leaf if child is None else _recomputed_value(child, discount))
+    return edge.reward + discount * acc
+
+
+def _recomputed_value(node, discount):
+    """V^ of a node recomputed from scratch: its leaf estimate, or max_a of the recomputed edge Q values."""
+    if node.edges is None:
+        return node.leaf_value
+    return max(_recomputed_q(edge, discount) for edge in node.edges)
+
+
+def _expanded_nodes(node):
+    """Every expanded node of the tree below (and including) `node`."""
+    if node.edges is None:
+        return []
+    found = [node]
+    for edge in node.edges:
+        for child in edge._children:
+            if child is not None:
+                found += _expanded_nodes(child)
+    return found
+
+
+def _frontier_depth(node):
+    """Shallowest depth of a frontier (unexpanded) node below `node` through positive-probability branches."""
+    if node is None or node.edges is None:
+        return 0
+    return min(1 + _frontier_depth(child) for edge in node.edges
+               for p, child in zip(edge._probs, edge._children) if p > 0)
+
+
+def _edge_depth(edge):
+    """d_a of the convergence bound: 1 + the shallowest positive-probability frontier depth below the edge."""
+    return min(1 + _frontier_depth(child) for p, child in zip(edge._probs, edge._children) if p > 0)
 
 
 class TestExactSearchModel:
@@ -151,6 +191,42 @@ class TestBeliefTreeSearch:
         stats.update(10.0)
         stats.update(-10.0)
         assert (stats.normalize(-10.0), stats.normalize(0.0), stats.normalize(10.0)) == (0.0, 0.5, 1.0)
+
+    @pytest.mark.parametrize("prune", [0.0, 0.2])
+    def test_cached_values_equal_the_expectimax_of_the_final_tree(self, tiger, value_functions, prune):
+        # mcts.py, sections 2 and 7: Q and V^ are cached and refreshed only along the simulated path, and children are
+        # created lazily. After a deep search every expanded node's cached V^, and every root edge's cached Q, must equal
+        # a from-scratch expectimax over the final tree, exactly (the recursion uses Edge.refresh's order of operations).
+        # prune = 0.2 drops Tiger's improbable growl at confident beliefs (P = 0.171 at b = 0.97) and renormalises.
+        planner = BeliefTreeSearch(ExactSearchModel(tiger, value_functions[3], CPU), num_simulations=300, c_puct=1.25,
+                                   dirichlet_alpha=0.3, dirichlet_epsilon=0.25, seed=0, observation_prune=prune)
+        planner.search(_beliefs(0.5, 0.85, 0.97, 0.03), temperature=1.0)
+        if prune > 0.0:                                  # |O| = 2: at most one branch per edge is dropped
+            assert 0.0 < planner.statistics.max_pruned_mass < prune
+        for root in planner.roots:
+            nodes = _expanded_nodes(root)
+            assert len(nodes) > 10
+            for node in nodes:
+                assert node.value() == _recomputed_value(node, tiger.discount)
+            for edge in root.edges:
+                assert edge.q == _recomputed_q(edge, tiger.discount)
+
+    def test_the_tree_only_grows_with_the_simulation_budget(self, tiger, value_functions):
+        # With a fixed seed the search after N simulations is the prefix of the search after N' > N (one random stream,
+        # consumed in the same order), so root visit counts and every edge's frontier depth d_a are non-decreasing in N.
+        # d_a is the depth of the convergence bound (test_root_error_is_bounded_by_the_frontier_depth, slow).
+        beliefs = _beliefs(0.5, 0.85, 0.97)
+        previous_counts, previous_depths = None, None
+        for sims in (1, 2, 4, 8, 16, 32, 64, 128, 256):
+            planner = BeliefTreeSearch(ExactSearchModel(tiger, value_functions[3], CPU), num_simulations=sims,
+                                       c_puct=1.25, dirichlet_alpha=0.3, dirichlet_epsilon=0.25, seed=0)
+            planner.search(beliefs, temperature=1.0)
+            counts = planner.statistics.visit_counts
+            depths = np.array([[_edge_depth(edge) for edge in root.edges] for root in planner.roots])
+            if previous_counts is not None:
+                assert (counts >= previous_counts).all() and (depths >= previous_depths).all()
+            previous_counts, previous_depths = counts, depths
+        assert previous_depths.max() >= 3
 
 
 def model_without_branches(belief_filter, codec, num_a, num_o, dim, hidden):
@@ -429,15 +505,51 @@ def _discounted_returns(tiger, agent, steps, seed):
     return returns
 
 
+@pytest.fixture(scope="module")
+def certified(tiger):
+    """The certified infinite-horizon solution of canonical Tiger (about 6 min on one CPU thread; slow tests only)."""
+    return solve_infinite_horizon(tiger, tolerance=1e-3, prune_epsilon=1e-6)
+
+
 @pytest.mark.slow
-def test_exact_model_planner_matches_optimal_policy_return(tiger):
+def test_root_error_is_bounded_by_the_frontier_depth(tiger, value_functions, certified):
+    """
+    Consistency of the search on an exact model, with inexact leaves. If every leaf estimate is within eps of V*
+    (eps = ||leaf - V*||_inf), the expectimax tree satisfies, at every root edge,
+        |Q_tree(b, a) - Q*(b, a)| <= gamma^{d_a} eps,
+    where d_a = 1 + the shallowest positive-probability frontier depth below the edge (induction: a leaf is off by at
+    most eps, a chance edge averages its children's errors and a decision node's max moves by at most the largest one).
+    The tree only grows with the budget (test_the_tree_only_grows_with_the_simulation_budget), so the bound is
+    non-increasing in the number of simulations. The solver's certified error delta enters as delta in eps and gamma
+    delta in Q*. The decision argmax_a Q_tree is NOT monotone in the budget when the leaves are poor (the horizon
+    effect; reports/2026-11-16_code_audit/planner_budget.py), which is why the bound, not the decision, is tested.
+    """
+    vstar, delta = certified.value_function, certified.error_bound
+    corners = vstar.value(torch.eye(2, dtype=torch.float64))
+    assert float(vstar.value(_beliefs(0.5))) > 0.0                    # V* > 0 on the simplex: ||V*|| is a corner value
+    leaves = {"zero": (None, float(corners.max()) + delta)}
+    for h in (1, 3, 8):
+        leaves[f"V{h}"] = (value_functions[h - 1], sup_norm_distance(value_functions[h - 1], vstar) + delta)
+    beliefs = _beliefs(0.5, 0.85, 0.95, 0.97, 0.99)
+    exact_q = _exact_q(tiger, vstar, beliefs).numpy()
+    for leaf, eps in leaves.values():
+        for sims in (1, 4, 16, 64, 256, 1024):
+            planner = BeliefTreeSearch(ExactSearchModel(tiger, leaf, CPU), sims, 1.25, 0.3, 0.0, seed=0)
+            planner.search(beliefs, temperature=0.0)
+            depths = np.array([[_edge_depth(edge) for edge in root.edges] for root in planner.roots])
+            bound = tiger.discount ** depths * eps + tiger.discount * delta
+            assert (np.abs(planner.statistics.q_values - exact_q) <= bound + 1e-9).all()
+
+
+@pytest.mark.slow
+def test_exact_model_planner_matches_optimal_policy_return(tiger, certified):
     """
     End-to-end on the exact model. (1) With V* leaves, root Q equals Q* at any search depth.
     (2) The planning agent (exact beliefs, V* leaves, 50 simulations, greedy) earns the same
     discounted return as the exact optimal policy on identical simulator seeds, and that return
     matches V*(b0) = 19.37 (100 steps; 0.95^100 = 0.006).
     """
-    solution = solve_infinite_horizon(tiger, tolerance=1e-3, prune_epsilon=1e-6)
+    solution = certified
     batch, steps = 256, 100
 
     class OptimalAgent:

@@ -94,6 +94,25 @@
 #      of next_states), so every SearchModel and wrapper works as before. Edge.refresh reads a
 #      materialised child's CURRENT value, so code that edits a child's leaf_value and refreshes
 #      the edge (reports/.../self_loop_diag.py) behaves as before.
+#
+# 8. What a Larger Budget Guarantees, and What It Does Not (code audit 2026-11-19;
+#    reports/2026-11-16_code_audit/planner_budget.py and its log; tests/test_planner_and_agent.py):
+#    - Guaranteed, for the model the search is given: if every leaf estimate is within eps of that model's optimal
+#      value, every root edge satisfies |Q_tree(s, a) - Q*(s, a)| <= gamma^{d_a} eps, where d_a = 1 + the shallowest
+#      positive-probability frontier depth below the edge (a leaf errs by at most eps, a chance edge averages its
+#      children's errors, a decision node's max moves by at most its largest edge error). With a fixed seed the
+#      tree after N simulations is a prefix of the tree after N' > N, so d_a never decreases and the bound is
+#      non-increasing in N; PUCT reaches every branch eventually, so Q_tree converges to Q* (consistency).
+#    - Not guaranteed: the decision at a finite budget. PUCT deepens the promising action first, so actions are
+#      compared on subtrees of different depths, and with biased leaves the comparison can flip as N grows (the
+#      horizon effect of best-first search). On the exact canonical Tiger with zero leaves, the greedy agent plays
+#      the optimal actions at N = 1, then loses 5.4 per episode at N = 2 and 5.9 at N = 4 (paired over 256
+#      episodes, 95% half-widths about 3) and recovers to -1.1 at N = 32; with V_8 leaves the root decision is
+#      optimal at every budget tested. The bound tightens slowly: after 4096 simulations d_a is 2 or 3 at every root.
+#    - Consequence: at practical budgets the leaf value and the model set the decision quality, not the number of
+#      simulations, and more search converges to the optimal policy of the MODEL it is given. With a learned model
+#      that policy exploits the model's errors (the optimizer's curse), so a learned planner need not improve with
+#      its budget (PROTOCOL.md: C-g on Wumpus; C-q.3 measures the learned Tiger planner).
 # ==============================================================================
 
 from bisect import bisect_right
