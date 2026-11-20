@@ -1,0 +1,3 @@
+[23:59:11] commit 2f245f3; args {'bracket_epsilon': 0.05, 'controller_epsilon': 0.5, 'seed_delay': 1, 'delays': '0,1', 'trials': 1000, 'epsilon': 0.5, 'max_beliefs': 1000000, 'lower_only': True}
+[23:59:44] level 0 (j): bracket [8.2380, 8.2879], controller 17 nodes, exact value 8.2378; level-1 fold: 26 states, 6 observations (33s)
+[23:59:44] fast informed bound U(b0) = 77.5129

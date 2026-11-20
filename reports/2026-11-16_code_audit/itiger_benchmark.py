@@ -29,14 +29,22 @@
 #    - The defaults are conf/env/itiger.yaml's: j's controller extracted at 0.5 and certified at 0.05
 #      (interactive.py, section 6), which gives the 26-state fold. Delay 2 needs about 4.5 GB and 30 min, and its
 #      368,396 points are too many to seed the sawtooth, so HSVI is seeded with --seed-delay.
-#    - --lower-only skips the relaxation and runs unseeded HSVI for --trials trials. Its lower end tightens with the
-#      number of trials: a seeded run of 40 trials reached L = 16.27, and an earlier untracked run of about 1,000 trials
-#      reached 16.54.
+#    - --lower-only skips the relaxation and runs unseeded HSVI for --trials trials, without corner backups (hsvi()'s
+#      trials). Its lower end tightens with the number of trials: a seeded run of 40 trials reached L = 16.27, and an
+#      earlier untracked run of about 1,000 trials reached 16.54.
+# 6. E1's Benchmark File (--artifact, with --lower-only):
+#    - E1 must not recompute the bracket per seed, because the delay-2 relaxation takes 30 min and 5.8 GB. The file
+#      holds L, U, the lower-bound vectors and their actions, and the fold's digest
+#      (experiments/interactive_analysis.py). The analysis plays the reference agent (the best vector's action at the
+#      exact belief, value >= L) and checks the digest against the run's fold.
+#    - U is the smaller of this run's HSVI upper end and --upper, a certified value from a tracked log. Its source is
+#      written into the file.
 # ==============================================================================
 
 import argparse
 import subprocess
 import time
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -45,6 +53,7 @@ from ipomdp.domain.bounds import _HSVI, hsvi_budget, revealed_upper_bound
 from ipomdp.domain.interactive import TIGER_LEVEL_ZERO_NOISE, nested_problem, relaxation_reveal
 from ipomdp.domain.multiagent_tiger import Agent, build_multiagent_tiger
 from ipomdp.domain.tiger import TigerAction
+from ipomdp.experiments.interactive_analysis import InteractiveBenchmark, fold_digest
 
 
 def threshold_values(problem, thetas, episodes=20_000, steps=260, seed=0):
@@ -84,6 +93,10 @@ def main():
     parser.add_argument("--max-beliefs", type=int, default=1_000_000)
     parser.add_argument("--lower-only", action="store_true",
                         help="skip the relaxation; run unseeded HSVI for --trials trials (section 5)")
+    parser.add_argument("--artifact", type=str, default=None,
+                        help="with --lower-only: save E1's benchmark file here (section 6)")
+    parser.add_argument("--upper", type=float, default=None, help="with --artifact: a certified U(b0) from a log")
+    parser.add_argument("--upper-source", type=str, default=None, help="with --artifact: where --upper comes from")
     args = parser.parse_args()
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], capture_output=True,
@@ -102,9 +115,21 @@ def main():
     log(f"fast informed bound U(b0) = {float(b0 @ _HSVI(m).corner):.4f}")
     if args.lower_only:
         t = time.time()
-        bracket = hsvi_budget(m, args.epsilon, args.trials)
-        log(f"HSVI, unseeded, corners backed up: L(b0) = {bracket.lower:.4f} (certified lower end), "
+        bracket = hsvi_budget(m, args.epsilon, args.trials, back_up_corners=False)
+        log(f"HSVI, unseeded, as hsvi(): L(b0) = {bracket.lower:.4f} (certified lower end), "
             f"U(b0) = {bracket.upper:.4f} after {bracket.trials} trials ({time.time() - t:.0f}s)")
+        if args.artifact is not None:
+            if args.upper is None or args.upper_source is None:
+                raise ValueError("--artifact needs --upper and --upper-source.")
+            upper = min(args.upper, bracket.upper)
+            benchmark = InteractiveBenchmark(
+                lower=bracket.lower, upper=upper, vectors=bracket.lower_vectors,
+                actions=bracket.controller.action_law.argmax(-1), digest=fold_digest(m),
+                source=(f"lower: unseeded HSVI, {bracket.trials} trials, epsilon {args.epsilon}, commit {commit}; "
+                        f"upper: {args.upper_source}"))
+            benchmark.save(Path(args.artifact))
+            log(f"E1 benchmark saved to {args.artifact}: [{benchmark.lower:.4f}, {benchmark.upper:.4f}], "
+                f"{benchmark.vectors.shape[0]} vectors, fold digest {benchmark.digest[:16]}")
         log(f"total {time.time() - start:.0f}s")
         return
     corners = torch.eye(m.num_states, dtype=torch.float64)

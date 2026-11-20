@@ -292,7 +292,7 @@ class _SeededHSVI(_HSVI):
 
 
 def hsvi_budget(model: FinitePOMDP, epsilon: float, trials: int, corners: torch.Tensor | None = None,
-                points: tuple[torch.Tensor, torch.Tensor] | None = None) -> Bracket:
+                points: tuple[torch.Tensor, torch.Tensor] | None = None, back_up_corners: bool = True) -> Bracket:
     """
     The certified bracket after at most `trials` HSVI trials toward width `epsilon` (sections 4 and 6). Unlike
     hsvi(), the width is whatever the budget reached: both ends are proofs either way, and the caller reports the
@@ -304,6 +304,9 @@ def hsvi_budget(model: FinitePOMDP, epsilon: float, trials: int, corners: torch.
         trials: The trial budget.
         corners: Optional float64 (S,) upper bounds of V* at the corners (e.g. RelaxedBound.root_values).
         points: Optional (beliefs (K, S), values (K,)) upper bounds of V* (e.g. RelaxedBound.beliefs, .values).
+        back_up_corners: Back up the corners after every trial (section 6). The cost of a sweep grows with the stored
+            points (on the level-1 fold, 1,000 trials did not finish in 11 hours with it). Without it and without
+            seeds, the trials are hsvi()'s, so a run that needs only the lower end turns it off.
     """
     search = _SeededHSVI(model, None if corners is None else corners.numpy(),
                          None if points is None else points[0].numpy(), None if points is None else points[1].numpy())
@@ -313,7 +316,8 @@ def hsvi_budget(model: FinitePOMDP, epsilon: float, trials: int, corners: torch.
     trial = 0
     for trial in range(1, trials + 1):
         search.explore(b0, epsilon, 0)
-        search.back_up_corners()
+        if back_up_corners:
+            search.back_up_corners()
         if float(search.upper(b0[None])[0] - search.lower(b0[None])[0]) <= epsilon:
             break
     return _bracket(search, b0, trial)
