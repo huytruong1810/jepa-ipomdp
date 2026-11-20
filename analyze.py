@@ -10,6 +10,8 @@
 #      which documents the outputs under <run>/analysis/).
 #    - The domain is read from the run's config: Wumpus World runs go to
 #      ipomdp.experiments.wumpus.analyze_wumpus_run (no solver; --solver-tolerance is unused).
+#    - Interactive Tiger runs (env=itiger) go to ipomdp.experiments.interactive_analysis.analyze_interactive_run and
+#      need --benchmark: the fold's certified bracket, computed once per fold, because the exact solve is out of reach.
 #
 # 2. Exact References (Tiger):
 #    - V* and the per-action Q* vector sets are computed by the certified solver; the certified
@@ -29,6 +31,8 @@ from omegaconf import OmegaConf
 import torch
 
 from ipomdp.experiments import AnalysisSettings, WumpusAnalysisSettings, analyze_run, analyze_wumpus_run
+from ipomdp.experiments.interactive_analysis import (InteractiveAnalysisSettings, analyze_interactive_run,
+                                                     print_interactive_summary)
 from ipomdp.interpretability import BeliefAnalysis
 
 
@@ -76,11 +80,22 @@ def main() -> None:
     parser.add_argument("--analysis-output", default=None,
                         help="Wumpus only: output directory under the run (default analysis; "
                              "experiments/wumpus.py, section 3).")
+    parser.add_argument("--benchmark", type=Path, default=None,
+                        help="Interactive Tiger only, required there: the fold's benchmark file "
+                             "(experiments/interactive_analysis.py, section 4).")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     domain = OmegaConf.load(args.run_dir / ".hydra" / "config.yaml").env.name
-    if domain == "wumpus":
+    if (domain == "itiger") != (args.benchmark is not None):
+        raise ValueError("--benchmark is required for an itiger run and applies to itiger runs only.")
+    if domain == "itiger":
+        if args.analysis_output is not None:
+            raise ValueError("--analysis-output applies to Wumpus World runs only.")
+        settings = InteractiveAnalysisSettings(args.episodes, args.mlp_probe_steps, args.seed)
+        print_interactive_summary(analyze_interactive_run(args.run_dir, settings, args.benchmark, device))
+        output = "analysis"
+    elif domain == "wumpus":
         settings = WumpusAnalysisSettings(args.episodes, args.mlp_probe_steps, args.seed)
         if args.analysis_output is not None:
             settings = replace(settings, output=args.analysis_output)

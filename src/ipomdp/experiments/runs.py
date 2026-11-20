@@ -221,6 +221,9 @@ class AnalysisSettings:
 
 def analyze_run(run_dir: Path, settings: AnalysisSettings, device: torch.device) -> BeliefAnalysis:
     """Runs interpretability.analyze_beliefs on a run's best.pt and writes <run>/analysis/ (section 4)."""
+    if OmegaConf.load(run_dir / ".hydra" / "config.yaml").env.name == "itiger":
+        raise TypeError("an itiger fold is out of the exact solver's reach: analyse it against its benchmark file "
+                        "(experiments/interactive_analysis.py; analyze.py --benchmark).")
     trained = load_trained_run(run_dir, device)
     pomdp, run, cfg = trained.setup.domain, trained.run, trained.cfg
     if not isinstance(pomdp, FinitePOMDP):

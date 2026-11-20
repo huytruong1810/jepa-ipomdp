@@ -147,7 +147,7 @@ The solver's witness LP becomes public; nothing numeric changes.
 | 6 interpretability and error bounds | `src/ipomdp/interpretability/wumpus_latents.py` | | | |
 | 6 interpretability and error bounds | `tests/test_interpretability.py` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `README.md` | | | |
-| 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `analyze.py` | | | |
+| 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `analyze.py` | E1 plumbing (2026-11-20): an itiger run went to analyze_run and would have started an exact solve of the fold, which is out of reach. | itiger runs go to `analyze_interactive_run` and need `--benchmark`; the flag is refused for other domains. Phase 7 review still open. | `--help`; the slow end-to-end test in `tests/test_interactive_analysis.py`. |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `conf/config.yaml` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `conf/env/tiger.yaml` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `conf/env/wumpus.yaml` | | | |
@@ -279,7 +279,8 @@ The solver's witness LP becomes public; nothing numeric changes.
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `src/ipomdp/__init__.py` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `src/ipomdp/experiments/__init__.py` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `src/ipomdp/experiments/aggregate.py` | | | |
-| 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `src/ipomdp/experiments/runs.py` | | | |
+| 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `src/ipomdp/experiments/interactive_analysis.py` | NEW 2026-11-20 (E1 plumbing). It analyses an itiger run against its fold's certified bracket, read from a benchmark file tied to the fold by a digest. The reference agent is the exact filter plus the best lower-bound vector's action (value >= L). The analysis reports the KL on the interactive state and on both marginals (physical, other node). | New module and new test file; the Tiger analysis path is not touched (analyze_run gained only a guard). | `tests/test_interactive_analysis.py`: 6 fast tests (6 s) and 1 slow end to end (about 55 s). |
+| 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `src/ipomdp/experiments/runs.py` | E1 plumbing (2026-11-20): `analyze_run` would have run the exact solver on an itiger fold. Phase 7 review still open. | Guard: it raises for an itiger run before loading it. Tiger is unchanged: the guard only reads the run's config and compares the domain name. | The slow test checks the TypeError; `tests/test_experiments.py` passes. |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `src/ipomdp/experiments/wumpus.py` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `src/ipomdp/telemetry/__init__.py` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `src/ipomdp/telemetry/guardrails.py` | | | |
