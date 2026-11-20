@@ -47,6 +47,12 @@
   - the relaxed belief graph is finite only with a compact j. With the 12-node controller extracted at 2.0, j listens for long stretches and the graph exceeded 200,000 beliefs at delay 0.
 - **What E1 can claim with a bracket near 3:** the learned agent's return against [L, U], and against L, the value of the best certified controller. It cannot claim "optimal" beyond the bracket. Canonical Tiger keeps the optimality claim.
 
+**C-q.3 read once** (the reviewer session's registration, edb2483; its run finished at 00:30; PROTOCOL.md "C-q results").
+- The learned Tiger planner's gap to the optimal agent is -0.08 to -0.28 per episode, against 22.375, at every budget N in 1..128.
+- The Student-t interval on the ten per-seed gaps contains 0 at every N. At N = 128 the gap is -0.076 [-0.198, +0.046].
+- By the registered rule, the search budget does not change learned Tiger play, so the C-g degradation on Wumpus is attributed to the Wumpus model.
+- On the exact model, zero leaves lose up to 5.9 per episode at small N (the horizon effect), so the planner itself is not monotone in N with poor leaves. That is material for the user's question on monotone improvement with resources. Your call for the paper.
+
 **Not changed:** no paper number, no ledger value, no stored run.
 - golden: 51 identical;
 - load gate: 140 runs, 0 differ;

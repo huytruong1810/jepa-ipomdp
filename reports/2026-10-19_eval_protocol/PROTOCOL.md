@@ -325,6 +325,17 @@ Networks: best.pt of the three stored oracle + double runs (exact-belief targets
   - random direction of the same length: to a door 0.07 +- 0.16% [0.0, 0.7]; to LISTEN 94.3% (a perturbed latent falls back to LISTEN); pooled 46.3%.
   - no change: flip rate 0.5%.
   - Reading: the planner's action is determined by the belief the latent encodes (replace 100%); a random move of the same size never opens a door. The residual of the latent beyond the belief matters: keeping it leaves about a quarter of the door flips undone. Ledger ids `tiger.intervention.*`.
+- **C-q.3 (search budget of the learned Tiger planner, read once 2026-11-20 00:30; log `reports/2026-11-16_code_audit/learned_planner_budget.log`, run at edb2483; ten JEPA seeds of `runs/sweeps/polyak`, 256 paired episodes each; the optimal agent scores 22.375 on these episodes).** Mean paired gap (learned minus optimal) per episode over the ten seeds, Student-t 95% on the per-seed gaps:
+
+  | N | 1 | 2 | 4 | 8 | 16 | 32 | 50 | 64 | 128 |
+  |---|---|---|---|---|---|---|---|---|---|
+  | mean | -0.127 | -0.147 | -0.275 | -0.182 | -0.168 | -0.119 | -0.088 | -0.067 | -0.076 |
+  | lower | -0.327 | -0.306 | -0.720 | -0.425 | -0.377 | -0.249 | -0.237 | -0.183 | -0.198 |
+  | upper | +0.073 | +0.012 | +0.169 | +0.061 | +0.042 | +0.010 | +0.062 | +0.049 | +0.046 |
+
+  - Per-seed values are in the log. Seeds 1 and 6 carry most of the gap: -0.33 and -0.32 at N = 128. Seed 9 is +0.198 at N = 1 and at N >= 50.
+  - Reading, by the registered rule: the interval contains 0 at every N >= 16, in fact at every N. The learned value is accurate enough that the search budget does not change Tiger play, and the Wumpus search-budget result (C-g) is attributed to the Wumpus model.
+  - Comparison: on the exact model, zero leaves lose 5.4 per episode at N = 2 and 5.9 at N = 4, recovering to -2.9 at N = 16, while V8 leaves are optimal from N = 32 (`reports/2026-11-16_code_audit/planner_budget.log`). The learned leaves behave like accurate leaves, not like zero leaves.
 
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
