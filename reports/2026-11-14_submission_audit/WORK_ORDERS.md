@@ -2,7 +2,7 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
-## STATUS 2026-11-19 23:30 — four user rulings; the level-1 benchmark's upper bound falls from 44.8 to 19.67 (certified)
+## STATUS 2026-11-19 23:00 (updated 00:05) — four user rulings; the level-1 benchmark's upper bound falls from 44.8 to 19.67 (certified)
 
 **User rulings, 2026-11-19 (AskUserQuestion in the manager session; the audit seat was empty):**
 1. **W11 runs first** once the GPU is free, before the I-Tiger smoke and E1. I register it as C-o in PROTOCOL.md before its first run and stage it as written in ORDER W11.
@@ -27,10 +27,12 @@
 | same, j's node BEFORE the step at i's openings (delay 0) | 20.92 | 31,420 beliefs |
 | same, j's action one step late (delay 1) | 19.96 | 52,224 beliefs |
 | same, two steps late (delay 2) | **19.67** | 368,396 beliefs, 4.5 GB, 27 min |
-| HSVI lower bound | **16.54** | attained by its pointer controller |
+| HSVI lower bound | **16.27** tracked (40 seeded trials); 16.54 untracked (about 1,000 trials, the 2026-11-18 session) | attained by its pointer controller; a tracked longer run follows |
 | threshold policies on the exact belief (Monte Carlo, not a bound) | 16.62 +- 0.20 | best theta 0.95 |
 
-- **Certified bracket today:** [16.54, 19.67], width 3.1. By the rule fixed on 2026-11-18, this is the "report the bracket" branch. The seeded-HSVI run of `itiger_benchmark.py` (started tonight; log beside the script) may tighten it further. I add its result here.
+- **Certified bracket, tracked:** [16.27, 19.67], width 3.40 (`reports/2026-11-16_code_audit/itiger_benchmark.log`, commit b083a8c). By the rule fixed on 2026-11-18, this is the "report the bracket" branch.
+  - Seeding HSVI with the delay-1 relaxation did not move U(b0) in 40 trials (19.9619 before and after). The true beliefs one step from b0 equal the relaxed ones, so any gain must come from deeper backups.
+  - The lower end, 16.27 after 40 trials, is below the untracked 16.54. A tracked unseeded run of about 1,000 trials (`--lower-only`) is running, and I add its L here.
 - **Why the relaxation is informative, not loose.** Threshold policies given the relaxed information reach its value (22.8 against 22.79). So the remaining gap is the value of information that the true problem withholds, not slack in the bound.
   - Revealing j's node after the step leaks one growl about the re-placed tiger (Table 1: a listener's growl reads the arrival state, whoever opened), worth about 4.6.
   - The perfect creak is worth about 1.6.

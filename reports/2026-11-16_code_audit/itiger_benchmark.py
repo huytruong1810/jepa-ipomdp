@@ -29,6 +29,9 @@
 #    - The defaults are conf/env/itiger.yaml's: j's controller extracted at 0.5 and certified at 0.05
 #      (interactive.py, section 6), which gives the 26-state fold. Delay 2 needs about 4.5 GB and 30 min, and its
 #      368,396 points are too many to seed the sawtooth, so HSVI is seeded with --seed-delay.
+#    - --lower-only skips the relaxation and runs unseeded HSVI for --trials trials. Its lower end tightens with the
+#      number of trials: a seeded run of 40 trials reached L = 16.27, and an earlier untracked run of about 1,000 trials
+#      reached 16.54.
 # ==============================================================================
 
 import argparse
@@ -79,6 +82,8 @@ def main():
     parser.add_argument("--trials", type=int, default=100)
     parser.add_argument("--epsilon", type=float, default=0.5)
     parser.add_argument("--max-beliefs", type=int, default=1_000_000)
+    parser.add_argument("--lower-only", action="store_true",
+                        help="skip the relaxation; run unseeded HSVI for --trials trials (section 5)")
     args = parser.parse_args()
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], capture_output=True,
@@ -95,6 +100,13 @@ def main():
         f"states, {m.num_observations} observations ({time.time() - start:.0f}s)")
     b0 = m.initial_belief.numpy()
     log(f"fast informed bound U(b0) = {float(b0 @ _HSVI(m).corner):.4f}")
+    if args.lower_only:
+        t = time.time()
+        bracket = hsvi_budget(m, args.epsilon, args.trials)
+        log(f"HSVI, unseeded, corners backed up: L(b0) = {bracket.lower:.4f} (certified lower end), "
+            f"U(b0) = {bracket.upper:.4f} after {bracket.trials} trials ({time.time() - t:.0f}s)")
+        log(f"total {time.time() - start:.0f}s")
+        return
     corners = torch.eye(m.num_states, dtype=torch.float64)
     best, seed = None, None
     for delay in [int(d) for d in args.delays.split(",")]:
