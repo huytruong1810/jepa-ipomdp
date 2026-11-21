@@ -2,6 +2,29 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-21 11:00 (written by the phase 2-4 reviewer session; the manager is not listed) — C-r Tiger read; a correction; E1's benchmark run crashed
+
+**C-r Tiger, read once** (PROTOCOL.md "C-r result, Tiger"; `ddd8a62`). Gap per episode to the optimal agent on the 256 paired episodes, Student-t over 10 runs:
+- ours: -0.09 [-0.24, +0.06];
+- BA-POMCP main: -6.76 [-8.41, -5.10], so BA-POMCP minus ours is -6.67 [-8.32, -5.01] (Welch);
+- the other arms: 50 simulations -41.0, uniform rollouts -13.9, weak prior -61.2 (one run converged to the mirrored model and loses 548 per episode).
+
+Post hoc, not registered:
+- the models are learned (listening accuracy 0.84-0.86 on 39 of 40 runs);
+- BA-POMCP with the TRUE model loses -6.22 +- 3.27 at 1,000 simulations, so its deficit is the search, not the learning.
+No paper number or ledger value changed.
+
+**Correction (my error).** On 2026-11-20 I reported that BA-POMCP with the true model and the EXPECTED_MDP rollout "plays the optimal return". That rested on a 32-episode slow test whose 5-standard-error tolerance was wider than the real 6.2 deficit. The test is removed, and the module and test headers state the measured deficit. What remains true: the root decisions are optimal at the six beliefs the optimal policy reaches.
+
+**E1's benchmark run crashed at 05:22 after about 17 h of HSVI.** Log: `reports/2026-11-16_code_audit/itiger_benchmark_artifact.log` (untracked, yours). `runs/benchmarks/itiger_level1.pt` was not written.
+- Cause: `bounds._bracket` builds the pointer controller as a dense (k, A, Z, k) tensor. With about 50,000 lower-bound vectors it asked for 359 GB.
+- Possible fixes, for you: build no controller in artifact mode, since InteractiveBenchmark needs only L, U, the vectors and their actions; or store successors as an index array (k, Z); and checkpoint the vectors during the trials. I have not touched `domain/`.
+
+**C-r I-Tiger phase:** running since 10:45 with ipomcp's owner's agreement (`catch-up-ipomcp-desktop-owner` holds that role since 2026-11-20 18:52).
+- Load: 4 workers at nice 19, about 5.2 GB, about 16 h.
+- Safeguard: a watchdog stops the campaign if MemAvailable stays under 3 GB for 5 min.
+- Its readout needs the benchmark file.
+
 ## STATUS 2026-11-20 12:20 — BA-POMCP's design (user rulings); C-q.3 corrected; E1's benchmark file
 
 **BA-POMCP** (Katt, Oliehoek & Amato 2017; code `src/ipomdp/baselines/ba_pomcp.py`, ab7934a, by the reviewer session). User rulings of 2026-11-19 and 2026-11-20, taken via AskUserQuestion after two findings of the reviewer:
