@@ -361,6 +361,31 @@ Networks: best.pt of the three stored oracle + double runs (exact-belief targets
     - V8 leaves: optimal at every N except N = 8 (-0.75 +- 1.10).
     - So with biased leaves the return oscillates with the budget (the horizon effect) instead of improving monotonically. The learned leaves behave like accurate leaves, not like zero leaves.
 
+## C-r result, Tiger (read once 2026-11-21 10:01; `reports/2026-10-19_eval_protocol/ba_pomcp_tiger_readout.log`; campaign at 5609947, log beside it): OURS AHEAD OF EVERY BA-POMCP ARM
+
+On the 256 paired episodes of seed 11 the optimal agent scores 22.375, as in C-q.3. Gap to the optimal agent per episode, Student-t 95% over 10 runs (ours: the ten JEPA seeds at N = 50, from C-q.3):
+
+| Arm | Return | Gap to optimal | BA-POMCP minus ours (Welch) |
+|---|---|---|---|
+| ours | 22.29 | -0.087 [-0.237, +0.062] | |
+| main (paper prior, EXPECTED_MDP, 1000 simulations) | 15.62 | -6.756 [-8.408, -5.104] | -6.669 [-8.323, -5.014] |
+| matched (50 simulations) | -18.61 | -40.987 [-42.598, -39.375] | -40.899 [-42.513, -39.285] |
+| uniform rollouts (1000) | 8.48 | -13.898 [-14.929, -12.866] | -13.810 [-14.846, -12.774] |
+| weak prior (1.25 / 0.75) | -38.84 | -61.215 [-183.484, +61.054] | -61.128 [-183.397, +61.141] |
+
+- Per-run values are in the log. In the weak arm, nine runs lie at -4.4 to -11.0 and run 9 at -547.6.
+- Learning curves (mean over runs, per 2,000 environment steps):
+  - main: flat, between 5.4 and 18.6 from the first 2,000 steps on (13.14 in the first block, 13.32 in the last);
+  - ours, the greedy evaluations during training: -19.88 at 32,000 steps, 17.52 at 96,000, 20.27 at 160,000.
+- Reading:
+  - Our agent ends ahead of every BA-POMCP arm. Told the states, the rewards and the transitions, BA-POMCP plays its final policy from its first 20 learning episodes on; our agent needs about 100,000 steps to learn a latent model from scratch.
+  - BA-POMCP needs its full budget of 1000 simulations: at our 50 it loses 41 per episode, while ours is within 0.1 of the optimum.
+- **Post hoc diagnostics** (written after the readout, not registered):
+  1. **The models are learned.** In 39 of the 40 runs the post-learning posterior mean of the listening accuracy is 0.84 to 0.86 (truth 0.85), identical across particles. Weak run 9 converged to the MIRRORED model (0.148, every particle): it believes each growl points to the wrong side and opens the wrong door again and again. With rewards unobserved, a weakly oriented prior can tip into the mirror image and lock in; our agent observes rewards. Read from `runs/baselines/ba_pomcp/tiger/<arm>/run<r>_agent.pkl`.
+  2. **The deficit is the search, not the learning.** BA-POMCP with the TRUE model at point-mass confidence, everything else as main, loses -6.224 +- 3.267 per episode on the same 256 episodes (1.96 s.e. over episodes; one planner), as much as main with its learned model (-6.756). It opens a wrong door in 7.0% of episodes (gap < -50), and 1.2% of its episodes match the optimal agent's return (`reports/2026-10-19_eval_protocol/ba_pomcp_point_mass_check.py` and `.log`).
+     - Its root decisions are optimal at each of the six beliefs the optimal policy reaches. The loss comes from search noise over whole episodes: a UCB constant of 20 (max R - min R) explores almost uniformly, and a Monte Carlo average sometimes opens a door on the wrong side.
+     - Our planner (expectimax over exact observation branching with a learned value leaf) is near the optimum at 50 simulations (C-q.3).
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 

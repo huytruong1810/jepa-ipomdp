@@ -1,0 +1,21 @@
+# C-r Tiger readout (read once); code at 5609947, registration 5609947; 2026-11-21 10:01
+optimal agent on the 256 paired episodes: 22.375 (C-q.3 logged 22.375; certified error 9.8e-04)
+ours (C-q.3, N = 50): gap -0.087 [-0.237, +0.062]; per seed [-0.001, -0.506, -0.241, -0.002, 0.056, -0.01, -0.333, 0.0, -0.036, 0.198]
+
+tiger/main: return 15.618; gap to the optimal agent -6.756 [-8.408, -5.104] (Student-t over 10 runs); per run [-6.608, -4.558, -5.125, -5.402, -5.835, -7.293, -8.848, -6.453, -12.279, -5.161]
+  BA-POMCP minus ours: -6.669 [-8.323, -5.014] (Welch, 9.1 df)
+  learning curve (mean over runs, per 2,000 steps): 13.14, 5.41, 12.25, 12.23, 18.56, 9.61, 13.42, 10.50, 8.72, 13.32
+
+tiger/matched: return -18.612; gap to the optimal agent -40.987 [-42.598, -39.375] (Student-t over 10 runs); per run [-41.829, -39.302, -46.305, -37.692, -42.09, -40.771, -40.66, -41.019, -40.234, -39.966]
+  BA-POMCP minus ours: -40.899 [-42.513, -39.285] (Welch, 9.2 df)
+  learning curve (mean over runs, per 2,000 steps): -13.92, -26.23, -23.09, -19.74, -22.36, -17.33, -21.74, -32.30, -26.36, -22.36
+
+tiger/uniform: return 8.477; gap to the optimal agent -13.898 [-14.929, -12.866] (Student-t over 10 runs); per run [-14.99, -14.613, -13.402, -12.668, -12.73, -15.718, -12.77, -11.98, -16.268, -13.838]
+  BA-POMCP minus ours: -13.810 [-14.846, -12.774] (Welch, 9.4 df)
+  learning curve (mean over runs, per 2,000 steps): 9.99, 5.90, 6.81, 7.86, 11.31, 7.76, 8.66, 8.41, 5.74, 7.81
+
+tiger/weak: return -38.840; gap to the optimal agent -61.215 [-183.484, +61.054] (Student-t over 10 runs); per run [-6.182, -4.383, -6.984, -5.305, -8.316, -7.009, -8.015, -7.29, -11.03, -547.636]
+  BA-POMCP minus ours: -61.128 [-183.397, +61.141] (Welch, 9.0 df)
+  learning curve (mean over runs, per 2,000 steps): -28.16, -46.93, -39.38, -45.07, -39.08, -37.36, -38.23, -41.25, -43.27, -38.96
+
+ours, greedy evaluation during training (mean over seeds): 32000: -19.88, 64000: -16.76, 96000: 17.52, 128000: 18.24, 160000: 20.27, 192000: 19.82, 224000: 20.65, 256000: 18.72

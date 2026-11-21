@@ -1,0 +1,5 @@
+# post hoc diagnostic of C-r (not registered); code at 5609947 + this script; 2026-11-21 10:07; 4 workers, CPU, nice 19
+optimal agent: 22.375 on the 256 paired episodes (C-r readout: 22.375)
+BA-POMCP with the TRUE model at point-mass confidence (EXPECTED_MDP, 1000 simulations): return 16.151; gap -6.224 +- 3.267
+episodes with a wrong door opened at least once: share of gap < -50 = 0.070; episodes identical to the optimal agent's return: 0.012
+C-r main arm (learned model, read once): -6.756 [-8.408, -5.104] over 10 runs

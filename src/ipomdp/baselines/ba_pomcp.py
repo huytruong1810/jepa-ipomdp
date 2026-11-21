@@ -59,6 +59,12 @@
 #      P = 0.97, where the optimum opens by a margin of 0.72, it listens at both budgets. A door that ENDS the game
 #      (the episodic Tiger of many BA-POMDP studies) would not have this bias. The EXPECTED_MDP rollout values every
 #      continuation by a policy that opens the right door, which removes it; the comparison reports both.
+#    - Removing that bias does not make the search exact. With the TRUE model (point-mass prior) and the EXPECTED_MDP
+#      rollout, the root decision is optimal at each of the six beliefs the optimal policy reaches (tests), yet over
+#      whole episodes the agent loses 6.22 +- 3.27 per episode to the optimal agent at 1,000 simulations (256 paired
+#      episodes of seed 11; a wrong door in 7% of them; reports/2026-10-19_eval_protocol/ba_pomcp_point_mass_check.log).
+#      The Monte Carlo averages of a search whose UCB constant explores almost uniformly are noisy enough that a door is
+#      sometimes opened on the wrong side, at a cost of about 110.
 #
 # 5. The Planning Horizon Is an Argument:
 #    - The paper's Tiger horizon is 20 steps. The protocol that compares this baseline with our agent fixes H; a

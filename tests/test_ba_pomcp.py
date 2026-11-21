@@ -10,8 +10,12 @@ What is verified:
        received); the share of particles on each side matches the prior predictive; an observation the counts make
        impossible raises.
     4. With point-mass priors on the true tables the agent is POMCP on the true model. With the EXPECTED_MDP rollout it
-       chooses Tiger's optimal action at every belief the optimal policy reaches, and it plays the optimal return
-       (slow). The uniform rollout's failure on the continuing Tiger is recorded in the module header, section 4b.
+       chooses Tiger's optimal action at every belief the optimal policy reaches. Its PLAY is not optimal at 1,000
+       simulations, and no test claims it is: on the 256 paired episodes of seed 11 it loses 6.22 +- 3.27 per episode
+       to the optimal agent, with a wrong door in 7% of the episodes
+       (reports/2026-10-19_eval_protocol/ba_pomcp_point_mass_check.log). An earlier slow test that asserted the optimal
+       return on 32 episodes passed only because its 5-standard-error tolerance was wider than that deficit, and it was
+       removed. The uniform rollout's failure on the continuing Tiger is recorded in the module header, section 4b.
     5. Under the paper's formalism (rewards are not observations) a symmetric, uninformed growl prior cannot learn
        which growl means which side: the belief over the tiger stays at 1/2 whatever is heard.
     6. Runs are reproducible from the seed.
@@ -23,8 +27,8 @@ import numpy as np
 import pytest
 import torch
 
-from ipomdp.baselines.ba_pomcp import BAPOMCPAgent, BAPOMCPBatch, DirichletPrior, Rollout, _draw, _draw_rows
-from ipomdp.domain import BatchedPOMDPEnv, TigerAction, belief_update, build_tiger_pomdp, solve_finite_horizon
+from ipomdp.baselines.ba_pomcp import BAPOMCPAgent, DirichletPrior, Rollout, _draw, _draw_rows
+from ipomdp.domain import BatchedPOMDPEnv, TigerAction, build_tiger_pomdp
 
 LISTEN, OPEN_LEFT, OPEN_RIGHT = int(TigerAction.LISTEN), int(TigerAction.OPEN_LEFT), int(TigerAction.OPEN_RIGHT)
 GROWL_LEFT, GROWL_RIGHT = 0, 1
@@ -171,43 +175,3 @@ def test_simulator_rows_do_not_depend_on_other_rows_actions(tiger):
     (full_o, full_s), (mixed_o, mixed_s) = trajectories(False), trajectories(True)
     assert torch.equal(full_o[16:48], mixed_o[16:48]) and torch.equal(full_s[16:48], mixed_s[16:48])
     assert not torch.equal(full_o[:16], mixed_o[:16])               # the other rows did change
-
-
-@pytest.mark.slow
-def test_point_mass_prior_plays_the_optimal_return(tiger):
-    """
-    With point-mass priors and the EXPECTED_MDP rollout, BA-POMCP plays canonical Tiger like the exact optimal agent
-    (the greedy policy of the 20-step solution, which takes the infinite-horizon optimal action at every belief Tiger
-    reaches) on the same 32 episodes of 100 steps: paired gap within 5 standard errors.
-    """
-    batch, steps = 32, 100
-    point_mass = DirichletPrior.from_model(tiger, 1e9, 1e9)
-    agents = BAPOMCPBatch([_agent(tiger, point_mass, sims=1000, seed=seed) for seed in range(batch)], steps)
-    optimal_policy = solve_finite_horizon(tiger, 20)[-1]
-
-    class Optimal:
-        batch_size = batch
-
-        def reset(self, initial_observation):
-            self.state = tiger.initial_belief.expand(batch, -1).clone()
-
-        def act(self):
-            return optimal_policy.greedy_action(self.state)
-
-        def update(self, action, observation):
-            self.state = belief_update(tiger, self.state, action, observation)
-
-    def play(agent):
-        env = BatchedPOMDPEnv(tiger, batch, steps, 11, torch.device("cpu"))
-        env.reset()
-        agent.reset(None)
-        returns = torch.zeros(batch, dtype=torch.float64)
-        for t in range(steps):
-            action = agent.act()
-            out = env.step(action)
-            agent.update(action, out.observation)
-            returns += tiger.discount ** t * out.reward.double()
-        return returns
-
-    gap = play(agents) - play(Optimal())
-    assert abs(float(gap.mean())) <= 5 * float(gap.std()) / math.sqrt(batch) + 1e-9
