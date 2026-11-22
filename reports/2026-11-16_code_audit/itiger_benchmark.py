@@ -49,7 +49,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from ipomdp.domain.bounds import _HSVI, hsvi_budget, revealed_upper_bound
+from ipomdp.domain.bounds import _HSVI, hsvi_budget, hsvi_vector_bracket, revealed_upper_bound
 from ipomdp.domain.interactive import TIGER_LEVEL_ZERO_NOISE, nested_problem, relaxation_reveal
 from ipomdp.domain.multiagent_tiger import Agent, build_multiagent_tiger
 from ipomdp.domain.tiger import TigerAction
@@ -115,7 +115,7 @@ def main():
     log(f"fast informed bound U(b0) = {float(b0 @ _HSVI(m).corner):.4f}")
     if args.lower_only:
         t = time.time()
-        bracket = hsvi_budget(m, args.epsilon, args.trials, back_up_corners=False)
+        bracket = hsvi_vector_bracket(m, args.epsilon, args.trials)
         log(f"HSVI, unseeded, as hsvi(): L(b0) = {bracket.lower:.4f} (certified lower end), "
             f"U(b0) = {bracket.upper:.4f} after {bracket.trials} trials ({time.time() - t:.0f}s)")
         if args.artifact is not None:
@@ -123,8 +123,8 @@ def main():
                 raise ValueError("--artifact needs --upper and --upper-source.")
             upper = min(args.upper, bracket.upper)
             benchmark = InteractiveBenchmark(
-                lower=bracket.lower, upper=upper, vectors=bracket.lower_vectors,
-                actions=bracket.controller.action_law.argmax(-1), digest=fold_digest(m),
+                lower=bracket.lower, upper=upper, vectors=bracket.vectors, actions=bracket.actions,
+                digest=fold_digest(m),
                 source=(f"lower: unseeded HSVI, {bracket.trials} trials, epsilon {args.epsilon}, commit {commit}; "
                         f"upper: {args.upper_source}"))
             benchmark.save(Path(args.artifact))

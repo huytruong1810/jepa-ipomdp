@@ -1,0 +1,16 @@
+[12:14:04] commit 070d63e; args {'bracket_epsilon': 0.05, 'controller_epsilon': 0.5, 'seed_delay': 1, 'delays': '0,1', 'trials': 1000, 'epsilon': 0.5, 'max_beliefs': 1000000, 'lower_only': True, 'artifact': 'runs/benchmarks/itiger_level1.pt', 'upper': 19.6692, 'upper_source': 'information relaxation, delay 2, merge slack included (reports/2026-11-16_code_audit/itiger_benchmark.log, commit b083a8c)'}
+[12:14:51] level 0 (j): bracket [8.2380, 8.2879], controller 17 nodes, exact value 8.2378; level-1 fold: 26 states, 6 observations (47s)
+[12:14:51] fast informed bound U(b0) = 77.5129
+Traceback (most recent call last):
+  File "/home/andyj1810/projects/jepa_ipomdp/reports/2026-11-16_code_audit/itiger_benchmark.py", line 163, in <module>
+    main()
+  File "/home/andyj1810/projects/jepa_ipomdp/reports/2026-11-16_code_audit/itiger_benchmark.py", line 118, in main
+    bracket = hsvi_budget(m, args.epsilon, args.trials, back_up_corners=False)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/andyj1810/projects/jepa_ipomdp/src/ipomdp/domain/bounds.py", line 323, in hsvi_budget
+    return _bracket(search, b0, trial)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/andyj1810/projects/jepa_ipomdp/src/ipomdp/domain/bounds.py", line 237, in _bracket
+    successor = torch.zeros(k, search.A, z, k, dtype=torch.float64)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: [enforce fail at alloc_cpu.cpp:127] err == 0. DefaultCPUAllocator: can't allocate memory: you tried to allocate 358690792464 bytes. Error code 12 (Cannot allocate memory)

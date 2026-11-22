@@ -308,6 +308,11 @@ def hsvi_budget(model: FinitePOMDP, epsilon: float, trials: int, corners: torch.
             points (on the level-1 fold, 1,000 trials did not finish in 11 hours with it). Without it and without
             seeds, the trials are hsvi()'s, so a run that needs only the lower end turns it off.
     """
+    search, trial = _run_budget(model, epsilon, trials, corners, points, back_up_corners)
+    return _bracket(search, model.initial_belief.numpy(), trial)
+
+
+def _run_budget(model: FinitePOMDP, epsilon: float, trials: int, corners, points, back_up_corners: bool):
     search = _SeededHSVI(model, None if corners is None else corners.numpy(),
                          None if points is None else points[0].numpy(), None if points is None else points[1].numpy())
     span = (search.R.max() - search.R.min()) / (1 - search.gamma)
@@ -320,7 +325,32 @@ def hsvi_budget(model: FinitePOMDP, epsilon: float, trials: int, corners: torch.
             search.back_up_corners()
         if float(search.upper(b0[None])[0] - search.lower(b0[None])[0]) <= epsilon:
             break
-    return _bracket(search, b0, trial)
+    return search, trial
+
+
+@dataclass(frozen=True)
+class VectorBracket:
+    """The bracket of hsvi_budget without the pointer controller: lower-bound vectors and their actions only."""
+
+    lower: float
+    upper: float
+    vectors: torch.Tensor
+    actions: torch.Tensor
+    trials: int
+
+
+def hsvi_vector_bracket(model: FinitePOMDP, epsilon: float, trials: int) -> VectorBracket:
+    """
+    hsvi_budget (no seeds, no corner backups) returning the lower-bound vectors and their actions instead of the
+    controller. The controller's successor law is dense (K, A, O, K): with the K of about 5,000 vectors that 1,000
+    trials leave on the level-1 fold it needs 359 GB, which killed a run after all its trials had finished. A
+    reference agent needs only the vectors (the best vector's action at the exact belief is worth at least L).
+    """
+    search, trial = _run_budget(model, epsilon, trials, None, None, False)
+    b0 = model.initial_belief.numpy()
+    return VectorBracket(float(search.lower(b0[None])[0]), float(search.upper(b0[None])[0]),
+                         torch.from_numpy(search.vectors.rows.copy()), torch.tensor(search.actions, dtype=torch.int64),
+                         trial)
 
 
 @dataclass(frozen=True)
