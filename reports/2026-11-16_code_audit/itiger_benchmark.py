@@ -44,10 +44,13 @@
 #      vectors and points. --checkpoint names a file that holds the search after every --checkpoint-every trials
 #      (bounds.py, section 7). Running the same command again continues from it, and the result equals the
 #      uninterrupted run's, so append to the log (>>) when relaunching.
-#    - A progress line (trial, L, U, vectors) is logged at the same trials, with or without a checkpoint.
+#    - A progress line (trial, L, U, vectors, resident memory) is logged at the same trials, with or without a
+#      checkpoint.
 # ==============================================================================
 
 import argparse
+import gc
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -124,6 +127,13 @@ def main():
     b0 = m.initial_belief.numpy()
     log(f"fast informed bound U(b0) = {float(b0 @ _HSVI(m).corner):.4f}")
     if args.lower_only:
+        # The level-0 brackets hold their dense pointer controllers (bounds._bracket), about 2 GB at the default
+        # epsilons. The search needs only the folded tables in `m`, so they are released before it starts: the
+        # process then holds a few hundred MB instead of 2.3 GB for the day the search takes.
+        del problem, zero
+        gc.collect()
+        resident = lambda: os.sysconf("SC_PAGE_SIZE") * int(Path("/proc/self/statm").read_text().split()[1]) / 2**20  # noqa: E731
+        log(f"level-0 objects released; resident memory {resident():.0f} MB")
         t = time.time()
         checkpoint = None if args.checkpoint is None else Path(args.checkpoint)
         if checkpoint is not None and checkpoint.exists():
@@ -131,7 +141,8 @@ def main():
         bracket = hsvi_vector_bracket(
             m, args.epsilon, args.trials, checkpoint, args.checkpoint_every,
             report=lambda trial, lower, upper, count: log(
-                f"trial {trial}: L(b0) = {lower:.4f}, U(b0) = {upper:.4f}, {count} vectors ({time.time() - t:.0f}s)"))
+                f"trial {trial}: L(b0) = {lower:.4f}, U(b0) = {upper:.4f}, {count} vectors, {resident():.0f} MB "
+                f"({time.time() - t:.0f}s)"))
         log(f"HSVI, unseeded, as hsvi(): L(b0) = {bracket.lower:.4f} (certified lower end), "
             f"U(b0) = {bracket.upper:.4f} after {bracket.trials} trials ({time.time() - t:.0f}s)")
         if args.artifact is not None:
