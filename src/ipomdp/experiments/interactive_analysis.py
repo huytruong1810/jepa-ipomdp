@@ -38,6 +38,25 @@
 #    - The file stores a SHA-256 digest of the fold's tables (T, O, R, b0) and gamma. The analysis refuses a file whose
 #      digest differs from the run's fold, or whose lower bound does not reproduce L(b0) from its vectors, so a
 #      benchmark is never read against another problem.
+#
+# 5. Probe Control: the Run's Own Untrained Filter:
+#    - A recurrent network carries much of its input history before any training (on the canonical Tiger an untrained
+#      GRU already reaches belief R^2 = 0.93; interpretability/belief_probe.py), so a probe's divergence is evidence
+#      of learning only against the same probe on the untrained network (probe controls, Hewitt & Liang 2019). The
+#      control is the run's INITIAL acting filter: a TrainingRun built from the run's own config and seed holds the
+#      networks training started from. They are created on the CPU from the run's NETWORK_INIT stream and then moved
+#      (training/run.py), so the analysis device does not change them.
+#    - Same probes on the same histories, so every control number is paired with a trained one:
+#        * the interactive-state probes "<linear|mlp>/random" read analyze_beliefs' random histories, replayed from
+#          its streams (1 and then 2, played by one uniform agent on stream 6; interpretability/analysis.py). Its
+#          agent histories depend on the planner's generator state at that point and cannot be replayed, so the
+#          control has no agent-history state probe;
+#        * the four marginal probes of section 3 read section 3's episodes themselves, played once and read by both
+#          filters.
+#    - The MLP probes are reseeded for every fit (fit_mlp_probe), so with the trained filter in the control's place
+#      the control reproduces the trained MLP reports exactly (tests/test_interactive_analysis.py). The linear probes
+#      start from the global generator's state and are compared, not reproduced.
+#    - Readout: descriptive, no threshold. What the trained probes gain over this control is what training adds.
 # ==============================================================================
 
 import hashlib
@@ -54,12 +73,12 @@ from ..domain.interactive import TIGER_LEVEL_ZERO_NOISE, InteractiveModel, neste
 from ..domain.multiagent_tiger import Agent, build_multiagent_tiger
 from ..domain.solver import AlphaVectorSet
 from ..interpretability import BeliefAnalysis, analyze_beliefs, build_probe_dataset
-from ..interpretability.belief_probe import ProbeDataset, fit_linear_probe, fit_mlp_probe
+from ..interpretability.belief_probe import ProbeDataset, ProbeReport, evaluate_probe, fit_linear_probe, fit_mlp_probe
 from ..models import BeliefFilter
 from ..planning import BeliefTreeSearch
-from ..training import play_episodes, save_checkpoint
+from ..training import EpisodeBatch, TrainingRun, play_episodes, save_checkpoint
 from ..training.seeding import stream_seed
-from .runs import load_trained_run
+from .runs import TrainedRun, build_run_config, load_trained_run
 
 # L(b0) recomputed from the stored vectors must equal the stored lower bound to this tolerance (section 4).
 LOWER_BOUND_TOLERANCE = 1e-9
@@ -176,6 +195,20 @@ def marginal_reports(probe, dataset: ProbeDataset, problem: InteractiveModel) ->
 
 
 @dataclass(frozen=True)
+class ProbeControl:
+    """
+    The probes of the run's untrained filter (section 5), each on the histories of its trained counterpart.
+
+    Attributes:
+        probes: "<linear|mlp>/random" interactive-state probe reports on analyze_beliefs' random histories.
+        marginals: as InteractiveAnalysis.marginals, on the same episodes as the trained filter's.
+    """
+
+    probes: dict[str, ProbeReport]
+    marginals: dict[str, dict[str, MarginalReport]]
+
+
+@dataclass(frozen=True)
 class InteractiveAnalysis:
     """
     Everything an interactive run's analysis measures.
@@ -185,26 +218,58 @@ class InteractiveAnalysis:
         reference: analyze_beliefs against the reference sets (section 2): its "optimal" return row is the REFERENCE
             agent, its optimal_value_b0 is L(b0) and its solver_error_bound is the bracket width U - L.
         marginals: per probe ("<linear|mlp>/<random|agent>") the physical and other-node marginal reports (section 3).
+        untrained: the same probes on the run's untrained filter (section 5).
     """
 
     bracket: dict
     reference: BeliefAnalysis
     marginals: dict[str, dict[str, MarginalReport]]
+    untrained: ProbeControl
 
 
-def analyze_interactive(problem: InteractiveModel, belief_filter: BeliefFilter, planner_agent: PlanningAgent,
-                        benchmark: InteractiveBenchmark, episode_length: int, num_episodes: int, mlp_probe_steps: int,
-                        seed: int, device: torch.device) -> InteractiveAnalysis:
+def _fitters(mlp_probe_steps: int):
+    """The two probe families, in the order analyze_beliefs fits them."""
+    return (("linear", fit_linear_probe), ("mlp", lambda d: fit_mlp_probe(d, steps=mlp_probe_steps)))
+
+
+def _marginal_probes(problem: InteractiveModel, belief_filter: BeliefFilter,
+                     episodes: dict[str, tuple[EpisodeBatch, EpisodeBatch]],
+                     mlp_probe_steps: int) -> dict[str, dict[str, MarginalReport]]:
+    """Section 3: per probe family and history source, a probe fitted on the first set and scored on the second."""
+    data = {source: (build_probe_dataset(problem.pomdp, belief_filter, fit_episodes),
+                     build_probe_dataset(problem.pomdp, belief_filter, eval_episodes))
+            for source, (fit_episodes, eval_episodes) in episodes.items()}
+    return {f"{kind}/{source}": marginal_reports(fit(fit_set), eval_set, problem)
+            for kind, fit in _fitters(mlp_probe_steps) for source, (fit_set, eval_set) in data.items()}
+
+
+def _random_state_probes(pomdp: FinitePOMDP, belief_filter: BeliefFilter, episode_length: int, num_episodes: int,
+                         mlp_probe_steps: int, seed: int, device: torch.device) -> dict[str, ProbeReport]:
     """
-    Sections 2 and 3 on one trained agent.
+    Section 5: the interactive-state probes on analyze_beliefs' random histories, replayed from its streams (1 and
+    then 2, one uniform agent on stream 6, in the order analyze_beliefs plays them).
+    """
+    env = lambda stream: BatchedPOMDPEnv(pomdp, num_episodes, episode_length, stream_seed(seed, stream), device)  # noqa: E731
+    uniform = UniformRandomAgent(pomdp.num_actions, num_episodes, stream_seed(seed, 6), device)
+    fit_set = build_probe_dataset(pomdp, belief_filter, play_episodes(env(1), uniform)[0])
+    eval_set = build_probe_dataset(pomdp, belief_filter, play_episodes(env(2), uniform)[0])
+    return {f"{kind}/random": evaluate_probe(fit(fit_set), eval_set) for kind, fit in _fitters(mlp_probe_steps)}
+
+
+def analyze_interactive(problem: InteractiveModel, belief_filter: BeliefFilter, initial_filter: BeliefFilter,
+                        planner_agent: PlanningAgent, benchmark: InteractiveBenchmark, episode_length: int,
+                        num_episodes: int, mlp_probe_steps: int, seed: int, device: torch.device) -> InteractiveAnalysis:
+    """
+    Sections 2, 3 and 5 on one trained agent.
 
     Args:
         problem: The fold the agent was trained on (its pomdp must match the benchmark's digest).
         belief_filter: The agent's acting filter.
+        initial_filter: The run's untrained acting filter, the probe control (section 5; initial_acting_filter).
         planner_agent: The agent's greedy planner, batch size num_episodes.
         benchmark: The fold's certified bracket.
         episode_length, num_episodes, mlp_probe_steps, seed, device: as interpretability.analyze_beliefs; this module
-            also uses streams 11-16 of `seed` (section 3).
+            also uses streams 11-16 of `seed` (section 3) and replays streams 1, 2 and 6 (section 5).
     """
     pomdp = problem.pomdp
     value, per_action = reference_sets(benchmark, pomdp)
@@ -212,17 +277,15 @@ def analyze_interactive(problem: InteractiveModel, belief_filter: BeliefFilter, 
                                 episode_length, num_episodes, mlp_probe_steps, seed, device)
     env = lambda stream: BatchedPOMDPEnv(pomdp, num_episodes, episode_length, stream_seed(seed, stream), device)  # noqa: E731
     uniform = UniformRandomAgent(pomdp.num_actions, num_episodes, stream_seed(seed, 16), device)
-    data = {"random": (build_probe_dataset(pomdp, belief_filter, play_episodes(env(11), uniform)[0]),
-                       build_probe_dataset(pomdp, belief_filter, play_episodes(env(12), uniform)[0])),
-            "agent": (build_probe_dataset(pomdp, belief_filter, play_episodes(env(13), planner_agent)[0]),
-                      build_probe_dataset(pomdp, belief_filter, play_episodes(env(14), planner_agent)[0]))}
-    marginals = {}
-    for kind, fit in (("linear", fit_linear_probe), ("mlp", lambda d: fit_mlp_probe(d, steps=mlp_probe_steps))):
-        for source, (fit_set, eval_set) in data.items():
-            marginals[f"{kind}/{source}"] = marginal_reports(fit(fit_set), eval_set, problem)
+    episodes = {"random": (play_episodes(env(11), uniform)[0], play_episodes(env(12), uniform)[0]),
+                "agent": (play_episodes(env(13), planner_agent)[0], play_episodes(env(14), planner_agent)[0])}
+    marginals = _marginal_probes(problem, belief_filter, episodes, mlp_probe_steps)
+    untrained = ProbeControl(_random_state_probes(pomdp, initial_filter, episode_length, num_episodes, mlp_probe_steps,
+                                                  seed, device),
+                             _marginal_probes(problem, initial_filter, episodes, mlp_probe_steps))
     bracket = {"lower": benchmark.lower, "upper": benchmark.upper, "width": benchmark.upper - benchmark.lower,
                "source": benchmark.source, "digest": benchmark.digest}
-    return InteractiveAnalysis(bracket, reference, marginals)
+    return InteractiveAnalysis(bracket, reference, marginals, untrained)
 
 
 def print_interactive_summary(analysis: InteractiveAnalysis) -> None:
@@ -237,6 +300,12 @@ def print_interactive_summary(analysis: InteractiveAnalysis) -> None:
     for name, reports in analysis.marginals.items():
         print(f"  marginal probe {name:<12} " + "  ".join(f"{m}: KL {r.kl_mean:.5f} L1 {r.l1_mean:.4f}"
                                                          for m, r in reports.items()))
+    print("  control: the same probes on the run's untrained filter (section 5)")
+    for name, probe in analysis.untrained.probes.items():
+        print(f"  untrained probe {name:<12} interactive-state KL mean {probe.mean_kl:.5f}  L1 mean {probe.mean_l1:.4f}")
+    for name, reports in analysis.untrained.marginals.items():
+        print(f"  untrained marginal probe {name:<12} " + "  ".join(f"{m}: KL {r.kl_mean:.5f} L1 {r.l1_mean:.4f}"
+                                                                   for m, r in reports.items()))
 
 
 @dataclass(frozen=True)
@@ -251,6 +320,17 @@ class InteractiveAnalysisSettings:
     episodes: int
     mlp_probe_steps: int
     seed: int
+
+
+def initial_acting_filter(trained: TrainedRun, device: torch.device) -> BeliefFilter:
+    """
+    The run's acting filter before its first update (section 5): a TrainingRun built from the run's own config and
+    seed over the already built domain (the fold is not rebuilt). Like every TrainingRun it re-seeds the global
+    generator from the run's NETWORK_INIT stream, which the linear probes' initial weights then read (section 5).
+    """
+    fresh = TrainingRun(trained.setup, build_run_config(trained.cfg), device)
+    fresh.acting_filter.eval()
+    return fresh.acting_filter
 
 
 def interactive_problem(env_cfg) -> InteractiveModel:
@@ -277,8 +357,8 @@ def analyze_interactive_run(run_dir: Path, settings: InteractiveAnalysisSettings
                                 dirichlet_epsilon=0.0, seed=stream_seed(settings.seed, 7),
                                 observation_prune=cfg.mcts.observation_prune),
         settings.episodes, temperature=0.0, seed=stream_seed(settings.seed, 8), device=device)
-    analysis = analyze_interactive(problem, run.acting_filter, planner, benchmark, cfg.env.max_steps, settings.episodes,
-                                   settings.mlp_probe_steps, settings.seed, device)
+    analysis = analyze_interactive(problem, run.acting_filter, initial_acting_filter(trained, device), planner, benchmark,
+                                   cfg.env.max_steps, settings.episodes, settings.mlp_probe_steps, settings.seed, device)
     out = run_dir / "analysis"
     out.mkdir(exist_ok=True)
     report = asdict(analysis) | {"checkpoint_collection": trained.checkpoint_collection,

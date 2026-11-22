@@ -11,6 +11,8 @@ every value from above. What is verified:
        of the best vector; a benchmark of another fold, or one whose vectors do not give its lower bound, is refused.
     3. The marginal divergences vanish for a probe that returns the exact beliefs and are positive for a uniform one.
     4. The whole analysis runs on an untrained agent and reports the bracket, the reference agent and both marginals.
+    5. The probe control (module section 5) reads the trained probes' histories: with the trained filter in its place
+       it reproduces the trained MLP reports exactly; through a run directory its filter is the run's initial one.
 """
 
 import json
@@ -30,7 +32,9 @@ from ipomdp.domain.policy_graph import PolicyGraph
 from ipomdp.experiments import AnalysisSettings, analyze_run, build_training_run
 from ipomdp.experiments.interactive_analysis import (InteractiveAnalysisSettings, InteractiveBenchmark,
                                                      analyze_interactive, analyze_interactive_run, fold_digest,
-                                                     interactive_problem, marginal_reports, reference_sets)
+                                                     initial_acting_filter, interactive_problem, marginal_reports,
+                                                     reference_sets)
+from ipomdp.experiments.runs import load_trained_run
 from ipomdp.interpretability.belief_probe import ProbeDataset
 from ipomdp.models import BeliefFilter, ObservationHead, RewardHead, TwoHotSymlog, ValueHead
 from ipomdp.planning import BeliefTreeSearch, LearnedSearchModel
@@ -136,27 +140,59 @@ def test_marginal_divergences_vanish_for_the_exact_beliefs(problem):
     assert all(report.kl_mean > 0.0 for report in uniform.values())
 
 
+EPISODES, DIM, HIDDEN = 8, 8, 16
+
+
+def _agent(problem) -> tuple[BeliefFilter, PlanningAgent]:
+    """An untrained filter and the greedy planner over it, batch size EPISODES."""
+    pomdp = problem.pomdp
+    num_a, num_o = pomdp.num_actions, pomdp.num_observations
+    belief_filter = BeliefFilter(num_a, num_o, DIM, HIDDEN, 1)
+    codec = TwoHotSymlog(31, pomdp.value_bound)
+    model = LearnedSearchModel(belief_filter, RewardHead(DIM, num_a, HIDDEN, 1, 31),
+                               ObservationHead(DIM, num_a, num_o, HIDDEN, 1), ValueHead(DIM, HIDDEN, 1, 31), codec, num_a,
+                               num_o, pomdp.discount)
+    planner = PlanningAgent(model, BeliefTreeSearch(model, 4, 1.25, 0.3, 0.0, seed=0), EPISODES, temperature=0.0, seed=0,
+                            device=CPU)
+    return belief_filter, planner
+
+
+def _analyze(problem, belief_filter, initial_filter, planner):
+    return analyze_interactive(problem, belief_filter, initial_filter, planner, _blind_benchmark(problem), episode_length=6,
+                               num_episodes=EPISODES, mlp_probe_steps=20, seed=1, device=CPU)
+
+
 def test_the_analysis_reports_the_bracket_the_reference_and_both_marginals(problem):
     torch.manual_seed(0)
-    pomdp = problem.pomdp
-    num_a, num_o, dim, hidden, episodes = pomdp.num_actions, pomdp.num_observations, 8, 16, 8
-    belief_filter = BeliefFilter(num_a, num_o, dim, hidden, 1)
-    codec = TwoHotSymlog(31, pomdp.value_bound)
-    model = LearnedSearchModel(belief_filter, RewardHead(dim, num_a, hidden, 1, 31),
-                               ObservationHead(dim, num_a, num_o, hidden, 1), ValueHead(dim, hidden, 1, 31), codec, num_a,
-                               num_o, pomdp.discount)
-    planner = PlanningAgent(model, BeliefTreeSearch(model, 4, 1.25, 0.3, 0.0, seed=0), episodes, temperature=0.0, seed=0,
-                            device=CPU)
+    belief_filter, planner = _agent(problem)
+    initial_filter = BeliefFilter(problem.pomdp.num_actions, problem.pomdp.num_observations, DIM, HIDDEN, 1)
     benchmark = _blind_benchmark(problem)
-    analysis = analyze_interactive(problem, belief_filter, planner, benchmark, episode_length=6, num_episodes=episodes,
-                                   mlp_probe_steps=20, seed=1, device=CPU)
+    analysis = _analyze(problem, belief_filter, initial_filter, planner)
     assert analysis.bracket["width"] == pytest.approx(benchmark.upper - benchmark.lower)
     assert analysis.reference.optimal_value_b0 == pytest.approx(benchmark.lower, abs=1e-12)
     assert {"optimal", "learned_planner", "decoded_linear", "decoded_mlp"} <= set(analysis.reference.returns)
     assert set(analysis.marginals) == {"linear/random", "linear/agent", "mlp/random", "mlp/agent"}
-    for reports in analysis.marginals.values():
+    assert set(analysis.untrained.marginals) == set(analysis.marginals)
+    assert set(analysis.untrained.probes) == {"linear/random", "mlp/random"}
+    for reports in (*analysis.marginals.values(), *analysis.untrained.marginals.values()):
         assert set(reports) == {"physical", "other_node"}
         assert all(math.isfinite(r.kl_mean) and r.kl_mean >= -1e-12 for r in reports.values())
+    assert all(math.isfinite(r.mean_kl) and r.mean_kl >= -1e-12 for r in analysis.untrained.probes.values())
+
+
+def test_the_control_reads_the_histories_of_the_trained_probes(problem):
+    """
+    With the trained filter in the control's place, every control MLP report equals its trained counterpart exactly:
+    the MLP fit is reseeded per fit, so equality holds only if the control's histories are the trained probes' (the
+    replayed streams of analyze_beliefs, and section 3's own episodes). The linear fits start from the global
+    generator's state and are not compared.
+    """
+    torch.manual_seed(0)
+    belief_filter, planner = _agent(problem)
+    analysis = _analyze(problem, belief_filter, belief_filter, planner)
+    assert analysis.untrained.probes["mlp/random"] == analysis.reference.probes["mlp/random"]
+    for source in ("random", "agent"):
+        assert analysis.untrained.marginals[f"mlp/{source}"] == analysis.marginals[f"mlp/{source}"]
 
 
 @pytest.mark.slow
@@ -173,6 +209,7 @@ def test_a_trained_itiger_run_is_analysed_against_its_benchmark_file(tmp_path):
     with initialize_config_dir(config_dir=CONF_DIR, version_base=None):
         cfg = compose(config_name="config", overrides=overrides)
     _, run = build_training_run(cfg, CPU)
+    initial = {name: value.clone() for name, value in run.acting_filter.state_dict().items()}
     run.collect_and_train()
     (tmp_path / ".hydra").mkdir()
     OmegaConf.save(cfg, tmp_path / ".hydra" / "config.yaml")
@@ -185,6 +222,12 @@ def test_a_trained_itiger_run_is_analysed_against_its_benchmark_file(tmp_path):
     report = json.loads((tmp_path / "analysis" / "report.json").read_text())
     assert report["bracket"]["lower"] == analysis.bracket["lower"] and report["checkpoint_collection"] == 1
     assert set(report["marginals"]["mlp/agent"]) == {"physical", "other_node"}
+    assert set(report["untrained"]["probes"]) == {"linear/random", "mlp/random"}
+    assert set(report["untrained"]["marginals"]["mlp/agent"]) == {"physical", "other_node"}
+    trained = load_trained_run(tmp_path, CPU)                 # the control's filter is the run's initial one, not best.pt
+    control = initial_acting_filter(trained, CPU).state_dict()
+    assert all(torch.equal(control[name], value) for name, value in initial.items())
+    assert not all(torch.equal(trained.run.acting_filter.state_dict()[name], value) for name, value in initial.items())
     other = fold(build_multiagent_tiger(0.95).view(Agent.I), _controller(0), L)
     _blind_benchmark(other).save(tmp_path / "other.pt")
     with pytest.raises(ValueError):
