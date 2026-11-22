@@ -32,6 +32,7 @@ from ipomdp.domain import (
     build_tiger_pomdp,
     initial_beliefs,
     observation_distribution,
+    predict_state,
     prune,
     solve_finite_horizon,
     solve_infinite_horizon,
@@ -260,6 +261,33 @@ class TestBeliefFilter:
         belief = initial_beliefs(deterministic, 1, CPU)
         with pytest.raises(ValueError):
             belief_update(deterministic, belief, torch.tensor([0]), torch.tensor([1]))
+
+    def test_predict_state_pushes_the_belief_through_an_asymmetric_transition(self, tiger):
+        # b^a(s') = sum_s T(s' | s, a) b(s). The canonical Tiger's transitions are symmetric matrices (the identity for
+        # LISTEN, uniform rows for the doors), so a filter that summed over the arrival state instead of the departure
+        # state would pass every test above. This three-state chain is asymmetric and tells the two apart: for the
+        # first row the correct prediction starts with 0.43, the transposed sum with 0.21.
+        transition = torch.tensor([[[0.9, 0.1, 0.0], [0.0, 0.2, 0.8], [0.5, 0.0, 0.5]],
+                                   [[0.0, 1.0, 0.0], [0.3, 0.3, 0.4], [0.0, 0.0, 1.0]]], dtype=torch.float64)
+        chain = FinitePOMDP(
+            transition=transition, observation=torch.full((2, 3, 2), 0.5, dtype=torch.float64),
+            reward=torch.zeros(2, 3, dtype=torch.float64),
+            initial_belief=torch.tensor([0.2, 0.3, 0.5], dtype=torch.float64), discount=0.95,
+            state_names=("s0", "s1", "s2"), action_names=("a0", "a1"), observation_names=("o0", "o1"))
+        belief = torch.tensor([[0.2, 0.3, 0.5], [1.0, 0.0, 0.0], [0.0, 0.6, 0.4]], dtype=torch.float64)
+        action = torch.tensor([0, 1, 1])
+        predicted = predict_state(chain, belief, action)
+        for row in range(3):
+            for arrival in range(3):
+                expected = sum(float(belief[row, s]) * float(transition[action[row], s, arrival]) for s in range(3))
+                assert predicted[row, arrival].item() == pytest.approx(expected, abs=1e-15)
+        assert torch.allclose(predicted[0], torch.tensor([0.43, 0.08, 0.49], dtype=torch.float64), atol=1e-15, rtol=0)
+        assert torch.allclose(predicted.sum(dim=-1), torch.ones(3, dtype=torch.float64), atol=1e-15, rtol=0)
+        # On the canonical Tiger, listening leaves the belief where it is and a door resets it to the prior.
+        confident = torch.tensor([[0.9, 0.1]], dtype=torch.float64)
+        assert torch.equal(predict_state(tiger, confident, torch.tensor([int(TigerAction.LISTEN)])), confident)
+        for door in (TigerAction.OPEN_LEFT, TigerAction.OPEN_RIGHT):
+            assert torch.equal(predict_state(tiger, confident, torch.tensor([int(door)])), initial_beliefs(tiger, 1, CPU))
 
 
 # ----------------------------------------------------------------------------------------------
