@@ -19,17 +19,18 @@
 #      observations, so the expanded tree computes precisely the finite belief-tree values the
 #      exact solver computes, with the leaf estimates at its frontier. With exact leaves the
 #      search can only improve on them; it never mixes in the values of exploratory actions.
-#    - Phase-4 finding: the earlier mean backup (V^ = average of all returns backed up through
-#      a node, as in MuZero) made estimates WORSE with more search. At b = (0.97, 0.03) with
-#      exact V_8 leaves, root Q(OPEN_RIGHT) fell from the exact 12.80 (1 simulation) to -2.98
-#      (1000 simulations) because returns of exploratory door openings (Q = -90) were averaged
-#      in; the search then preferred LISTEN over the optimal OPEN_RIGHT. MuZero tolerates mean
-#      backups only because a learned policy prior keeps exploration narrow; here the prior is
-#      uniform and the branch probabilities are exact, so expectimax is the principled choice.
+#    - Why not a mean backup (V^ = average of all returns backed up through a node, as in
+#      MuZero): measured, it makes estimates WORSE with more search. At b = (0.97, 0.03) with
+#      exact V_8 leaves, a mean backup's root Q(OPEN_RIGHT) falls from the exact 12.80 (1
+#      simulation) to -2.98 (1000 simulations), because returns of exploratory door openings
+#      (Q = -90) are averaged in; the search then prefers LISTEN over the optimal OPEN_RIGHT.
+#      MuZero tolerates mean backups only because a learned policy prior keeps exploration
+#      narrow; here the prior is uniform and the branch probabilities are exact, so expectimax
+#      is the principled choice.
 #    - Only nodes on the simulated path change, so both Q(s, a) per edge and V^ per node are
 #      cached and recomputed bottom-up along the path after each expansion. Selection then costs
-#      O(|A|) per node instead of recomputing every Q from its children (profiling: ~18k Q
-#      evaluations per 16-root, 50-simulation search before caching).
+#      O(|A|) per node instead of recomputing every Q from its children (profiled: without the
+#      caches a 16-root, 50-simulation search makes about 18k Q evaluations).
 #
 # 3. Selection (PUCT, AlphaZero/MuZero form):
 #      a* = argmax_a  Q_norm(s, a) + c_puct * P(a) * sqrt(N(s) + 1) / (1 + N(s, a))
@@ -40,14 +41,17 @@
 #      c_puct is independent of the reward scale (-100 .. +10 on Tiger).
 #    - Descent below the chosen edge samples o ~ P(o | s, a), so simulations concentrate on
 #      likely observation branches.
-#    - Bugs of the previous search fixed here: unvisited actions were scored by V(child)
-#      WITHOUT the immediate reward, so opening a door (r = -45 in expectation at b0) looked
-#      as good as listening; Python's `random`/NumPy global generators were unseeded; a
-#      silent random-action fallback existed; Q telemetry ignored rewards.
+#    - Every action is scored by its edge's Q(s, a), which includes the immediate reward, from
+#      the moment its parent is expanded (section 1); an unvisited action is never scored by
+#      V(child) alone, under which opening a door (r = -45 in expectation at b0) would look as
+#      good as listening. The root Q values of SearchStatistics are these same edge values.
+#    - There is no random-action fallback: the returned policy always comes from the searched
+#      tree (section 5), and all randomness is seeded (section 4).
 #
 # 4. Reproducibility:
 #    - All randomness (Dirichlet noise, observation sampling) comes from one seeded
-#      numpy Generator owned by the planner.
+#      numpy Generator owned by the planner; no global generator (Python's `random`, NumPy's
+#      module-level functions) is used.
 #
 # 5. Output:
 #    - temperature = 0 (evaluation): a one-hot on argmax_a Q(root, a), the Bellman-optimal
@@ -56,7 +60,7 @@
 #      follow PUCT's exploration and give a smoothed, exploratory policy.
 #    - Root visit counts and Q values are recorded for telemetry and tests.
 #
-# 6. Pruning Negligible Observations (Wumpus World, design decision 2026-10-01):
+# 6. Pruning Negligible Observations (Wumpus World):
 #    - Wumpus World has 33 observations, so exact branching would create 5 x 33 = 165 Python
 #      child nodes per expansion although, in any given belief, most percept combinations are
 #      impossible. With observation_prune = eps > 0 an edge keeps only the observations with
@@ -67,36 +71,37 @@
 #    - observation_prune = 0 keeps every observation, zero-probability ones included, and does
 #      NOT renormalise: canonical Tiger's search is bit-identical to the unpruned search.
 #
-# 7. Cost of the Python Tree (2026-11-15; results bit-identical to the earlier implementation):
+# 7. Cost of the Python Tree (every choice below keeps the fingerprinted results bit for bit):
 #    - A Wumpus recipe seed spends about three quarters of its wall time in this module's Python,
-#      not on the GPU (profile_recipe.py). Four costs were removed without changing one number
-#      (checked by the GPU Wumpus fingerprint: every metric, parameter sum and the full-state hash):
-#        a. Children are created LAZILY. An expansion creates about 15 kept children per node, of
-#           which the search later visits one or two. An edge now holds the children's leaf values
-#           as plain floats and builds a DecisionNode only when the descent selects that child (or
-#           when `Edge.children` is read from outside, which materialises all of them).
+#      not on the GPU (profile_recipe.py). Four choices keep that cost down without changing one
+#      number (checked by the GPU Wumpus fingerprint: every metric, parameter sum and the full-state
+#      hash):
+#        a. Children are created LAZILY. An expansion keeps about 15 children per node, of which the
+#           search later visits one or two. An edge holds the children's leaf values as plain floats
+#           and builds a DecisionNode only when the descent selects that child (or when
+#           `Edge.children` is read from outside, which materialises all of them).
 #        b. A node's state is a HANDLE (the expansion's next_states block and an index), turned into
-#           a tensor only when the node is expanded. The earlier code created a tensor view per
-#           child (about a thousand GPU-tensor views per simulation step that were never read).
+#           a tensor only when the node is expanded. A tensor view per child would cost about a
+#           thousand GPU-tensor views per simulation step that are never read.
 #        c. Selection works on Python floats: sqrt(N + 1) once per node, c_puct * P(a) once per
 #           search, a first-maximum loop for the argmax, and the cumulative branch probabilities
 #           cached per edge (bisect on a list). Each expression keeps its order of operations.
 #        d. Edge.refresh accumulates p * V^ in an explicit left-to-right loop.
 #    - What must NOT be "simplified" (each would change rounding):
 #        * Python 3.12's built-in sum() uses compensated summation for exact floats, while the
-#          earlier generator of np.float64 products was added plainly, left to right. The explicit
-#          `acc += p * v` loop is the same plain addition; sum() over Python floats is not.
+#          fingerprinted results add the np.float64 products plainly, left to right. The explicit
+#          `acc += p * v` loop is that plain addition; sum() over Python floats is not.
 #        * The pruned mass and the renormalisation stay per-edge numpy calls on the compacted
 #          array: numpy's reduction is not a left-to-right sum, and its order depends on the length.
 #        * math.sqrt and np.sqrt agree (both correctly rounded), and a product of a Python float
 #          and an np.float64 is the same IEEE double product.
-#    - The model's contract is unchanged (one batched expand per simulation step; states are rows
-#      of next_states), so every SearchModel and wrapper works as before. Edge.refresh reads a
+#    - The model's contract is one batched expand per simulation step, with states as rows of
+#      next_states; every SearchModel and wrapper relies on that alone. Edge.refresh reads a
 #      materialised child's CURRENT value, so code that edits a child's leaf_value and refreshes
-#      the edge (reports/.../self_loop_diag.py) behaves as before.
+#      the edge (reports/.../self_loop_diag.py) sees its edit.
 #
-# 8. What a Larger Budget Guarantees, and What It Does Not (code audit 2026-11-19;
-#    reports/2026-11-16_code_audit/planner_budget.py and its log; tests/test_planner_and_agent.py):
+# 8. What a Larger Budget Guarantees, and What It Does Not
+#    (reports/2026-11-16_code_audit/planner_budget.py and its log; tests/test_planner_and_agent.py):
 #    - Guaranteed, for the model the search is given: if every leaf estimate is within eps of that model's optimal
 #      value, every root edge satisfies |Q_tree(s, a) - Q*(s, a)| <= gamma^{d_a} eps, where d_a = 1 + the shallowest
 #      positive-probability frontier depth below the edge (a leaf errs by at most eps, a chance edge averages its

@@ -11,24 +11,26 @@
 #      action, only its effects on observations and rewards; the learned model therefore
 #      describes the POMDP the agent actually faces, with the opponent folded into the
 #      environment exactly as in the exact solver's S x M_j reduction (domain/pomdp.py,
-#      section 4). What the latent knows about the opponent is read out by probes
-#      (src/ipomdp/interpretability), never fed in. (Phase-4 decision; an earlier design fed
-#      the opponent's true action -- privileged information -- into every head.)
+#      section 4; the fold itself is domain/interactive.py). What the latent knows about the
+#      opponent is read out by probes (src/ipomdp/interpretability,
+#      experiments/interactive_analysis.py), never fed in. Feeding the opponent's true action
+#      into the heads would give the model privileged information the agent cannot have at
+#      decision time.
 #
 # 2. Distributional Value and Reward:
 #    - Two-hot distributions over bins bounded by the domain's value bound
 #      (models/distributions.py); the decoded mean is unbiased. The final projection is
 #      zero-initialised so the initial prediction is uniform, whose mean is exactly 0.
 #
-# 2b. Horizon Value Head (optional, model.time_aware_value; design decision 2026-10-07):
+# 2b. Horizon Value Head (optional, model.time_aware_value):
 #    - V(z_t, k_t) where k_t = H - t is the number of steps left in the agent's fixed window of H
 #      steps. k is the agent's own step counter, not privileged information. It enters as k / H
 #      concatenated to the latent.
 #    - Why: Wumpus World is scored on the return inside a 50-step window, but the window is a
 #      truncation and a stationary V(z) bootstraps through it, i.e. it optimises an infinite-
 #      horizon game in which a wasted step costs only about 1 + (1 - gamma) * V ~ 7.5. The
-#      greedy planner then idled in front of provably safe unvisited cells whenever V-hat errors
-#      between neighbouring latents exceeded that (~15 measured;
+#      greedy planner then idles in front of provably safe unvisited cells whenever V-hat errors
+#      between neighbouring latents exceed that (~15 measured;
 #      reports/2026-10-02_wumpus_diagnostics/unfinished_diag.py). With k the value is the
 #      finite-horizon value of the window, so a wasted step costs a step of a scarce budget.
 #    - Only the value depends on time: the dynamics (reward and observation heads) are
@@ -37,7 +39,7 @@
 #    - Verdict: not adopted (training/run.py, section 9: 200 / 108 / 143 per game against 186 / 166 / 215 on three
 #      paired seeds, about 69% of games still unfinished).
 #
-# 2c. Value Pair for Double and Clipped-Double Estimation (optional, model.value_estimator; 2026-10-15):
+# 2c. Value Pair for Double and Clipped-Double Estimation (optional, model.value_estimator):
 #    - Two independent value heads A and B read as one value: their mean (double, van Hasselt 2010) or
 #      their minimum (clipped double, Fujimoto et al. 2018). The trainer gives each its own targets and
 #      rows (training/trainer.py, section 3e); the planner and the backup read the combined value.
@@ -52,7 +54,7 @@
 #    - Verdict: the double estimator is part of the Wumpus recipe. Its held-out leave-one-out arm (PROTOCOL.md, C-e,
 #      arm 1, abl_max) found no detectable contribution: recipe minus max backup +33.5 [-25.5, +94.4] per game.
 #
-# 2d. Observation-Conditioned Reward Head (optional, model.observation_reward; 2026-10-27):
+# 2d. Observation-Conditioned Reward Head (optional, model.observation_reward):
 #    - r(z_t, a_t, o_{t+1}) as two-hot logits: the reward head also reads the one-hot NEXT observation. The model is
 #      then one joint p(o', r | z, a) = P(o' | z, a) p(r | z, a, o'), and the expected reward the planner backs up is
 #      sum_o P(o | z, a) r(z, a, o) (planning/search_model.py, section 8). DreamerV3 reads its reward off the
@@ -60,7 +62,7 @@
 #    - Why: with R(z, a) the model holds the same event twice. On Wumpus World a death is the GAME_OVER percept after
 #      FORWARD and a win the GAME_OVER percept after GRAB, and every other reward is a fixed step cost, so r is a
 #      function of (alive, a, o'). R(z, a) = -1 - 1000 P(death) carries its own estimate of the death risk, separate
-#      from the observation head's P(GAME_OVER | z, FORWARD), and the planner's death cost came from the reward head
+#      from the observation head's P(GAME_OVER | z, FORWARD), and the planner's death cost comes from the reward head
 #      alone. Conditioning on o' puts every outcome's probability in P and leaves the reward head a near-deterministic
 #      lookup, so a term on P can see outcomes paid through the reward (training/trainer.py, section 2i).
 #    - Same residual stack and zero-initialised projection as RewardHead. Off (the default and canonical Tiger)
@@ -74,8 +76,7 @@
 #      shapes the representation. On canonical Tiger it reaches a mean KL to the exact
 #      P(o' | b, a) of 0.001-0.007 nats (LISTEN) and < 0.0002 (door actions).
 #
-# 3b. Chain-Factored Observation Head (optional, model.observation_head=chain; 2026-11-10, Stage B of the
-#     2026-11-09 audit plan):
+# 3b. Chain-Factored Observation Head (optional, model.observation_head=chain):
 #    - A domain whose percept is a set of binary channels plus an absorbing marker (Wumpus: stench, breeze, glitter,
 #      bump, scream, and GAME_OVER) can factor P(o | z, a) by the chain rule instead of one 33-way softmax:
 #         P(o_abs) = p_T,   P(b_1..b_n) = (1 - p_T) prod_i P(b_i | z, a, b_<i).
@@ -90,7 +91,7 @@
 #      for n = 5); the terminal logit is a linear read of e. forward returns NORMALISED log-probabilities (N, |O|), a
 #      drop-in for the joint head's logits: softmax and cross_entropy of them are exact.
 #    - Verdict: not adopted. Its development screen (reports/2026-10-19_eval_protocol/PROTOCOL.md, C-j, arm CH) passed
-#      neither the mechanism nor the play rule, and Stage B was closed.
+#      neither the mechanism nor the play rule.
 #
 # 4. Multi-Step Observation Predictor (optional representation term, model.observation_horizon):
 #    - P(o_{t+j} | z_t, a_t..a_{t+j-1}) for j = 1..k, by an open-loop action-conditioned
@@ -98,7 +99,8 @@
 #      cross-entropy flows INTO the belief filter (training/trainer.py, section 2c).
 #    - Why: on Wumpus World neither JEPA nor one-step observation prediction makes the latent
 #      track the hunter's cell, heading and the danger ahead, although the same filter learns
-#      them almost perfectly from privileged supervision (2026-10-03).
+#      them almost perfectly from privileged supervision
+#      (reports/2026-10-02_wumpus_diagnostics/supervised_filter.py).
 #      Predicting future percepts under arbitrary future actions requires exactly that
 #      information. It is a self-supervised, non-privileged signal: actions and observations only.
 #    - It is not a planning model: the planner never reads it. With k = 0 it is not built at all.

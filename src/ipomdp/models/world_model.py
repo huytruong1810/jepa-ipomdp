@@ -15,14 +15,18 @@
 #      counterpart of the exact b_0(s) proportional to b0(s) P(o_0 | s). start() is the one
 #      place that knows whether a domain has o_0; every latent sequence begins at z_start.
 #      z_t = phi(h_t) is a function of the history h_t = (a_0, o_1, ..., a_{t-1}, o_t), and
-#      the Phase-2 acceptance test probes it against the exact posterior b*(h_t).
+#      the acceptance test (tests/test_world_model_acceptance.py) probes it against the exact
+#      posterior b*(h_t).
 #
 # 2. One Latent Vector (No Object Slots):
-#    - Single-agent Tiger has one binary hidden variable. An earlier iteration split the
-#      latent into N_obj "object slots" with slot embeddings, inter-slot attention and
-#      attention pooling. Nothing gave those slots meaning, and the per-slot offsets let
-#      VICReg's variance target be met without encoding any information. Structured slots
-#      will be reintroduced only when the interactive state (S x M_j) gives them semantics.
+#    - The belief is one vector z_t in R^D. A latent split into N_obj "object slots" (slot
+#      embeddings, inter-slot attention, attention pooling) was measured on single-agent Tiger,
+#      which has one binary hidden variable: nothing gave the slots meaning, and the per-slot
+#      offsets let VICReg's variance target be met without encoding any information.
+#    - The interactive problems need no slots either. The I-POMDP fold (domain/interactive.py)
+#      is one FinitePOMDP over the interactive states (s, n_j, a_j), so the interactive agent
+#      filters with this same single latent, and what it holds about the other agent is read
+#      out by marginal probes (experiments/interactive_analysis.py, section 3), never by a slot.
 #
 # 3. Training Signal (see src/ipomdp/training/trainer.py):
 #    - JEPA self-prediction: the predictor predicts the EMA target filter's next latent
@@ -31,14 +35,14 @@
 #      detached latents and do not shape the representation (training/trainer.py, section 2).
 #    - Baseline: the decoder agent (training/trainer.py, section 2b) builds no RecurrentJEPA;
 #      the bare BeliefFilter is shaped by reward and the next-observation likelihood instead.
-#    - Measured on canonical Tiger (Phase-2 isolated study, random-policy data): JEPA
-#      self-prediction ALONE leaves the latent no more belief-like than an untrained network
-#      (probe KL 0.018 vs 0.024 nats); reward grounding brings it to 0.0015 (linear probe) /
-#      0.0002 (MLP probe). This matches the self-predictive RL analysis of Ni et al. (ICLR
-#      2024): latent self-prediction has uninformative fixed points unless grounded. VICReg
-#      was removed: applied to the encoder it made the latent WORSE (KL 0.076 without reward,
-#      0.0026 vs 0.0015 with reward), and its old placement (on predictor outputs, slots
-#      pooled into one batch) could not prevent encoder collapse at all.
+#    - Measured on canonical Tiger (an isolated study of the representation terms on
+#      random-policy data): JEPA self-prediction ALONE leaves the latent no more belief-like than
+#      an untrained network (probe KL 0.018 vs 0.024 nats); reward grounding brings it to 0.0015
+#      (linear probe) / 0.0002 (MLP probe). This matches the self-predictive RL analysis of Ni et
+#      al. (ICLR 2024): latent self-prediction has uninformative fixed points unless grounded.
+#    - No VICReg term: applied to the encoder it made the latent WORSE (KL 0.076 without reward,
+#      0.0026 vs 0.0015 with reward), and applied to predictor outputs (slots pooled into one
+#      batch) it could not prevent encoder collapse at all.
 #
 # 4. EMA Target Filter:
 #    - A frozen copy of the filter, updated as target <- m * target + (1 - m) * online after
@@ -48,15 +52,15 @@
 #    - g(z_t, a_t) predicts the EMA target latent z-bar_{t+1}; the loss is the mean
 #      squared error. In a POMDP z-bar_{t+1} is random (it depends on o_{t+1}), so g learns
 #      its conditional mean -- the "expected self-prediction" (EZP) objective of Ni et al.,
-#      which together with reward grounding is what the Phase-2 study validated.
-#    - The predictor is NOT used for planning. Phase-3 study (canonical Tiger, 1000 updates):
-#      a DreamerV3-style stochastic latent transition imagined biased beliefs (post-LISTEN
-#      mean 0.57 from b = 0.85, never moving towards TL), because (i) the EMA target lives in
-#      a different latent space than the online latents the heads read (probe error 0.41 vs
-#      0.03 on the same histories), (ii) predicting online latents instead collapses the
-#      representation (probe error 0.13), and (iii) straight-through discrete latents learned
-#      even the two-outcome growl distribution poorly. The discrete latent, prior/posterior,
-#      KL balancing and unimix were therefore removed.
+#      which together with reward grounding is the combination section 3 measured.
+#    - The predictor is NOT used for planning. Measured on canonical Tiger (1000 updates): a
+#      DreamerV3-style stochastic latent transition imagines biased beliefs (post-LISTEN mean
+#      0.57 from b = 0.85, never moving towards TL), because (i) the EMA target lives in a
+#      different latent space than the online latents the heads read (probe error 0.41 vs 0.03
+#      on the same histories), (ii) predicting online latents instead collapses the
+#      representation (probe error 0.13), and (iii) straight-through discrete latents learn even
+#      the two-outcome growl distribution poorly. The model therefore has no discrete latent,
+#      no prior/posterior pair, no KL balancing and no unimix.
 #
 # 6. Planning Model = Observation Branching Through the Filter:
 #    - The planner branches over o' with the learned P(o' | z, a) (ObservationHead,
@@ -64,15 +68,17 @@
 #      z' = BeliefFilter.step(z, a, o'). Imagined latents are therefore exactly the latents
 #      the filter would produce after that history, on the manifold the heads were trained
 #      on, and branching mirrors the exact belief tree of the benchmark solver.
-# 7. Whole-Sequence Unroll Hoists the Input Network (2026-10-04 speed-up):
+#
+# 7. Whole-Sequence Unroll Hoists the Input Network:
 #    - input_net reads only (a_t, o_{t+1}), never the latent, so unroll() applies it to the whole
 #      sequence in one call and loops only the GRU cell. step() (used by the planner, one
 #      transition at a time) is the same function: z_{t+1} = cell(input_net([a_t, o_{t+1}]), z_t).
-#    - The unroll is 4.5-7.6x faster (it was kernel-launch-bound). The forward pass is
-#      bit-identical under bf16 autocast, but gradients accumulate input_net's weight gradient in
-#      one GEMM instead of T, so training differs at floating-point-summation level: runs before
-#      this change (including the cited Tiger sweeps) reproduce bit-for-bit only at their own
-#      commits. Statistical equivalence on Tiger is checked separately.
+#    - The hoisted unroll is 4.5-7.6x faster than stepping T times (that loop is
+#      kernel-launch-bound). The forward pass is bit-identical to stepping under bf16 autocast,
+#      but the gradient accumulates input_net's weight gradient in one GEMM instead of T, so
+#      training differs from a per-step unroll at floating-point-summation level: runs made with
+#      a per-step unroll (including the cited Tiger sweeps) reproduce bit-for-bit only at their
+#      own commits. Statistical equivalence on Tiger is checked separately.
 # ==============================================================================
 
 import torch
