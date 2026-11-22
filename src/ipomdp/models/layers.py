@@ -14,8 +14,9 @@
 #      starts as its input and output projections.
 #
 # 3. Scope:
-#    - Attention poolers, swarm action encoders and 2D positional encodings belonged to the
-#      removed multi-slot / image-observation design and were deleted with it.
+#    - Only the blocks the filter and heads use. The latent is one vector and observations are
+#      one-hot (world_model.py, section 2), so there are no attention poolers, swarm action
+#      encoders or 2D positional encodings.
 # ==============================================================================
 
 from typing import List

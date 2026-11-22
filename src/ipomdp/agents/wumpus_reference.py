@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Why a Reference Agent (design decision, 2026-10-02):
+# 1. Why a Reference Agent:
 #    - Wumpus World has no exact solver (domain/wumpus.py, section 4), so a learned agent's
 #      return has no optimum to be compared with. This agent supplies the missing yardstick
 #      from below: any policy's return is a lower bound on V*(b0). The full-information bound
@@ -36,8 +36,8 @@
 #      TURN_RIGHT, entering provably safe cells only. Every action costs -1 (shooting -10), so
 #      the fewest actions are the cheapest.
 #    - Search runs per game in Python on the CPU (64 nodes); the exact filter runs batched on
-#      the simulator's device. Marginals are copied to the CPU synchronously (CLAUDE.md:
-#      non_blocking copies corrupted memory before).
+#      the simulator's device. Marginals are copied to the CPU synchronously: a non_blocking
+#      copy read before the device synchronises returns stale memory.
 #
 # 4. Deterministic:
 #    - The policy has no randomness (ties go to the first action in FORWARD, TURN_LEFT,

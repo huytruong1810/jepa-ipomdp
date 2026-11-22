@@ -12,9 +12,9 @@
 #         LearnedSearchModel  states are learned latents z; rewards/observations/values come
 #                             from the heads, successors from the BeliefFilter.
 #    - The exact model lets the SEARCH be validated against the exact solver with no learning
-#      involved (Phase-4 small-scale check); swapping in the learned model then isolates the
-#      cost of the learned representation. A search bug can no longer hide behind a learning
-#      bug or vice versa.
+#      involved (tests/test_planner_and_agent.py); swapping in the learned model then isolates
+#      the cost of the learned representation. A search bug cannot hide behind a learning bug
+#      or vice versa.
 #
 # 2. Expansion Returns Every Child at Once:
 #      expand(states (N, ...)) -> rewards (N, A)          E[r | s, a]
@@ -36,7 +36,7 @@
 #      in float32 without autocast: planning evaluates few, small batches, and bfloat16 logits
 #      would perturb the two-hot means the search compares.
 #
-# 5. Optional Finite Horizon (LearnedSearchModel(horizon=H); model.time_aware_value, design decision 2026-10-07):
+# 5. Optional Finite Horizon (LearnedSearchModel(horizon=H); model.time_aware_value):
 #    - The state becomes [z, k]: the latent with the number of steps left in the agent's
 #      H-step window appended as one more column (exact small integers in float32). The agent's
 #      own step counter is not privileged. initial_states sets k = H, update and every imagined
@@ -52,7 +52,7 @@
 #    - Verdict: not adopted (training/run.py, section 9: 200 / 108 / 143 per game against 186 / 166 / 215 on three
 #      paired seeds, about 69% of games still unfinished).
 #
-# 6. Fixed Planning-Time Risk Margin (RiskMarginModel; mcts.risk_margin, 2026-10-22; training/run.py, 16):
+# 6. Fixed Planning-Time Risk Margin (RiskMarginModel; mcts.risk_margin; training/run.py, 16):
 #    - A domain with a fatal outcome describes it by a RiskSpec: the step action whose outcome can be fatal
 #      (Wumpus: FORWARD), the fatal observation (GAME_OVER, which FORWARD only emits on a death; a win ends on
 #      GRAB), the fatal reward (-1000) and the ordinary step cost (-1). No literal of a domain appears here.
@@ -76,7 +76,7 @@
 #      and deaths fall on two. The registered bar (training/run.py, section 17: +50 per game on 2 of 3 seeds) is not
 #      met: the offline gain on frozen networks does not survive training with the margin acting in collection.
 #
-# 7. Anchored Absorbing Value (AbsorbingValueModel, 2026-10-25; reports/2026-10-02_wumpus_diagnostics/retrain_play.py, 6):
+# 7. Anchored Absorbing Value (AbsorbingValueModel; reports/2026-10-02_wumpus_diagnostics/retrain_play.py, 6):
 #    - A domain whose games end in an absorbing state that the agent PERCEIVES (Wumpus: the GAME_OVER percept, emitted
 #      on every step after a win or a death, reward 0 forever after) has V = 0 at every latent reached through that
 #      percept. AbsorbingValueModel(inner, o_abs) wraps any SearchModel and sets next_values[:, :, o_abs] = 0 at every
@@ -93,8 +93,8 @@
 #      with the strong-weight-decay retrain in-agent (training/run.py, section 14, sweep wumpus_retrain_wd1_abs) it
 #      fails the registered mean bar: +22.1 per game over three seeds against +30.
 #
-# 8. Observation-Conditioned Reward (LearnedSearchModel with an ObservationRewardHead; model.observation_reward,
-#    2026-10-27; models/heads.py, section 2d):
+# 8. Observation-Conditioned Reward (LearnedSearchModel with an ObservationRewardHead; model.observation_reward;
+#    models/heads.py, section 2d):
 #    - The reward head reads (z, a, o'). The expansion evaluates it on the N x A x O rows it already builds for the
 #      filter's successors and returns
 #         branch_rewards (N, A, O)   r(z, a, o')
@@ -106,7 +106,7 @@
 #    - Verdict: not adopted (objective_ab.py 2p, retrain screen: the restructured reward alone plays -45.9 / +20.6 /
 #      -42.8 per game against the control, and with the Q-equivalent term -91.0 / +41.7 / +40.1; FAIL on both rules).
 #
-# 9. Planner-Consistent Pruning (PrunedModel; model.target_prune, 2026-11-10; training/trainer.py, 3h):
+# 9. Planner-Consistent Pruning (PrunedModel; model.target_prune; training/trainer.py, 3h):
 #    - The tree search drops observation branches with P(o | s, a) < delta and renormalises the rest (planning/mcts.py,
 #      section 6). The trainer's value targets summed every observation, so the value was fitted to a backup the
 #      planner never computes: branches the planner discards (often off the filter's manifold, where the value head
@@ -118,7 +118,7 @@
 #    - Verdict: not adopted. Screened only together with the absorbing codec bound (PROTOCOL.md, C-h, arm CBP): +5.7 /
 #      +41.9 / +9.8 per game against the control, mean +19.2, below the registered +20.
 #
-# 10. History-Token States (TokenSearchModel; model.filter=transformer, 2026-11-11; models/history_filter.py):
+# 10. History-Token States (TokenSearchModel; model.filter=transformer; models/history_filter.py):
 #    - A history filter has no step(z, a, o): its state is the history. A state is an int64 vector
 #      [length, a_-1, o_0, a_0, o_1, ...] of 1 + 2 L_max entries (pairs = the filter's tokens; unused pairs are 0).
 #      update appends one pair; L_max = the filter's max_len, and a history that would exceed it raises.

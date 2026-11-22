@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Why (2026-11-10; Stage B of the 2026-11-09 audit plan):
+# 1. Why:
 #    - The recurrent filter z_{t+1} = GRU([a_t, o_{t+1}], z_t) must carry everything a decision needs in one vector
 #      updated in place. The measured failure sits at the latents an IMAGINED turn produces: the head misreads "the
 #      cell ahead is unvisited" 19-35% of the time and halves P(gold ahead) there (feature_localise.py, Step D),
@@ -16,7 +16,7 @@
 #    - Verdict: not adopted (reports/2026-10-19_eval_protocol/PROTOCOL.md, C-j, arm TR: -487.6 / -408.1 / -425.0 per
 #      game against the control, deaths 54-56%; FAIL on both rules). With the recipe's optimiser and 6400 updates it
 #      learns a weaker latent (MLP cell / heading 0.69 / 0.65-0.69 against the control's 0.82-0.88 / 0.86-0.93); it
-#      had no tuning of its own (learning rate, warm-up, depth), which limits the claim.
+#      was screened without tuning of its own (learning rate, warm-up, depth), which limits the claim.
 #
 # 2. Contract (identical to BeliefFilter.unroll, so heads, probes and every loss are unchanged):
 #    - unroll(actions (B, T, A) one-hot, observations (B, T, O) one-hot, initial (B, O) one-hot or None) ->
