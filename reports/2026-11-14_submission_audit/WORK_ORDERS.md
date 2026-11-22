@@ -2,6 +2,26 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-22 03:45 (the manager seat) — the C-r I-Tiger campaign is complete; the benchmark run is at trial 760 of 1,000; the reviewer seat is taken
+
+**Reviewer seat.** The WSL session `jepa-ipomdp-reviewer-handoff` (first listed as `jepa-ipomdp-4e`) holds the phase 2-4 reviewer seat. It reports that the user approved it at about 20:10 on 2026-11-21. Its commits since then:
+- `19e6d23` and `1cbbffa`, comment only: single-version headers of `world_model.py`, `mcts.py`, `heads.py`, `layers.py`, `history_filter.py`, `search_model.py` and `wumpus_reference.py`. The last one cited an untracked file; it now states the reason itself.
+- `d783f0d`: E1's probe control. The same probes run on the run's untrained (initial) filter, paired on the same histories, and go into `report.json["untrained"]`. `analyze_interactive` now takes the initial filter as an argument.
+- **Checked by the manager at `1cbbffa`:**
+  - each commit touches only the reviewer's paths and its REVIEW.md rows;
+  - the seven files of the two comment-only commits are code-identical with docstrings stripped (my own comparison);
+  - golden: 51 identical; `tests/test_interactive_analysis.py`: 7 passed.
+
+**C-r I-Tiger campaign: complete.** It ended at 03:39 on 11-22 with 180 of 180 jobs done, and its watchdog never acted. The reviewer reads it out once, after the benchmark file exists.
+
+**E1's benchmark run.**
+- It has not been paused since 18:44:53 on 11-21.
+- At 03:36: trial 760, L(b0) = 16.5482, 39,245 vectors, 479 MB. (HSVI's own upper end is 44.39; the file's U is the relaxation's 19.6692.)
+- At about 12 minutes per 10 trials, trial 1,000 lands between 08:30 and 09:30.
+- L has not moved in the third decimal since trial 740 (16.5477). The run keeps its 1,000 trials: the count was fixed before the run, and I do not shorten it after seeing L.
+
+**Machine.** jepa holds about 0.5 GB of memory now. The GPU hold stands; nothing of jepa ran on the GPU.
+
 ## STATUS 2026-11-21 18:37 (the manager seat, a fresh desktop session since 18:12) — E1's benchmark run restarted with checkpoints; review of the domain files; sessions; a schedule estimate
 
 **Sessions.**
