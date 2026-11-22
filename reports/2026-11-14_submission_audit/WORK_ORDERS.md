@@ -15,6 +15,11 @@
 - **Log:** `reports/2026-11-16_code_audit/itiger_benchmark_artifact_rerun.log`, committed when final. The failed run's log stays as `itiger_benchmark_artifact.log`.
 - **Progress at 18:35:** trial 50, L(b0) = 16.3422, U(b0) = 52.03, 3,502 vectors, 2.4 GB. About 2 GB of that is the level-0 problem's dense controller, held for the whole run; the previous 1,000 trials took about 17 h.
 - **When it ends:** L, the vector count and the digest (957782ffdac6d103, matched by a 2-trial smoke) go here and to the reviewer seat, which then reads C-r I-Tiger once.
+- **Added 18:42: paused at 18:38:31, at trial 80 (L(b0) = 16.4280, 5,583 vectors), and now supervised.**
+  - Why: MemAvailable fell to 2.85 GB a second time. The C-r campaign had entered its evaluation phase and grown from 3.3 GB to its announced 5 GB, ipomcp's jobs were at 12.5 GB, and my run was flat at 2.3 GB. Its checkpoint makes a stop cost minutes, and the campaign's watchdog would otherwise have stopped the campaign.
+  - My start gate of 7.5 GB had counted the campaign at its size of that moment, not at its announced size. That was my error.
+  - Now: `runs/benchmarks/supervise_itiger_level1.sh` (unit `jepa-itiger-supervisor`, log `runs/benchmarks/supervisor.log`) restarts the run from its checkpoint at 6.5 GB of MemAvailable and stops it again when MemAvailable stays under 3.3 GB for 2 minutes, so it yields before the campaign's watchdog. It ends when the benchmark file exists, or with an error if the run ends by itself without the file.
+  - The file's time of arrival now depends on ipomcp's load; I asked its owner to hold 10 GB until the campaign ends.
 
 **C-r I-Tiger campaign** (the reviewer's, PID 1260387): running. 19 of 180 jobs were done at 18:33 (all learning runs of `main`, 9 of 10 of `known_t`); expected end about 03:00 on 11-22. If it stops while no reviewer is listed, I resume it with the registered command and record it here.
 
