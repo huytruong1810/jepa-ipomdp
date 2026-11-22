@@ -54,6 +54,11 @@
 #      The sup-norm distance between two PWLC functions is computed EXACTLY by LPs
 #      (max over the simplex of each one minus the other), so the reported bound is a
 #      proof, not an estimate. Iteration stops once the bound is below `tolerance`.
+#    - Precision of that statement: the LPs (witness margins and sup-norm distances) are solved in floating point by
+#      HiGHS at its default feasibility tolerances, 1e-7. If their optima were accurate only to that tolerance, a
+#      backup's error would be 2|O| (eps + 1e-7), and the bound on the canonical Tiger would grow by
+#      (2|O| + gamma) * 1e-7 / (1 - gamma), about 1e-5. The tests measure far better accuracy: the pruning guarantee
+#      holds to 1e-12 on random vector sets and V_h equals an independent expectimax to 1e-9 (tests/test_domain.py).
 #    - On the canonical Tiger, eps = 1e-6 certifies V* to 0.01 in about 2.5 minutes on one CPU thread (and to 1e-4
 #      in the slow test), whereas eps = 1e-9 keeps many vectors with negligible advantage mid-horizon.
 # ==============================================================================
