@@ -110,6 +110,22 @@ class TestRules:
         assert steps[0][:2] == (Percept.STENCH, -10.0) and bool(steps[0][2].wumpus_alive)   # shot North: missed
         assert steps[2][:2] == (GAME_OVER, -1001.0)
 
+    def test_arrow_flies_ahead_only_along_the_row(self, world):
+        # The arrow kills only a wumpus strictly AHEAD on the hunter's line. From the start, nothing can be behind
+        # the hunter, so the two tests above never exercise the sign of "ahead" or a shot along a row. Here the
+        # wumpus sits at (0,1) and the hunter walks to (1,1), on the same row: a shot East flies away from it and
+        # misses; a shot West kills it.
+        layout = _layout(world, (10, 11), wumpus=4, gold=15)
+        walk = [A.TURN_RIGHT, A.FORWARD, A.TURN_LEFT, A.FORWARD]                # East to (1,0), North to (1,1)
+        away = _play(world, layout, walk + [A.TURN_RIGHT, A.SHOOT])             # facing East, the wumpus behind
+        assert away[3][2].cell.item() == 5 and away[4][2].heading.item() == Heading.EAST
+        assert away[5][:2] == (Percept.STENCH, -10.0)                           # no scream: the arrow is spent
+        assert bool(away[5][2].wumpus_alive) and not bool(away[5][2].arrow)
+        toward = _play(world, layout, walk + [A.TURN_LEFT, A.SHOOT])            # facing West, the wumpus ahead
+        assert toward[4][2].heading.item() == Heading.WEST
+        assert toward[5][:2] == (Percept.STENCH | Percept.SCREAM, -10.0)
+        assert not bool(toward[5][2].wumpus_alive)
+
     def test_grab_off_the_gold_does_nothing(self, world):
         layout = _layout(world, (10, 11), wumpus=15, gold=3)
         steps = _play(world, layout, [A.GRAB])
