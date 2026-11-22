@@ -20,6 +20,14 @@
   - My start gate of 7.5 GB had counted the campaign at its size of that moment, not at its announced size. That was my error.
   - Now: `runs/benchmarks/supervise_itiger_level1.sh` (unit `jepa-itiger-supervisor`, log `runs/benchmarks/supervisor.log`) restarts the run from its checkpoint at 6.5 GB of MemAvailable and stops it again when MemAvailable stays under 3.3 GB for 2 minutes, so it yields before the campaign's watchdog. It ends when the benchmark file exists, or with an error if the run ends by itself without the file.
   - The file's time of arrival now depends on ipomcp's load; I asked its owner to hold 10 GB until the campaign ends.
+- **Added 18:50: running again since 18:44:53, from the checkpoint, at 0.7 GB.**
+  - The script now releases the level-0 brackets before the search (`d10b21b`). Their dense controllers were 2 GB of the 2.3 GB; the trial values are unchanged (trials 10, 20 and 30 equal the first run's).
+  - The supervisor could not restart the run between 18:39 and 18:44: a systemd unit's PATH does not hold `uv`, and my launcher called it by name. It now uses the absolute path.
+  - At 18:46:48: trial 90, L(b0) = 16.4394, 6,215 vectors, 712 MB.
+- **Added 18:50: rows for the five new domain modules and `tests/test_interactive.py`** (`753778c`), read by a session that did not write them.
+  - The fold's index algebra and the three proof steps of the relaxation's upper bound were re-derived and hold.
+  - One latent defect, measured: `policy_graph.envelope` drops both copies of an exact duplicate. Every caller passes a pruned set, which holds no duplicates, so no result is affected.
+  - One point for the paper's wording, your call: in E1's problem, i's prior over j's first node is the node of j's own initial belief. That is the paper's case "i knows that j starts at 0.5" (Fig. 5, first case), not the "no information" prior.
 
 **C-r I-Tiger campaign** (the reviewer's, PID 1260387): running. 19 of 180 jobs were done at 18:33 (all learning runs of `main`, 9 of 10 of `known_t`); expected end about 03:00 on 11-22. If it stops while no reviewer is listed, I resume it with the registered command and record it here.
 
