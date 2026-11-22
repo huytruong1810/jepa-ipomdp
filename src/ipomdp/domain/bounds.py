@@ -70,11 +70,26 @@
 #    - Corners are backed up after every trial (_SeededHSVI). hsvi() itself is unchanged: the controllers that
 #      define the interactive problems (interactive.py, section 2) are extracted from it, so its arithmetic must stay
 #      identical.
+#
+# 7. Checkpoints of a Budgeted Search (hsvi_vector_bracket):
+#    - Why: a trial's cost grows with the stored vectors and points, so the 1,000 trials behind the level-1 benchmark
+#      take most of a day. Without a checkpoint an interruption loses all of them, and the run says nothing until
+#      its last line.
+#    - What is stored: the whole mutable state of the search (the lower-bound vectors with their actions and
+#      successors; the sawtooth points with their inverses, values and excesses; the corners), the number of
+#      finished trials, the epsilon that set the depth and gap thresholds, and a digest of the model's tables.
+#    - A resumed run is the uninterrupted run: trials draw no random numbers and every array is restored bit for bit,
+#      so both give identical vectors (tested). A run that had reached its width is not given another trial.
+#    - A checkpoint of another model or another epsilon raises, and so does a budget below the stored trials: none
+#      of them is the search the caller asked for.
+#    - The file is replaced atomically (written beside itself, then renamed), so an interruption during a write
+#      leaves the previous checkpoint.
 # ==============================================================================
 
 import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import scipy.sparse as sparse
@@ -312,18 +327,80 @@ def hsvi_budget(model: FinitePOMDP, epsilon: float, trials: int, corners: torch.
     return _bracket(search, model.initial_belief.numpy(), trial)
 
 
-def _run_budget(model: FinitePOMDP, epsilon: float, trials: int, corners, points, back_up_corners: bool):
+def _model_digest(model: FinitePOMDP) -> str:
+    """SHA-256 of the model's tables and discount, which ties a checkpoint to the problem it searched (section 7)."""
+    digest = hashlib.sha256()
+    for table in (model.transition, model.observation, model.reward, model.initial_belief):
+        digest.update(str(tuple(table.shape)).encode())
+        digest.update(np.ascontiguousarray(table.numpy()).tobytes())
+    digest.update(repr(float(model.discount)).encode())
+    return digest.hexdigest()
+
+
+def _save_search(search: "_SeededHSVI", path: Path, digest: str, epsilon: float, trial: int) -> None:
+    """Write the search's whole mutable state after `trial` trials (section 7), replacing the file atomically."""
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with open(temporary, "wb") as handle:
+        np.savez(handle, digest=np.array(digest), epsilon=np.float64(epsilon), trial=np.int64(trial),
+                 vectors=search.vectors.rows, actions=np.asarray(search.actions, dtype=np.int64),
+                 successors=np.stack(search.successors), points=search.points.rows, inverse=search.inverse.rows,
+                 excess=np.asarray(search.excess, dtype=np.float64),
+                 values=np.asarray(search.values, dtype=np.float64), corner=search.corner)
+    temporary.replace(path)
+
+
+def _restore_search(search: "_SeededHSVI", path: Path, digest: str, epsilon: float) -> int:
+    """
+    Load a checkpoint into a freshly built search of the same model and return its finished trials (section 7).
+    Lists return to Python numbers and rows to fresh row stores, so every later operation reads the values the
+    uninterrupted search would read.
+    """
+    def rows(array: np.ndarray) -> _Rows:
+        store = _Rows(search.S)
+        for row in array:
+            store.append(row)
+        return store
+
+    with np.load(path) as stored:
+        if str(stored["digest"]) != digest or float(stored["epsilon"]) != epsilon:
+            raise ValueError(f"{path} is the checkpoint of another model or another epsilon (section 7).")
+        search.vectors, search.points, search.inverse = rows(stored["vectors"]), rows(stored["points"]), rows(
+            stored["inverse"])
+        search.actions, search.successors = stored["actions"].tolist(), list(stored["successors"])
+        search.excess, search.values = stored["excess"].tolist(), stored["values"].tolist()
+        search.corner = stored["corner"]
+        return int(stored["trial"])
+
+
+def _run_budget(model: FinitePOMDP, epsilon: float, trials: int, corners, points, back_up_corners: bool,
+                checkpoint: Path | None = None, every: int = 10,
+                report: Callable[[int, float, float, int], None] | None = None):
     search = _SeededHSVI(model, None if corners is None else corners.numpy(),
                          None if points is None else points[0].numpy(), None if points is None else points[1].numpy())
     span = (search.R.max() - search.R.min()) / (1 - search.gamma)
     search.max_depth = int(np.ceil(np.log(epsilon / span) / np.log(search.gamma))) + 1
     b0 = model.initial_belief.numpy()
+    gap = lambda: float(search.upper(b0[None])[0] - search.lower(b0[None])[0])   # noqa: E731
+    digest = None if checkpoint is None else _model_digest(model)
     trial = 0
-    for trial in range(1, trials + 1):
+    if checkpoint is not None and checkpoint.exists():
+        trial = _restore_search(search, checkpoint, digest, epsilon)
+        if trial > trials:
+            raise ValueError(f"{checkpoint} holds {trial} trials, more than the budget of {trials} (section 7).")
+        if gap() <= epsilon:
+            # The stored search had stopped at this trial. Another trial would go beyond the uninterrupted run.
+            return search, trial
+    for trial in range(trial + 1, trials + 1):
         search.explore(b0, epsilon, 0)
         if back_up_corners:
             search.back_up_corners()
-        if float(search.upper(b0[None])[0] - search.lower(b0[None])[0]) <= epsilon:
+        reached = gap() <= epsilon
+        if reached or trial == trials or trial % every == 0:
+            if checkpoint is not None:
+                _save_search(search, checkpoint, digest, epsilon, trial)
+            if report is not None:
+                report(trial, float(search.lower(b0[None])[0]), float(search.upper(b0[None])[0]), search.vectors.size)
+        if reached:
             break
     return search, trial
 
@@ -339,14 +416,26 @@ class VectorBracket:
     trials: int
 
 
-def hsvi_vector_bracket(model: FinitePOMDP, epsilon: float, trials: int) -> VectorBracket:
+def hsvi_vector_bracket(model: FinitePOMDP, epsilon: float, trials: int, checkpoint: Path | None = None,
+                        every: int = 10,
+                        report: Callable[[int, float, float, int], None] | None = None) -> VectorBracket:
     """
     hsvi_budget (no seeds, no corner backups) returning the lower-bound vectors and their actions instead of the
-    controller. The controller's successor law is dense (K, A, O, K): with the K of about 5,000 vectors that 1,000
-    trials leave on the level-1 fold it needs 359 GB, which killed a run after all its trials had finished. A
-    reference agent needs only the vectors (the best vector's action at the exact belief is worth at least L).
+    controller. The controller's successor law is dense (K, A, O, K) in float64: with the K = 49,909 vectors that
+    1,000 trials left on the level-1 fold (A = 3, O = 6) it needs 8 * 3 * 6 * K^2 bytes = 359 GB, which killed a run
+    after all its trials had finished. A reference agent needs only the vectors (the best vector's action at the
+    exact belief is worth at least L).
+
+    Args:
+        model: Exact POMDP specification.
+        epsilon: Target width; it also sets the trials' depth and gap thresholds, as in hsvi().
+        trials: The trial budget.
+        checkpoint: Optional file (section 7). If it exists the search continues from it, and the result equals the
+            uninterrupted run's. It is rewritten every `every` trials and after the last one.
+        every: Trials between checkpoints and between progress reports.
+        report: Optional callback (trial, L(b0), U(b0), number of lower-bound vectors), called at the same trials.
     """
-    search, trial = _run_budget(model, epsilon, trials, None, None, False)
+    search, trial = _run_budget(model, epsilon, trials, None, None, False, checkpoint, every, report)
     b0 = model.initial_belief.numpy()
     return VectorBracket(float(search.lower(b0[None])[0]), float(search.upper(b0[None])[0]),
                          torch.from_numpy(search.vectors.rows.copy()), torch.tensor(search.actions, dtype=torch.int64),

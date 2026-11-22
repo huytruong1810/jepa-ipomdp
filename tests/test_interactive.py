@@ -22,7 +22,7 @@ import torch
 
 from ipomdp.domain import (BatchedPOMDPEnv, FinitePOMDP, TigerAction, TigerState, action_value_functions, belief_update,
                            build_tiger_pomdp, solve_finite_horizon)
-from ipomdp.domain.bounds import _HSVI, hsvi, hsvi_budget, revealed_upper_bound
+from ipomdp.domain.bounds import _HSVI, hsvi, hsvi_budget, hsvi_vector_bracket, revealed_upper_bound
 from ipomdp.domain.interactive import (TIGER_LEVEL_ZERO_NOISE, fold, nested_problem, noise_model,
                                        relaxation_reveal)
 from ipomdp.domain.multiagent_tiger import (CREAK_ACCURACY, CREAK_ERROR, OBSERVATIONS, Agent, Creak, Growl,
@@ -290,6 +290,46 @@ class TestBracket:
         value = float(compact.initial_law @ (evaluate(model, compact) @ model.initial_belief))
         assert compact.num_nodes < bracket.controller.num_nodes
         assert value <= 19.3713 + 1e-4 and bracket.upper - value < 1.0
+
+    def test_a_checkpointed_search_continues_to_the_uninterrupted_result(self, tmp_path):
+        # bounds.py, section 7: trials draw no random numbers and a checkpoint restores every array bit for bit, so
+        # three trials, a stop and three more must equal six trials in one go. A width of 0.01 is not reached in six
+        # trials on the canonical Tiger, so all six run.
+        model = build_tiger_pomdp()
+        straight = hsvi_vector_bracket(model, 0.01, 6)
+        path, seen = tmp_path / "search.npz", []
+        first = hsvi_vector_bracket(model, 0.01, 3, path, every=2, report=lambda *row: seen.append(row))
+        resumed = hsvi_vector_bracket(model, 0.01, 6, path, every=2, report=lambda *row: seen.append(row))
+        assert first.trials == 3 and resumed.trials == straight.trials == 6
+        assert torch.equal(resumed.vectors, straight.vectors) and torch.equal(resumed.actions, straight.actions)
+        assert (resumed.lower, resumed.upper) == (straight.lower, straight.upper)
+        # Reports and checkpoints fall on every second trial and on each run's last trial.
+        assert [row[0] for row in seen] == [2, 3, 4, 6]
+        assert seen[-1] == (6, straight.lower, straight.upper, straight.vectors.shape[0])
+        # A finished search runs no further trial.
+        again = hsvi_vector_bracket(model, 0.01, 6, path)
+        assert again.trials == 6 and torch.equal(again.vectors, straight.vectors)
+        # None of these is the search the checkpoint holds: another epsilon, another model, a smaller budget.
+        other = fold(build_multiagent_tiger(0.95).view(Agent.I), constant_policy(onehot(OL, 3), 6, "open"), L).pomdp
+        with pytest.raises(ValueError, match="another model or another epsilon"):
+            hsvi_vector_bracket(model, 0.02, 6, path)
+        with pytest.raises(ValueError, match="another model or another epsilon"):
+            hsvi_vector_bracket(other, 0.01, 6, path)
+        with pytest.raises(ValueError, match="more than the budget"):
+            hsvi_vector_bracket(model, 0.01, 3, path)
+
+    def test_a_search_that_reached_its_width_is_not_given_another_trial(self, tmp_path):
+        # The uninterrupted search stops at the first trial whose width is at most epsilon. Its checkpoint holds that
+        # state, and a second call must return it unchanged, whatever budget is left.
+        model = build_tiger_pomdp()
+        straight = hsvi_vector_bracket(model, 0.5, 100_000)
+        path = tmp_path / "search.npz"
+        first = hsvi_vector_bracket(model, 0.5, 100_000, path)
+        again = hsvi_vector_bracket(model, 0.5, 100_000, path)
+        assert straight.upper - straight.lower <= 0.5 and straight.trials < 100_000
+        for bracket in (first, again):
+            assert bracket.trials == straight.trials and torch.equal(bracket.vectors, straight.vectors)
+            assert (bracket.lower, bracket.upper) == (straight.lower, straight.upper)
 
 
 class TestHierarchy:

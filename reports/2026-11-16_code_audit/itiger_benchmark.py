@@ -39,6 +39,12 @@
 #      exact belief, value >= L) and checks the digest against the run's fold.
 #    - U is the smaller of this run's HSVI upper end and --upper, a certified value from a tracked log. Its source is
 #      written into the file.
+# 7. Checkpoint and Progress (--checkpoint, with --lower-only):
+#    - The 1,000 trials take most of a day (about 17 h on a busy machine), because a trial's cost grows with the stored
+#      vectors and points. --checkpoint names a file that holds the search after every --checkpoint-every trials
+#      (bounds.py, section 7). Running the same command again continues from it, and the result equals the
+#      uninterrupted run's, so append to the log (>>) when relaunching.
+#    - A progress line (trial, L, U, vectors) is logged at the same trials, with or without a checkpoint.
 # ==============================================================================
 
 import argparse
@@ -97,6 +103,10 @@ def main():
                         help="with --lower-only: save E1's benchmark file here (section 6)")
     parser.add_argument("--upper", type=float, default=None, help="with --artifact: a certified U(b0) from a log")
     parser.add_argument("--upper-source", type=str, default=None, help="with --artifact: where --upper comes from")
+    parser.add_argument("--checkpoint", type=str, default=None,
+                        help="with --lower-only: continue from this file if it exists, and rewrite it (section 7)")
+    parser.add_argument("--checkpoint-every", type=int, default=10,
+                        help="trials between checkpoints and between progress lines (section 7)")
     args = parser.parse_args()
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], capture_output=True,
@@ -115,7 +125,13 @@ def main():
     log(f"fast informed bound U(b0) = {float(b0 @ _HSVI(m).corner):.4f}")
     if args.lower_only:
         t = time.time()
-        bracket = hsvi_vector_bracket(m, args.epsilon, args.trials)
+        checkpoint = None if args.checkpoint is None else Path(args.checkpoint)
+        if checkpoint is not None and checkpoint.exists():
+            log(f"continuing from the checkpoint {checkpoint}")
+        bracket = hsvi_vector_bracket(
+            m, args.epsilon, args.trials, checkpoint, args.checkpoint_every,
+            report=lambda trial, lower, upper, count: log(
+                f"trial {trial}: L(b0) = {lower:.4f}, U(b0) = {upper:.4f}, {count} vectors ({time.time() - t:.0f}s)"))
         log(f"HSVI, unseeded, as hsvi(): L(b0) = {bracket.lower:.4f} (certified lower end), "
             f"U(b0) = {bracket.upper:.4f} after {bracket.trials} trials ({time.time() - t:.0f}s)")
         if args.artifact is not None:
