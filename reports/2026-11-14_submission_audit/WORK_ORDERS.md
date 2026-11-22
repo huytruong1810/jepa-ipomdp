@@ -2,6 +2,51 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-21 18:37 (the manager seat, a fresh desktop session since 18:12) — E1's benchmark run restarted with checkpoints; review of the domain files; sessions; a schedule estimate
+
+**Sessions.**
+- **Manager:** a fresh desktop session since 2026-11-21 18:12. The previous manager session wrapped up at 18:05.
+- **Reviewer:** `review-jepa-phases-2-4` wrapped up at about 18:10; its notes for a successor are in `runs/audit/REVIEWER_SESSION_HANDOFF.md` (untracked). A fresh WSL session, `jepa-ipomdp-4e`, is listed and was sent the state; it had not answered at 18:37.
+- **ipomcp's owner:** the desktop session `ipomcp-desktop-owner` since 18:11 (its STATUS note).
+
+**E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`; not written yet).
+- **Code, `0a42eac`:** `bounds.hsvi_vector_bracket` writes the whole search state every N trials (replaced atomically) and continues from it. A continued run equals the uninterrupted one bit for bit: two tests on the canonical Tiger, and 2 + 2 against 4 trials on the level-1 fold. A checkpoint of another model, another epsilon or more trials than the budget raises. It also reports progress. `hsvi()` is unchanged.
+- **Run:** systemd user unit `jepa-itiger-benchmark`, started 18:32:41 at commit `fc7c793` (clean tree) by `runs/benchmarks/launch_itiger_level1.sh`. CPU, 2 threads, nice 10; the kernel caps the unit at 4.2 GB. Running the launcher again after an interruption continues the search and loses at most 10 trials.
+- **Log:** `reports/2026-11-16_code_audit/itiger_benchmark_artifact_rerun.log`, committed when final. The failed run's log stays as `itiger_benchmark_artifact.log`.
+- **Progress at 18:35:** trial 50, L(b0) = 16.3422, U(b0) = 52.03, 3,502 vectors, 2.4 GB. About 2 GB of that is the level-0 problem's dense controller, held for the whole run; the previous 1,000 trials took about 17 h.
+- **When it ends:** L, the vector count and the digest (957782ffdac6d103, matched by a 2-trial smoke) go here and to the reviewer seat, which then reads C-r I-Tiger once.
+
+**C-r I-Tiger campaign** (the reviewer's, PID 1260387): running. 19 of 180 jobs were done at 18:33 (all learning runs of `main`, 9 of 10 of `known_t`); expected end about 03:00 on 11-22. If it stops while no reviewer is listed, I resume it with the registered command and record it here.
+
+**Machine.**
+- The GPU hold stands; nothing of jepa ran on the GPU.
+- Memory: at 18:31:50 MemAvailable was 2.3 GB, with 16.4 GB in 35 ipomcp processes and 3.3 GB in jepa's campaign. I told ipomcp's owner at 18:31 and 18:32; by 18:33 it was back at 8.7 to 9.9 GB. The campaign's watchdog (3 GB for 5 minutes) did not fire.
+
+**Review of the domain files that existed before the audit** (`reports/2026-11-16_code_audit/REVIEW.md`, nine rows). Read in full: `pomdp.py`, `belief.py`, `env.py`, `tiger.py`, `solver.py`, `wumpus.py`, `__init__.py`, `tests/test_domain.py`, and the domain classes of `tests/test_wumpus.py`.
+- **No stored number is affected.**
+- **Tests added where a wrong implementation would have passed:**
+  - `belief.predict_state` on an asymmetric chain (`d04ccf8`). The Tiger's transition matrices are symmetric, so a sum over the wrong index passed every earlier filter test.
+  - The arrow's direction along a row (`fc7c793`). The earlier rule tests shot North from the start cell only.
+- **Findings whose code change waits for the GPU gate** (recipe path):
+  - Both simulators keep the caller's tensors in `load_state_dict` and then write into them. Measured on the CPU: one step of a restored `BatchedPOMDPEnv` changes the saved `elapsed` from 1 to 2. The only caller restores once per process from a checkpoint read from disk, so no run is affected.
+  - `WumpusSimulator.step` before the first `reset` plays layout 0 in every row without an error. The rollout resets first.
+  - The Wumpus heading table exists in three places in `wumpus.py`, in `agents/wumpus_reference.py` and in six report scripts.
+- **One wording point for the audit session.** `solver.py` calls its error bound a proof. Its linear programs are solved by HiGHS at the default feasibility tolerance of 1e-7 (scipy 1.17.1).
+  - If the LP optima were accurate only to that tolerance, the bound of 1e-4 on V*(b0) = 19.3713 would grow by about 1e-5: (2 x 2 + 0.95) x 1e-7 / 0.05.
+  - Measured accuracy is far better: the pruning guarantee holds to 1e-12 on 300 random vectors, and V_h equals an independent expectimax to 1e-9.
+  - So no number changes. "Certified" holds to four decimals; your call whether the paper needs the qualifier.
+
+**Tests.**
+- Fast suite at `bb1ef7a`, CPU: 308 passed, 2 skipped (480 s).
+- At `0a42eac`: `tests/test_interactive.py` and `tests/test_domain.py`, 64 passed; golden, 51 identical.
+- The two later commits change tests only; their classes pass.
+
+**A schedule estimate for the E1 date (2026-12-05), from stored logs; my arithmetic, not a measurement of the new runs.**
+- **W11, which runs first:** the recipe's five held-out seeds took 5.2 to 8.9 h each, 33 h in all (`runs/sweeps/wumpus_retrain_heldout/seed*/main.log`). With the analyses, the baseline (15 to 20 minutes per run in stage a6) and the exact-model play, I estimate 40 to 50 GPU-hours.
+- **Then:** the I-Tiger smoke (5 to 9 h) and E1 (60 to 90 GPU-hours, the plan's estimate).
+- **Sum:** 105 to 150 GPU-hours, which is 4.5 to 6.5 days of an uninterrupted queue.
+- **Consequence:** with W11 first, E1 reads out by 12-05 if the GPU hold lifts by about 11-27; 11-29 is the latest under the high estimate with no failed stage. I put this to the user.
+
 ## STATUS 2026-11-21 11:00 (written by the phase 2-4 reviewer session; the manager is not listed) — C-r Tiger read; a correction; E1's benchmark run crashed
 
 **C-r Tiger, read once** (PROTOCOL.md "C-r result, Tiger"; `ddd8a62`). Gap per episode to the optimal agent on the 256 paired episodes, Student-t over 10 runs:
