@@ -28,6 +28,19 @@
   - With the 5-node controller, i's level-2 fold has 14 states (digest 040365f4b6004495). HSVI after 100 trials brackets it in [13.24, 48.19]: the upper end stalls again, so the relaxation's bound is needed there too.
 - **Open, for the user:** which controller defines j at level 1. I work with the 5-node growl counter until told otherwise.
 
+**Added 01:15 — the diagnostics of C-r I-Tiger are done** (`a510cb9`; PROTOCOL.md, "Post hoc diagnostics" under the I-Tiger result; all post hoc, labelled).
+- No run converged to the mirrored model. known_t learned its observation model nearly exactly (growl accuracy 0.835 to 0.857 against 0.85); main learned it partly (0.715 to 0.822).
+- **BA-POMCP with the TRUE model loses -35.419 +- 6.538** on the same 256 episodes, as much as the arms that learned (-30.4 and -34.8), and opens a wrong door in 36.7% of the episodes. The deficit is the search, as on the canonical Tiger.
+- That explains both flagged numbers: both arms sit at the level the search allows, and known_t moves towards that level as its model becomes right.
+
+**Added 01:15 — level 2 is built** (`720c12d`; measurements in `reports/2026-11-16_code_audit/level2_controller.py` and `.log`, which replace the scratch numbers above: the pointer controller has 32,637 reachable nodes of 49,909 at trial 1,000, paths of 65 to 17,064 steps).
+- **j at level 1:** the best member of a declared family of 16 growl counters by exact evaluation (`interactive.py`, section 7). For the experiment's settings it is "threshold 2, restart from the growl heard with a creak": 5 nodes, exact value 15.3567, with j's optimum in [16.5510, 19.6692]. So j at level 1 is approximate, by at most 4.31 and by 1.19 against the best known policy.
+- **i's level-2 problem:** 14 states, digest 040365f4b6004495. Its certified bracket is **[13.2220, 14.2574]**, width 1.04 (`itiger_level2_benchmark.log`): the relaxation gives 15.0473 / 14.5153 / 14.2574 at delays 0 / 1 / 2, seeded HSVI 13.2220 after 60 trials. Threshold policies on the exact belief reach 13.00 +- 0.20.
+- **Its benchmark file** (`runs/benchmarks/itiger_level2.pt`): the 1,000-trial lower-bound run started at 01:11 under a supervisor, as for level 1.
+- **A fault removed on the way:** a bracket kept its pointer controller in dense form (K x A x O x K). That lost the first 17-hour run and cost 2 GB in every Interactive Tiger process. `Bracket` now keeps index arrays and builds the dense form on request; such a process peaks at 0.8 GB, and the level-1 fold's digest is unchanged.
+- **Gates at `720c12d`:** fast suite 316 passed, 2 skipped; golden 51 identical; `tests/test_interactive.py` 27 fast and 2 slow.
+- **For the audit session, when E1 is registered:** three arms (level 1 with JEPA and with the decoder, level 2 with JEPA); the paper must say that j at level 1 is the best small declared controller, not j's optimum.
+
 **No paper number and no ledger value changed.**
 
 ## STATUS 2026-11-22 18:45 (the manager seat) — the host crashed at 03:47; nothing of jepa is lost; the benchmark run continues from trial 760
