@@ -33,6 +33,10 @@
 - **`policy_graph.envelope` raises on duplicate vectors** (`2d49583`; the open item of the 2026-11-21 review). It used to drop both copies. No caller passes duplicates, so no result changes: the fast and the two slow tests of the interactive problems pass, golden 51.
 - **Level 2 runs end to end on the CPU:** `main.py env=itiger env.level=2` at tiny settings exits 0, and its analysis against `runs/benchmarks/itiger_level2.pt` completes; the level-1 file is refused for that run by its fold digest.
 
+**Addendum 2026-11-23 09:15: two rehearsals on the CPU, both clean.** They use stand-in agents trained for 64 episodes, so they measure the machinery and say nothing about E1's results.
+- **The whole analysis at the full size** (512 episodes, 3,000 probe steps, the level-1 benchmark file; 4 CPU threads under a 6 GB kernel cap): 45 min, peak host memory 3.4 GB, exit 0. Its reference agent scores 15.853 +- 1.271 on the 512 episodes of analysis seed 12345, which is 0.5 standard errors under L = 16.551. This was the measurement the 08:20 block listed as missing; on the GPU it is still unmeasured until the smoke.
+- **One E1 arm stage, end to end** (`runs/week/e1_arm.sh` with two seeds at tiny settings; the queue's gate and its GPU_BUSY file were not touched): `sweep.py` trained and analysed both seeds against `--benchmark`, the one-seed case of the first call was handled as `sweep_retry` handles it, the aggregate was written, the paired-episode play ran on the sweep's own run directories, and both readouts (`e1_readout.py arm`, `itiger_paired_episodes.py readout`) read the result. Seed 0 trained through the sweep equals the same seed trained through `main.py` directly, to every printed digit. The rehearsal's directories are deleted.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
