@@ -1,0 +1,16 @@
+[00:39:25] commit 720c12d; args {'level': 2, 'bracket_epsilon': 0.05, 'controller_epsilon': 0.5, 'seed_delay': 1, 'delays': '0,1,2', 'trials': 60, 'epsilon': 0.5, 'max_beliefs': 1000000, 'lower_only': False, 'artifact': None, 'upper': None, 'upper_source': None, 'checkpoint': None, 'checkpoint_every': 10}
+[00:40:06] level 0 (i): bracket [8.2380, 8.2879], controller 17 nodes, exact value 8.2378
+[00:40:06] level 1 (j): the best declared controller is t2.restart_from_growl, 5 nodes, exact value 15.3567
+[00:40:06] level-2 fold: 14 states, 6 observations, digest 040365f4b6004495 (41s)
+[00:40:06] fast informed bound U(b0) = 92.2926
+[00:40:19] relaxation, delay 0: U(b0) = 15.0473 (merge slack 1.0e-05), 16640 beliefs, corners [22.47, 24.29] (14s)
+[00:41:35] relaxation, delay 1: U(b0) = 14.5153 (merge slack 1.0e-05), 43270 beliefs, corners [21.76, 23.79] (75s)
+[00:58:17] relaxation, delay 2: U(b0) = 14.2574 (merge slack 1.9e-05), 303970 beliefs, corners [21.46, 23.54] (1002s)
+[01:10:37] HSVI seeded with the delay-1 relaxation: L(b0) = 13.2220, U(b0) = 14.4251 after 60 trials (740s)
+[01:10:37] CERTIFIED BRACKET of V*(b0): [13.2220, 14.2574], width 1.0354; decision rule: report the bracket (width > 0.5)
+[01:11:00] estimate, threshold policy theta = 0.9: 12.202 +- 0.213 (Monte Carlo, not a bound)
+[01:11:00] estimate, threshold policy theta = 0.93: 12.440 +- 0.206 (Monte Carlo, not a bound)
+[01:11:00] estimate, threshold policy theta = 0.95: 12.978 +- 0.200 (Monte Carlo, not a bound)
+[01:11:00] estimate, threshold policy theta = 0.96: 13.003 +- 0.197 (Monte Carlo, not a bound)
+[01:11:00] estimate, threshold policy theta = 0.97: 6.174 +- 0.115 (Monte Carlo, not a bound)
+[01:11:00] total 1895s
