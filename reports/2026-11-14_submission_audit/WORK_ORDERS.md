@@ -2,6 +2,27 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-23 08:20 (the only jepa session) — level 2's benchmark file is written; E1 is ready up to the GPU; two faults that would have stopped E1 are removed
+
+**Level 2's benchmark file** (`runs/benchmarks/itiger_level2.pt`, written 2026-11-23 07:50:13).
+- Certified bracket of V*(b0) on agent i's 14-state level-2 fold: **[13.2627, 14.2574]**, width 0.99 (level 1: [16.5510, 19.6692], width 3.12). 67,241 lower-bound vectors after 1,000 HSVI trials in 6.6 h at 0.77 GB; fold digest 040365f4b6004495. Log: `reports/2026-11-16_code_audit/itiger_level2_artifact.log` (`0826cfe`).
+- The file loads against a freshly built level-2 fold (same digest), and its L(b0) recomputes from the stored vectors.
+- Its reference agent scores 12.049 +- 1.674 (standard error over episodes) on the 256 episodes of simulator seed 11, which is 0.7 standard errors under L. At level 1 the same check gave 16.306 against L = 16.551.
+- It is built on j's 5-node growl counter. **The user has not yet confirmed that choice** (asked twice). If the 9-node searched controller is chosen instead, the level-2 bracket and file are redone (about 7 h of CPU).
+
+**Two faults found while preparing E1, both removed, neither had cost a run.**
+1. **`sweep.py` could not analyse an Interactive Tiger seed.** Every domain but Wumpus World took the Tiger path, so an `env=itiger` sweep would have trained its first seed (1.5 to 3 GPU-hours) and then stopped in the exact-solver analysis. `be501a6`: `--benchmark` is required for this domain, the benchmark's bounds and fold digest are part of the sweep's recorded condition, a stored report of another benchmark is refused, and an unknown domain raises. `experiments/aggregate.py` (section 8) has the domain's metric table: the report's "optimal" row is named the reference agent, every gap is to it, and "gain" is a trained probe's divergence minus the untrained filter's on the same histories. Tiger and Wumpus conditions and aggregates are unchanged.
+2. **The analysis needed 19 GB (level 1) or 26 GB (level 2) for one tensor.** `interpretability/error_bounds.py` evaluates the value set at every belief of the evaluation histories at once: 51,200 beliefs by 49,909 vectors in float64. The CPU dry run of 2026-11-22 used 16 episodes and did not show it. `5c24ffe`: `AlphaVectorSet` takes the product in row blocks of at most 2^26 entries. Measured at the real size: both passes in about 30 s at a 1.2 GB peak, for either file. A call that fits in one block evaluates the expression it always did, so the canonical Tiger is bit-identical (golden 51 identical; fast suite 319 passed, 2 skipped).
+- End-to-end check on the CPU with a stand-in (an agent trained for 64 episodes, 16 analysis episodes): `sweep.py` analysed one copy and read the stored report of the other; the two reports are equal field for field, although the new one used two blocks.
+- **Not yet measured:** the whole analysis at 512 episodes on the GPU. The smoke does that before anything is registered.
+
+**E1 (to be registered as C-s): what exists now.** Nothing is registered and nothing has run on the GPU.
+- `reports/2026-10-19_eval_protocol/itiger_paired_episodes.py` (`1ffb1b0`): plays a level-1 sweep's greedy learned planner on the 256 paired episodes of C-r (simulator seed 11; CPU, one thread, as C-q.3) and prints BA-POMCP minus ours by Welch against C-r's per-run gaps. It refuses to run unless its reference agent reproduces C-r's 16.306. About 5 min and 1.1 GB per seed.
+- Drafts, outside the tracked tree until the registration (`runs/week/drafts/`): the registration text (three arms of ten seeds: level 1 JEPA, level 1 decoder, level 2 JEPA; analysis seed 20261124), the readout script `e1_readout.py` (it moves to `reports/2026-10-19_eval_protocol/` with the registration), the smoke stage (seeds 100-102, one per arm) and one stage per arm.
+- **Three points of the registration are yours or the user's** (unchanged since the 01:15 addendum): the form of the claim against the reference agent (proposal: the smallest equivalence margin, as C-q.1; "optimal" claimed nowhere); whether the plan's write-in intervention on j's node is dropped from E1; whether the smoke uses seeds 100-102 so that no E1 seed is seen before its read.
+
+**The GPU hold stands** (`runs/week/PAUSE`, the user's). Order when it lifts: W11 (C-o), the GPU fingerprint stage for the deferred code batch, the I-Tiger smoke, E1. My estimate is unchanged: the hold has to lift by about 2026-11-27 for E1 to read out by 2026-12-05.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
