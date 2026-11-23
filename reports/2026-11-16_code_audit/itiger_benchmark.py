@@ -46,10 +46,15 @@
 #      uninterrupted run's, so append to the log (>>) when relaunching.
 #    - A progress line (trial, L, U, vectors, resident memory) is logged at the same trials, with or without a
 #      checkpoint.
+# 8. Level 2 (--level 2):
+#    - Agent i's level-2 problem folds agent j's level-1 controller, which is the best member of a declared family
+#      of growl counters by exact evaluation (src/ipomdp/domain/interactive.py, section 7): 5 nodes, exact value
+#      15.3567 in j's level-1 problem, whose optimum this script brackets in [16.55, 19.67] at level 1. The fold has
+#      14 states. Everything else is as at level 1: the same relaxation, the same HSVI, the same benchmark file
+#      format (use another --artifact and --checkpoint path).
 # ==============================================================================
 
 import argparse
-import gc
 import os
 import subprocess
 import time
@@ -59,7 +64,8 @@ import numpy as np
 import torch
 
 from ipomdp.domain.bounds import _HSVI, hsvi_budget, hsvi_vector_bracket, revealed_upper_bound
-from ipomdp.domain.interactive import TIGER_LEVEL_ZERO_NOISE, nested_problem, relaxation_reveal
+from ipomdp.domain.interactive import (TIGER_LEVEL_ZERO_NOISE, nested_problem, relaxation_reveal,
+                                       tiger_growl_counters)
 from ipomdp.domain.multiagent_tiger import Agent, build_multiagent_tiger
 from ipomdp.domain.tiger import TigerAction
 from ipomdp.experiments.interactive_analysis import InteractiveBenchmark, fold_digest
@@ -93,6 +99,7 @@ def threshold_values(problem, thetas, episodes=20_000, steps=260, seed=0):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--level", type=int, default=1, help="agent i's strategy level, 1 or 2 (section 8)")
     parser.add_argument("--bracket-epsilon", type=float, default=0.05)
     parser.add_argument("--controller-epsilon", type=float, default=0.5)
     parser.add_argument("--seed-delay", type=int, default=1)
@@ -117,23 +124,25 @@ def main():
     log = lambda text: print(f"[{time.strftime('%H:%M:%S')}] {text}", flush=True)   # noqa: E731
     log(f"commit {commit}{' (uncommitted changes)' if dirty else ''}; args {vars(args)}")
     start = time.time()
-    problem = nested_problem(build_multiagent_tiger(0.95), Agent.I, 1, TIGER_LEVEL_ZERO_NOISE,
-                             args.bracket_epsilon, args.controller_epsilon, int(TigerAction.LISTEN))
-    (zero,) = problem.below
+    problem = nested_problem(build_multiagent_tiger(0.95), Agent.I, args.level, TIGER_LEVEL_ZERO_NOISE,
+                             args.bracket_epsilon, args.controller_epsilon, int(TigerAction.LISTEN),
+                             tiger_growl_counters())
     m = problem.pomdp
-    log(f"level 0 (j): bracket [{zero.bracket.lower:.4f}, {zero.bracket.upper:.4f}], controller "
-        f"{zero.controller.num_nodes} nodes, exact value {zero.controller_value:.4f}; level-1 fold: {m.num_states} "
-        f"states, {m.num_observations} observations ({time.time() - start:.0f}s)")
+    for rung in problem.below:
+        who = f"level {rung.level} ({rung.agent.name.lower()})"
+        if rung.bracket is not None:
+            log(f"{who}: bracket [{rung.bracket.lower:.4f}, {rung.bracket.upper:.4f}], controller "
+                f"{rung.controller.num_nodes} nodes, exact value {rung.controller_value:.4f}")
+        else:
+            log(f"{who}: the best declared controller is {rung.controller.node_names[0].rsplit('.', 1)[0]}, "
+                f"{rung.controller.num_nodes} nodes, exact value {rung.controller_value:.4f}")
+    log(f"level-{args.level} fold: {m.num_states} states, {m.num_observations} observations, digest "
+        f"{fold_digest(m)[:16]} ({time.time() - start:.0f}s)")
     b0 = m.initial_belief.numpy()
     log(f"fast informed bound U(b0) = {float(b0 @ _HSVI(m).corner):.4f}")
     if args.lower_only:
-        # The level-0 brackets hold their dense pointer controllers (bounds._bracket), about 2 GB at the default
-        # epsilons. The search needs only the folded tables in `m`, so they are released before it starts: the
-        # process then holds a few hundred MB instead of 2.3 GB for the day the search takes.
-        del problem, zero
-        gc.collect()
         resident = lambda: os.sysconf("SC_PAGE_SIZE") * int(Path("/proc/self/statm").read_text().split()[1]) / 2**20  # noqa: E731
-        log(f"level-0 objects released; resident memory {resident():.0f} MB")
+        log(f"resident memory {resident():.0f} MB")
         t = time.time()
         checkpoint = None if args.checkpoint is None else Path(args.checkpoint)
         if checkpoint is not None and checkpoint.exists():
@@ -150,7 +159,7 @@ def main():
                 raise ValueError("--artifact needs --upper and --upper-source.")
             upper = min(args.upper, bracket.upper)
             benchmark = InteractiveBenchmark(
-                lower=bracket.lower, upper=upper, vectors=bracket.vectors, actions=bracket.actions,
+                lower=bracket.lower, upper=upper, vectors=bracket.lower_vectors, actions=bracket.actions,
                 digest=fold_digest(m),
                 source=(f"lower: unseeded HSVI, {bracket.trials} trials, epsilon {args.epsilon}, commit {commit}; "
                         f"upper: {args.upper_source}"))

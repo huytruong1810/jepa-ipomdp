@@ -9,8 +9,8 @@ WumpusWorld.step_rules) as the single source of truth for each environment's dyn
 from .belief import belief_update, initial_beliefs, observation_distribution, predict_state
 from .bounds import Bracket, hsvi
 from .env import BatchedPOMDPEnv, StepOutput
-from .interactive import (TIGER_LEVEL_ZERO_NOISE, InteractiveModel, Level, NestedProblem, fold, nested_problem,
-                          noise_model)
+from .interactive import (TIGER_LEVEL_ZERO_NOISE, InteractiveModel, Level, NestedProblem, fold, growl_counter,
+                          nested_problem, noise_model, tiger_growl_counters)
 from .multiagent_tiger import Agent, AgentView, TwoAgentModel, build_multiagent_tiger
 from .policy_graph import PolicyGraph, constant_policy, envelope, evaluate, plan_graph, stationary_graph
 from .pomdp import FinitePOMDP
@@ -66,6 +66,7 @@ __all__ = [
     "evaluate",
     "expand_observations",
     "fold",
+    "growl_counter",
     "game_outcome_flags",
     "game_outcomes",
     "hsvi",
@@ -81,4 +82,5 @@ __all__ = [
     "stationary_graph",
     "solve_infinite_horizon",
     "sup_norm_distance",
+    "tiger_growl_counters",
 ]

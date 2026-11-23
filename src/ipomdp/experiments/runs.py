@@ -45,7 +45,7 @@ from omegaconf import DictConfig, OmegaConf
 import torch
 
 from ..agents import PlanningAgent, UniformRandomAgent
-from ..domain.interactive import TIGER_LEVEL_ZERO_NOISE, nested_problem
+from ..domain.interactive import TIGER_LEVEL_ZERO_NOISE, nested_problem, tiger_growl_counters
 from ..domain.multiagent_tiger import Agent, build_multiagent_tiger
 from ..domain import (BatchedPOMDPEnv, FinitePOMDP, TigerAction, WumpusBeliefTracker, WumpusSimulator, WumpusWorld,
                       action_value_functions, build_tiger_pomdp, game_outcomes, solve_infinite_horizon)
@@ -107,7 +107,8 @@ def itiger_setup(device: torch.device, level: int, discount: float, bracket_epsi
     exactly like the canonical Tiger; no extra episode summary.
     """
     problem = nested_problem(build_multiagent_tiger(discount), Agent.I, level, TIGER_LEVEL_ZERO_NOISE,
-                             bracket_epsilon, controller_epsilon, int(TigerAction.LISTEN))
+                             bracket_epsilon, controller_epsilon, int(TigerAction.LISTEN), tiger_growl_counters())
+    # Above level 1 the modelled agent's controller is the best growl counter (domain/interactive.py, section 7).
     pomdp = problem.pomdp
     return DomainSetup(pomdp, lambda batch, steps, seed, dev: BatchedPOMDPEnv(pomdp, batch, steps, seed, dev),
                        lambda episodes: {})

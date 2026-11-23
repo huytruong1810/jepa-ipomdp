@@ -99,24 +99,59 @@ from .policy_graph import PolicyGraph
 from .pomdp import FinitePOMDP
 
 
+# The dense form of a bracket's pointer controller is refused above this size (section 2). Its successor law has
+# K * A * O * K float64 entries: 359 GB for the 49,909 vectors of the level-1 tiger fold, and about 2 GB for a level-0
+# bracket of width 0.05, which every Interactive Tiger process used to allocate while it built its problem.
+DENSE_CONTROLLER_BYTES = 4 * 2 ** 30
+
+
 @dataclass(frozen=True)
 class Bracket:
     """
-    A certified interval of V*(b0) and the controller behind its lower end.
+    A certified interval of V*(b0) and the lower bound behind its lower end (section 2).
 
     Attributes:
-        lower: L(b0), the lower bound (a value the controller provably attains or exceeds).
+        lower: L(b0), the lower bound (a value the pointer controller provably attains or exceeds).
         upper: U(b0), the upper bound of V*(b0).
-        controller: The lower bound's pointer controller (section 2), initial node = best vector at b0.
         lower_vectors: float64 (K, S), the lower-bound vectors (node k's lower bound).
+        actions: int64 (K,), the action of node k of the pointer controller.
+        successors: int64 (K, O), the node that node k moves to after each observation.
+        initial_node: The best vector at b0, where the pointer controller starts.
+        num_actions: |A|.
         trials: Exploration trials used.
     """
 
     lower: float
     upper: float
-    controller: PolicyGraph
     lower_vectors: torch.Tensor
+    actions: torch.Tensor
+    successors: torch.Tensor
+    initial_node: int
+    num_actions: int
     trials: int
+
+    @property
+    def controller(self) -> PolicyGraph:
+        """
+        The pointer controller as a dense PolicyGraph, the form that policy_graph.evaluate and the fold take. It is
+        built on request, because most callers need only the vectors and their actions, and it is refused above
+        DENSE_CONTROLLER_BYTES instead of exhausting the machine.
+        """
+        k, z = self.successors.shape
+        size = 8 * k * self.num_actions * z * k
+        if size > DENSE_CONTROLLER_BYTES:
+            raise ValueError(f"the dense pointer controller of {k} vectors needs {size / 2 ** 30:.1f} GB; use "
+                             f"lower_vectors, actions and successors instead.")
+        nodes = torch.arange(k)
+        action_law = torch.zeros(k, self.num_actions, dtype=torch.float64)
+        action_law[nodes, self.actions] = 1.0
+        successor = torch.zeros(k, self.num_actions, z, k, dtype=torch.float64)
+        successor[:, :, :, :] = torch.eye(k, dtype=torch.float64)[:, None, None, :]   # untaken actions: self-loops
+        successor[nodes, self.actions] = 0.0
+        successor[nodes[:, None], self.actions[:, None], torch.arange(z)[None, :], self.successors] = 1.0
+        initial = torch.zeros(k, dtype=torch.float64)
+        initial[self.initial_node] = 1.0
+        return PolicyGraph(action_law, successor, initial, tuple(f"l{i}" for i in range(k)))
 
 
 class _Rows:
@@ -244,21 +279,12 @@ def hsvi(model: FinitePOMDP, epsilon: float, max_trials: int = 100_000) -> Brack
 
 
 def _bracket(search: "_HSVI", b0: np.ndarray, trials: int) -> Bracket:
-    """The bracket at b0 and the lower bound's pointer controller (section 2)."""
+    """The bracket at b0 with the lower bound's vectors, actions and successor pointers (section 2)."""
     vectors = search.vectors.rows.copy()
-    k, z = len(vectors), search.Z
-    action_law = torch.zeros(k, search.A, dtype=torch.float64)
-    action_law[torch.arange(k), torch.tensor(search.actions)] = 1.0
-    successor = torch.zeros(k, search.A, z, k, dtype=torch.float64)
-    successor[:, :, :, :] = torch.eye(k, dtype=torch.float64)[:, None, None, :]   # untaken actions: self-loops
-    for node, (a, succ) in enumerate(zip(search.actions, search.successors)):
-        successor[node, a] = 0.0
-        successor[node, a, torch.arange(z), torch.from_numpy(succ)] = 1.0
-    initial = torch.zeros(k, dtype=torch.float64)
-    initial[int((vectors @ b0).argmax())] = 1.0
-    controller = PolicyGraph(action_law, successor, initial, tuple(f"l{i}" for i in range(k)))
-    return Bracket(float(search.lower(b0[None])[0]), float(search.upper(b0[None])[0]), controller,
-                   torch.from_numpy(vectors), trials)
+    return Bracket(float(search.lower(b0[None])[0]), float(search.upper(b0[None])[0]), torch.from_numpy(vectors),
+                   torch.tensor(search.actions, dtype=torch.int64),
+                   torch.from_numpy(np.stack(search.successors).astype(np.int64)), int((vectors @ b0).argmax()),
+                   search.A, trials)
 
 
 class _SeededHSVI(_HSVI):
@@ -405,26 +431,16 @@ def _run_budget(model: FinitePOMDP, epsilon: float, trials: int, corners, points
     return search, trial
 
 
-@dataclass(frozen=True)
-class VectorBracket:
-    """The bracket of hsvi_budget without the pointer controller: lower-bound vectors and their actions only."""
-
-    lower: float
-    upper: float
-    vectors: torch.Tensor
-    actions: torch.Tensor
-    trials: int
-
-
 def hsvi_vector_bracket(model: FinitePOMDP, epsilon: float, trials: int, checkpoint: Path | None = None,
                         every: int = 10,
-                        report: Callable[[int, float, float, int], None] | None = None) -> VectorBracket:
+                        report: Callable[[int, float, float, int], None] | None = None) -> Bracket:
     """
-    hsvi_budget (no seeds, no corner backups) returning the lower-bound vectors and their actions instead of the
-    controller. The controller's successor law is dense (K, A, O, K) in float64: with the K = 49,909 vectors that
-    1,000 trials left on the level-1 fold (A = 3, O = 6) it needs 8 * 3 * 6 * K^2 bytes = 359 GB, which killed a run
-    after all its trials had finished. A reference agent needs only the vectors (the best vector's action at the
-    exact belief is worth at least L).
+    hsvi_budget without seeds and without corner backups (its trials are hsvi()'s), for the long searches that give a
+    benchmark its lower-bound vectors: it can checkpoint and continue, and it reports progress. A reference agent
+    needs only the vectors and their actions (the best vector's action at the exact belief is worth at least L). The
+    dense controller of such a search cannot be built: with the K = 49,909 vectors that 1,000 trials left on the
+    level-1 fold (A = 3, O = 6) it needs 8 * 3 * 6 * K^2 bytes = 359 GB, which killed a run after all its trials had
+    finished, when every bracket still carried its controller in dense form (Bracket.controller refuses it now).
 
     Args:
         model: Exact POMDP specification.
@@ -436,10 +452,7 @@ def hsvi_vector_bracket(model: FinitePOMDP, epsilon: float, trials: int, checkpo
         report: Optional callback (trial, L(b0), U(b0), number of lower-bound vectors), called at the same trials.
     """
     search, trial = _run_budget(model, epsilon, trials, None, None, False, checkpoint, every, report)
-    b0 = model.initial_belief.numpy()
-    return VectorBracket(float(search.lower(b0[None])[0]), float(search.upper(b0[None])[0]),
-                         torch.from_numpy(search.vectors.rows.copy()), torch.tensor(search.actions, dtype=torch.int64),
-                         trial)
+    return _bracket(search, model.initial_belief.numpy(), trial)
 
 
 @dataclass(frozen=True)

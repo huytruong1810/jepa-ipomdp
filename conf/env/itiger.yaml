@@ -17,6 +17,11 @@
 #    - controller_epsilon 0.5 (design decision for the interactive experiments): j's level-0 controller has 11
 #      reachable, minimal nodes, and i's level-1 fold has 26 states. It is certified within 0.050 of j's optimum.
 #      Extraction at 0.05 gives a 38-node controller with a slightly lower value and an 80-state fold.
+#    - level: 2 folds j's level-1 controller instead. No tight bracket of j's level-1 problem exists to extract it
+#      from, so it is the best member of a declared family of growl counters by exact evaluation
+#      (src/ipomdp/domain/interactive.py, section 7): 5 nodes, exact value 15.3567 where j's optimum lies in
+#      [16.55, 19.67]. i's level-2 fold has 14 states. bracket_epsilon and controller_epsilon then act on level 0
+#      only, which sits at the bottom of the chain as i's own level-0 controller.
 # 2. Episodes and Discount as in the Canonical Tiger:
 #    - 100-step windows and gamma = 0.95, so returns compare with the single-agent benchmark's protocol; the game
 #      continues after a door is opened (the tiger is re-placed), as in Table 1.

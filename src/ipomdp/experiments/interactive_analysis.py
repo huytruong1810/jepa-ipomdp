@@ -69,7 +69,7 @@ from torch import Tensor
 
 from ..agents import PlanningAgent, UniformRandomAgent
 from ..domain import BatchedPOMDPEnv, FinitePOMDP, TigerAction
-from ..domain.interactive import TIGER_LEVEL_ZERO_NOISE, InteractiveModel, nested_problem
+from ..domain.interactive import TIGER_LEVEL_ZERO_NOISE, InteractiveModel, nested_problem, tiger_growl_counters
 from ..domain.multiagent_tiger import Agent, build_multiagent_tiger
 from ..domain.solver import AlphaVectorSet
 from ..interpretability import BeliefAnalysis, analyze_beliefs, build_probe_dataset
@@ -336,7 +336,8 @@ def initial_acting_filter(trained: TrainedRun, device: torch.device) -> BeliefFi
 def interactive_problem(env_cfg) -> InteractiveModel:
     """The fold of a run's env config, built exactly as experiments/runs.py itiger_setup builds it."""
     problem = nested_problem(build_multiagent_tiger(env_cfg.discount), Agent.I, env_cfg.level, TIGER_LEVEL_ZERO_NOISE,
-                             env_cfg.bracket_epsilon, env_cfg.controller_epsilon, int(TigerAction.LISTEN))
+                             env_cfg.bracket_epsilon, env_cfg.controller_epsilon, int(TigerAction.LISTEN),
+                             tiger_growl_counters())
     return problem.interactive
 
 

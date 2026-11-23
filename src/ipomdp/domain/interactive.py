@@ -84,20 +84,55 @@
 #      relaxed belief graph exceeded 200,000 beliefs at delay 0. With the 11-node one it has 31,420.
 #    - Design decision for the interactive experiments: controller_epsilon 0.5, epsilon 0.05
 #      (conf/env/itiger.yaml).
+#
+# 7. Above Level 0 the Modelled Agent's Controller Is the Best Member of a Declared Family (nested_problem):
+#    - Why section 6 stops at level 0: it needs a bracket of the modelled agent's problem of width controller_epsilon,
+#      and on the level-1 tiger fold (26 states) HSVI's upper end stalls at 43.6 against a lower end of 16.55 after
+#      1,000 trials (bounds.py, section 5). The relaxation's bound (19.67) certifies an interval but gives no
+#      controller, and both ways of taking a controller from the lower bound fail at this size
+#      (reports/2026-11-16_code_audit/level2_controller.py and its log):
+#      * policy_graph.stationary_graph picks each node's successors at one witness belief. In a 26-dimensional belief
+#        space a node's region is large, and the controllers it gives are worth -14.3 to +5.1 where the lower bound
+#        is 15.8 to 16.2.
+#      * The lower bound's own pointer controller attains the lower bound, but it is a plan tree, not a stationary
+#        controller: 32,637 of its 49,909 nodes are reachable after 1,000 trials, none of them mergeable, and every
+#        path ends in "listen forever" after 65 to 17,064 steps. Its fold would have up to 195,822 states.
+#    - So above level 0 the modelled agent's controller is chosen from a small declared family, by exact evaluation
+#      (policy_graph.evaluate) in the modelled agent's own problem, and its exact value is reported against that
+#      problem's certified interval. The claim one level up stays exact in the sense of section 2: optimal against
+#      the other agent executing this controller. What is approximate is the other agent: its controller is within
+#      (upper bound - value) of its optimum, and that number is stated with every result.
+#    - The tiger family (growl_counter, tiger_growl_counters): a counter of growls-left minus growls-right. It listens
+#      below a threshold, opens the door away from the tiger at the threshold, and restarts after opening. A heard
+#      creak says that the other agent probably opened a door, which re-places the tiger; four rules for it:
+#        ignore              count the growl as if nothing had happened;
+#        restart             forget everything, the growl of this step included;
+#        restart_from_growl  forget the past and count this step's growl (Table 1: a listener's growl reads the
+#                            arrival state, so it already reports the re-placed tiger);
+#        one_step_back       move the count one step towards zero, then count this step's growl.
+#      Thresholds 1 to 4 with each rule: 16 controllers of 3 to 9 nodes.
+#    - Measured for j at level 1 (gamma 0.95, against i's level-0 controller): the best is threshold 2 with
+#      restart_from_growl, 5 nodes, exact value 15.3567, while j's optimum lies in [16.55, 19.67]. It is close to the
+#      best small controller there is: an exact local search over every single change of an action or a successor,
+#      with up to 12 spare nodes, ends at 15.4516, and 24 random starts end at -20 (always listen) or at 15.40 to
+#      15.42. The remaining 1.2 to the lower bound is what tracking the other agent's node is worth to j.
+#    - Such a rung has no bracket of its own (Level.bracket is None): the certified interval of its problem comes from
+#      an experiment's benchmark file, which costs hours and is computed once.
 # ==============================================================================
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import torch
 from torch import Tensor
 
 from .bounds import Bracket, hsvi
-from .multiagent_tiger import Agent, AgentView, TwoAgentModel
+from .multiagent_tiger import OBSERVATIONS, Agent, AgentView, Creak, Growl, TwoAgentModel
 from .policy_graph import PolicyGraph, evaluate, stationary_graph
 from .pomdp import FinitePOMDP
 from .reduction import expand_observations, lump_observations
 from .solver import AlphaVectorSet
+from .tiger import TigerAction
 
 # The level-0 noise of the two-agent tiger game (Gmytrasiewicz & Doshi 2005, Section 7.3 and footnote 3): the other
 # agent listens with probability 0.8 and opens each door with probability 0.1, in TigerAction order (L, OL, OR).
@@ -107,6 +142,10 @@ TIGER_LEVEL_ZERO_NOISE = (0.8, 0.1, 0.1)
 # pruned at this fraction of that width (policy_graph.stationary_graph), and certified by the upper end of a
 # separate, tighter bracket of width epsilon (section 6).
 CONTROLLER_PRUNE_FRACTION = 0.1
+
+# The declared family of section 7: what a growl counter does with a heard creak, and the thresholds it may open at.
+CREAK_RULES = ("ignore", "restart", "restart_from_growl", "one_step_back")
+GROWL_COUNTER_THRESHOLDS = (1, 2, 3, 4)
 
 
 @dataclass(frozen=True)
@@ -229,27 +268,74 @@ def fold(view: AgentView, other: PolicyGraph, initial_previous_action: int) -> I
     return InteractiveModel(pomdp, grid_s[keep], grid_n[keep], grid_a[keep], other, num_s)
 
 
+def growl_counter(threshold: int, creak_rule: str) -> PolicyGraph:
+    """
+    A member of the tiger family of section 7, over the six (growl, creak) observations of the two-agent tiger game.
+
+    Its nodes are the counts d = growls-left minus growls-right, from -threshold to +threshold, starting at 0. It
+    listens while |d| < threshold, opens the right door at +threshold (the tiger is believed left) and the left door at
+    -threshold, and returns to 0 after opening, whatever it hears then. While it listens, silence moves d by this
+    step's growl, and a heard creak is handled by `creak_rule`. Counts are clipped at the thresholds.
+    """
+    if threshold < 1 or creak_rule not in CREAK_RULES:
+        raise ValueError(f"a growl counter needs a threshold >= 1 and a rule in {CREAK_RULES}, got {threshold}, {creak_rule}.")
+    listen, open_left, open_right = int(TigerAction.LISTEN), int(TigerAction.OPEN_LEFT), int(TigerAction.OPEN_RIGHT)
+    counts = list(range(-threshold, threshold + 1))
+    node = {d: k for k, d in enumerate(counts)}
+    n = len(counts)
+    action_law = torch.zeros(n, len(TigerAction), dtype=torch.float64)
+    successor = torch.zeros(n, len(TigerAction), len(OBSERVATIONS), n, dtype=torch.float64)
+    successor[:, :, :, :] = torch.eye(n, dtype=torch.float64)[:, None, None, :]        # untaken actions: self-loops
+    for d in counts:
+        action = open_right if d >= threshold else open_left if d <= -threshold else listen
+        action_law[node[d], action] = 1.0
+        successor[node[d], action] = 0.0
+        for o, (growl, creak) in enumerate(OBSERVATIONS):
+            step = 1 if growl == Growl.GROWL_LEFT else -1
+            if action != listen:
+                nxt = 0
+            elif creak == Creak.SILENCE or creak_rule == "ignore":
+                nxt = d + step
+            elif creak_rule == "restart":
+                nxt = 0
+            elif creak_rule == "restart_from_growl":
+                nxt = step
+            else:                                                                       # one_step_back
+                nxt = d - (d > 0) + (d < 0) + step
+            successor[node[d], action, o, node[max(-threshold, min(threshold, nxt))]] = 1.0
+    initial = torch.zeros(n, dtype=torch.float64)
+    initial[node[0]] = 1.0
+    return PolicyGraph(action_law, successor, initial, tuple(f"t{threshold}.{creak_rule}.d{d:+d}" for d in counts))
+
+
+def tiger_growl_counters() -> tuple[PolicyGraph, ...]:
+    """The declared family of section 7 in its fixed order: thresholds 1 to 4, each with the four creak rules."""
+    return tuple(growl_counter(threshold, rule) for threshold in GROWL_COUNTER_THRESHOLDS for rule in CREAK_RULES)
+
+
 @dataclass(frozen=True)
 class Level:
     """
-    One certified rung of the nested hierarchy below the modelled agent's own problem (section 2).
+    One rung of the nested hierarchy below the modelled agent's own problem (section 2).
 
     Attributes:
         level: Strategy level l of this agent's model.
         agent: Whose problem this is.
         problem: This agent's decision problem: the paper's noise model at level 0 (its uninformative creaks merged,
             domain/reduction.py), the fold of the other agent's level-(l-1) controller above.
-        bracket: Certified [L, U] of this problem's V*(b0), of width at most epsilon (domain/bounds.py).
+        bracket: At level 0, the certified [L, U] of this problem's V*(b0), of width at most epsilon
+            (domain/bounds.py). None above level 0: such a rung is not bracketed here (section 7).
         controller: This agent's compact stationary controller over its own six observations: the model of this
-            agent that the other agent folds one level up.
-        controller_value: The controller's exact value at b0; bracket.upper - controller_value bounds its
-            suboptimality (section 6).
+            agent that the other agent folds one level up. Extracted and certified at level 0 (section 6), the best
+            member of the declared family above (section 7).
+        controller_value: The controller's exact value at b0. At level 0, bracket.upper - controller_value bounds
+            its suboptimality; above, an upper bound of the problem from a benchmark file does.
     """
 
     level: int
     agent: Agent
     problem: FinitePOMDP
-    bracket: Bracket
+    bracket: Bracket | None
     controller: PolicyGraph
     controller_value: float
 
@@ -285,7 +371,7 @@ def _certified_level(level: int, agent: Agent, problem: FinitePOMDP, group: Tens
     if controller_epsilon < epsilon:
         raise ValueError(f"controller_epsilon ({controller_epsilon}) must be at least epsilon ({epsilon}).")
     coarse = hsvi(problem, controller_epsilon)
-    compact = stationary_graph(problem, AlphaVectorSet(coarse.lower_vectors, coarse.controller.action_law.argmax(-1)),
+    compact = stationary_graph(problem, AlphaVectorSet(coarse.lower_vectors, coarse.actions),
                                CONTROLLER_PRUNE_FRACTION * controller_epsilon)
     value = float(compact.initial_law @ (evaluate(problem, compact) @ problem.initial_belief))
     bracket = coarse if controller_epsilon == epsilon else hsvi(problem, epsilon)
@@ -293,14 +379,28 @@ def _certified_level(level: int, agent: Agent, problem: FinitePOMDP, group: Tens
     return Level(level, agent, problem, bracket, controller, value)
 
 
+def _family_level(level: int, agent: Agent, problem: FinitePOMDP, family: Sequence[PolicyGraph]) -> Level:
+    """
+    Section 7: the member of the declared family with the largest exact value at the problem's initial belief. Equal
+    values go to the earlier member, so the choice does not depend on anything but the family's order.
+    """
+    if len(family) == 0:
+        raise ValueError(f"level {level} needs a declared family of controllers (section 7).")
+    values = [float(member.initial_law @ (evaluate(problem, member) @ problem.initial_belief)) for member in family]
+    best = max(range(len(family)), key=lambda k: values[k])
+    return Level(level, agent, problem, None, family[best], values[best])
+
+
 def nested_problem(physics: TwoAgentModel, agent: Agent, level: int, noise: tuple[float, ...], epsilon: float,
-                   controller_epsilon: float, initial_previous_action: int) -> NestedProblem:
+                   controller_epsilon: float, initial_previous_action: int,
+                   family: Sequence[PolicyGraph]) -> NestedProblem:
     """
     `agent`'s level-`level` problem by the recursion of section 2, bottom-up: level 0 is the noise model of the agent
     at the bottom of the chain, and each level folds the controller of the level below into the other agent's view.
-    Each level below contributes the compact controller extracted at `controller_epsilon` and is certified by a
-    bracket of width `epsilon` (section 6). The top problem itself is not bracketed here: the benchmark of an
-    experiment brackets it once, and training needs only the problem.
+    Level 0 contributes the compact controller extracted at `controller_epsilon`, certified by a bracket of width
+    `epsilon` (section 6). Every level above it contributes the best member of `family` (section 7), which a level-1
+    problem never reads. The top problem itself is not bracketed here: the benchmark of an experiment brackets it
+    once, and training needs only the problem.
     """
     if level < 1:
         raise ValueError(f"a nested problem has level >= 1 (level 0 is noise_model), got {level}.")
@@ -313,6 +413,6 @@ def nested_problem(physics: TwoAgentModel, agent: Agent, level: int, noise: tupl
             below.append(_certified_level(rung, rung_agent, lumped.model, lumped.group, epsilon, controller_epsilon))
         else:
             folded = fold(view, below[-1].controller, initial_previous_action)
-            below.append(_certified_level(rung, rung_agent, folded.pomdp, None, epsilon, controller_epsilon))
+            below.append(_family_level(rung, rung_agent, folded.pomdp, family))
     interactive = fold(physics.view(agent), below[-1].controller, initial_previous_action)
     return NestedProblem(agent, level, interactive, tuple(below))

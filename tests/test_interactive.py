@@ -23,8 +23,8 @@ import torch
 from ipomdp.domain import (BatchedPOMDPEnv, FinitePOMDP, TigerAction, TigerState, action_value_functions, belief_update,
                            build_tiger_pomdp, solve_finite_horizon)
 from ipomdp.domain.bounds import _HSVI, hsvi, hsvi_budget, hsvi_vector_bracket, revealed_upper_bound
-from ipomdp.domain.interactive import (TIGER_LEVEL_ZERO_NOISE, fold, nested_problem, noise_model,
-                                       relaxation_reveal)
+from ipomdp.domain.interactive import (CREAK_RULES, TIGER_LEVEL_ZERO_NOISE, fold, growl_counter, nested_problem,
+                                       noise_model, relaxation_reveal, tiger_growl_counters)
 from ipomdp.domain.multiagent_tiger import (CREAK_ACCURACY, CREAK_ERROR, OBSERVATIONS, Agent, Creak, Growl,
                                             build_multiagent_tiger)
 from ipomdp.domain.policy_graph import (constant_policy, envelope, evaluate, node_law_on_segment, plan_graph,
@@ -286,7 +286,7 @@ class TestBracket:
     def test_compact_stationary_controller_of_the_tiger_is_certified_by_the_upper_bound(self):
         model = build_tiger_pomdp()
         bracket = hsvi(model, 0.5)
-        compact = stationary_graph(model, AlphaVectorSet(bracket.lower_vectors, bracket.controller.action_law.argmax(-1)), 0.05)
+        compact = stationary_graph(model, AlphaVectorSet(bracket.lower_vectors, bracket.actions), 0.05)
         value = float(compact.initial_law @ (evaluate(model, compact) @ model.initial_belief))
         assert compact.num_nodes < bracket.controller.num_nodes
         assert value <= 19.3713 + 1e-4 and bracket.upper - value < 1.0
@@ -301,14 +301,14 @@ class TestBracket:
         first = hsvi_vector_bracket(model, 0.01, 3, path, every=2, report=lambda *row: seen.append(row))
         resumed = hsvi_vector_bracket(model, 0.01, 6, path, every=2, report=lambda *row: seen.append(row))
         assert first.trials == 3 and resumed.trials == straight.trials == 6
-        assert torch.equal(resumed.vectors, straight.vectors) and torch.equal(resumed.actions, straight.actions)
+        assert torch.equal(resumed.lower_vectors, straight.lower_vectors) and torch.equal(resumed.actions, straight.actions)
         assert (resumed.lower, resumed.upper) == (straight.lower, straight.upper)
         # Reports and checkpoints fall on every second trial and on each run's last trial.
         assert [row[0] for row in seen] == [2, 3, 4, 6]
-        assert seen[-1] == (6, straight.lower, straight.upper, straight.vectors.shape[0])
+        assert seen[-1] == (6, straight.lower, straight.upper, straight.lower_vectors.shape[0])
         # A finished search runs no further trial.
         again = hsvi_vector_bracket(model, 0.01, 6, path)
-        assert again.trials == 6 and torch.equal(again.vectors, straight.vectors)
+        assert again.trials == 6 and torch.equal(again.lower_vectors, straight.lower_vectors)
         # None of these is the search the checkpoint holds: another epsilon, another model, a smaller budget.
         other = fold(build_multiagent_tiger(0.95).view(Agent.I), constant_policy(onehot(OL, 3), 6, "open"), L).pomdp
         with pytest.raises(ValueError, match="another model or another epsilon"):
@@ -328,20 +328,77 @@ class TestBracket:
         again = hsvi_vector_bracket(model, 0.5, 100_000, path)
         assert straight.upper - straight.lower <= 0.5 and straight.trials < 100_000
         for bracket in (first, again):
-            assert bracket.trials == straight.trials and torch.equal(bracket.vectors, straight.vectors)
+            assert bracket.trials == straight.trials and torch.equal(bracket.lower_vectors, straight.lower_vectors)
             assert (bracket.lower, bracket.upper) == (straight.lower, straight.upper)
 
 
 class TestHierarchy:
 
     def test_level_one_problem_folds_the_certified_level_zero_controller(self):
-        problem = nested_problem(build_multiagent_tiger(0.95), Agent.I, 1, TIGER_LEVEL_ZERO_NOISE, 2.0, 2.0, L)
+        problem = nested_problem(build_multiagent_tiger(0.95), Agent.I, 1, TIGER_LEVEL_ZERO_NOISE, 2.0, 2.0, L,
+                                 tiger_growl_counters())
         (zero,) = problem.below
         assert zero.agent == Agent.J and zero.level == 0
         assert zero.problem.num_observations == 2 and zero.controller.num_observations == 6    # merged, then expanded
         assert problem.interactive.other is zero.controller and problem.pomdp.num_observations == 6
         assert zero.bracket.lower <= zero.bracket.upper <= zero.bracket.lower + 2.0
         assert zero.controller_value <= zero.bracket.upper + 1e-9
+
+    def test_growl_counter_at_threshold_two_is_the_canonical_tiger_optimum(self):
+        # Against an agent that never opens a door, the fold is the canonical Tiger with a creak that is pure noise
+        # (TestDegenerateFolds). "Listen until two more growls came from one side than from the other, then open the
+        # other door" is the optimal policy there, so the counter that ignores creaks must be worth V*(b0) = 19.3713
+        # (certified to 1e-4, test_domain.py). A counter that restarts on a creak throws evidence away on every
+        # false alarm (one step in ten) and must be worth less.
+        folded = fold(build_multiagent_tiger(0.95).view(Agent.I), constant_policy(onehot(L, 3), 6, "listen"), L)
+        value = {rule: float(c.initial_law @ (evaluate(folded.pomdp, c) @ folded.pomdp.initial_belief))
+                 for rule in CREAK_RULES for c in [growl_counter(2, rule)]}
+        assert value["ignore"] == pytest.approx(19.3713, abs=2e-4)
+        assert all(value[rule] < value["ignore"] - 0.5 for rule in CREAK_RULES if rule != "ignore")
+        # Structure: 2 * threshold + 1 nodes, started at count 0, opening only at the two ends, back to 0 after it.
+        counter = growl_counter(3, "restart_from_growl")
+        assert counter.num_nodes == 7 and counter.initial_law.tolist() == [0, 0, 0, 1, 0, 0, 0]
+        assert counter.action_law.argmax(-1).tolist() == [OL, L, L, L, L, L, OR]
+        assert torch.equal(counter.successor_law[0, OL, :, 3], torch.ones(6, dtype=F64))
+        # A heard creak restarts the count from the growl heard with it: from +2, <growl right, creak left> leads to -1.
+        names = {(g, c): k for k, (g, c) in enumerate(OBSERVATIONS)}
+        assert counter.successor_law[5, L, names[(Growl.GROWL_RIGHT, Creak.CREAK_LEFT)], 2] == 1.0
+        assert counter.successor_law[5, L, names[(Growl.GROWL_RIGHT, Creak.SILENCE)], 4] == 1.0
+        with pytest.raises(ValueError):
+            growl_counter(2, "forget")
+
+    def test_level_two_problem_folds_the_best_declared_controller_of_level_one(self):
+        # interactive.py, section 7. Level 2 for agent i: i's own level-0 controller at the bottom, j's level-1 problem
+        # above it, and j's controller there is the member of the declared family with the largest exact value.
+        family = tiger_growl_counters()
+        problem = nested_problem(build_multiagent_tiger(0.95), Agent.I, 2, TIGER_LEVEL_ZERO_NOISE, 2.0, 2.0, L, family)
+        zero, one = problem.below
+        assert (zero.agent, zero.level, one.agent, one.level) == (Agent.I, 0, Agent.J, 1)
+        assert zero.bracket is not None and one.bracket is None
+        values = [float(c.initial_law @ (evaluate(one.problem, c) @ one.problem.initial_belief)) for c in family]
+        assert one.controller is family[values.index(max(values))] and one.controller_value == max(values)
+        assert problem.interactive.other is one.controller and problem.pomdp.num_observations == 6
+        # Against an opponent that opens doors, the best counter uses the creaks; and it beats always listening (-20).
+        assert "ignore" not in one.controller.node_names[0] and one.controller_value > -20.0
+        # The level-1 problem needs no family, and an empty one is refused where it is needed.
+        nested_problem(build_multiagent_tiger(0.95), Agent.I, 1, TIGER_LEVEL_ZERO_NOISE, 2.0, 2.0, L, ())
+        with pytest.raises(ValueError, match="declared family"):
+            nested_problem(build_multiagent_tiger(0.95), Agent.I, 2, TIGER_LEVEL_ZERO_NOISE, 2.0, 2.0, L, ())
+
+    def test_a_long_search_refuses_its_dense_controller(self):
+        # bounds.py, section 2: the pointer controller's dense form has K * A * O * K entries. A bracket keeps index
+        # arrays instead and builds the dense form on request; above 4 GB it raises instead of allocating.
+        model = build_tiger_pomdp()
+        bracket = hsvi_vector_bracket(model, 0.01, 3)
+        dense = bracket.controller
+        assert dense.num_nodes == bracket.lower_vectors.shape[0] and int(dense.initial_law.argmax()) == bracket.initial_node
+        assert torch.equal(dense.action_law.argmax(-1), bracket.actions)
+        taken = dense.successor_law[torch.arange(dense.num_nodes), bracket.actions]                  # (K, O, K)
+        assert torch.equal(taken.argmax(-1), bracket.successors)
+        huge = type(bracket)(bracket.lower, bracket.upper, bracket.lower_vectors, torch.zeros(20_000, dtype=torch.int64),
+                             torch.zeros(20_000, 2, dtype=torch.int64), 0, 3, bracket.trials)
+        with pytest.raises(ValueError, match="dense pointer controller"):
+            huge.controller
 
 
 class TestRelaxedBound:
@@ -385,7 +442,8 @@ class TestRelaxedBound:
     def test_level_one_relaxation_tightens_with_delay_and_dominates_a_feasible_controller(self):
         # E1's level-1 problem (conf/env/itiger.yaml: j's 11-node controller extracted at 0.5, certified at 0.05;
         # 26 states; about 1.5 min to build and 2.5 min for the two bounds).
-        problem = nested_problem(build_multiagent_tiger(0.95), Agent.I, 1, TIGER_LEVEL_ZERO_NOISE, 0.05, 0.5, L)
+        problem = nested_problem(build_multiagent_tiger(0.95), Agent.I, 1, TIGER_LEVEL_ZERO_NOISE, 0.05, 0.5, L,
+                                 tiger_growl_counters())
         (zero,) = problem.below
         assert problem.pomdp.num_states == 26 and zero.bracket.upper - zero.controller_value <= 0.051
         bounds = []
@@ -399,11 +457,29 @@ class TestRelaxedBound:
         fib = float(problem.pomdp.initial_belief @ hsvi_corners(problem.pomdp))
         canonical = build_tiger_pomdp()
         bracket = hsvi(canonical, 0.5)
-        compact = stationary_graph(canonical, AlphaVectorSet(bracket.lower_vectors,
-                                                             bracket.controller.action_law.argmax(-1)), 0.05)
+        compact = stationary_graph(canonical, AlphaVectorSet(bracket.lower_vectors, bracket.actions), 0.05)
         deaf = expand_observations(compact, torch.tensor([0, 0, 0, 1, 1, 1]))
         feasible = float(deaf.initial_law @ (evaluate(problem.pomdp, deaf) @ problem.pomdp.initial_belief))
         assert feasible <= bounds[1].upper <= bounds[0].upper < fib
         # The returned points are upper bounds at their marginals: b0's marginal is b0 itself.
         assert torch.equal(bounds[1].beliefs[0], problem.pomdp.initial_belief)
         assert float(bounds[1].values[0]) == bounds[1].upper
+
+    @pytest.mark.slow
+    def test_level_two_problem_of_the_interactive_experiment(self):
+        # The level-2 problem of conf/env/itiger.yaml with level: 2 (about 2 min: the level-0 brackets are built twice).
+        # - j's level-1 problem is i's level-1 problem, because the game is symmetric: the same tables.
+        # - Its best declared controller is the 5-node growl counter that restarts from the growl heard with a creak.
+        #   Its exact value, 15.3567, lies below the lower end of that problem's benchmark (16.55): the difference is
+        #   what tracking the other agent's node is worth (interactive.py, section 7).
+        # - i's level-2 fold has 14 states.
+        family = tiger_growl_counters()
+        physics = build_multiagent_tiger(0.95)
+        problem = nested_problem(physics, Agent.I, 2, TIGER_LEVEL_ZERO_NOISE, 0.05, 0.5, L, family)
+        level_one = nested_problem(physics, Agent.I, 1, TIGER_LEVEL_ZERO_NOISE, 0.05, 0.5, L, family).pomdp
+        zero, one = problem.below
+        for name in ("transition", "observation", "reward", "initial_belief"):
+            assert torch.equal(getattr(one.problem, name), getattr(level_one, name)), name
+        assert one.controller.node_names == tuple(f"t2.restart_from_growl.d{d:+d}" for d in range(-2, 3))
+        assert one.controller_value == pytest.approx(15.3567, abs=1e-4)
+        assert problem.pomdp.num_states == 14 and problem.interactive.other is one.controller
