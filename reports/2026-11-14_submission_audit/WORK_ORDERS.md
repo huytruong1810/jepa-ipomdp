@@ -63,6 +63,8 @@
 - **C-s draft:** C-s.4 names both forms and states in advance what the benchmark files alone give (L_Q 57.75 / 56.67; the active vector's half-span averages 18.9 / 16.8 at the reference agent's beliefs). The Interactive Tiger metric table, both console summaries and the readout draft carry the local form.
 - **Ledger:** no id is added. If the paper cites C-q.4, order the ids and I add them from the script's JSON.
 
+**Addendum 2026-11-23 17:50: user ruling on the write-in intervention.** The write-in intervention on j's node, which the plan of 2026-11-16 lists under E1, is not part of C-s. It needs no GPU, so it is registered later as its own descriptive item on the stored E1 runs, before its first run on them. Two points of the C-s draft remain for you or the user: the form of the claim against the reference agent (proposal: the smallest equivalence margin, as C-q.1, and "optimal" claimed nowhere), and whether the smoke uses seeds 100-102. C-q.4 is still running (37 min per seed; both units end at about 19:55).
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
