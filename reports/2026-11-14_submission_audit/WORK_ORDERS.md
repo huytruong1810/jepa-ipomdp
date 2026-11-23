@@ -52,7 +52,7 @@
 - **Not implemented from the plan:** geometry per marginal on the interactive state. It can be computed later from the stored runs on the CPU, labelled post hoc.
 - **Tests added:** the lemma at 14 and 26 states; the bounds on a lower-bound set grouped by action; an exactly informative latent over 14 states; the non-finite case; the pointer equation of a bracket; and the two the plan listed for Wumpus (the MLP probe, and a tiny run analysed end to end).
 
-**Addendum 2026-11-23 16:50: user ruling on the proposal of 15:35 ("Add it"): the local form of the span lemma is implemented, registered for the canonical Tiger as post hoc, and drafted into C-s.**
+**Addendum 2026-11-23 16:48: user ruling on the proposal of 15:35 ("Add it"): the local form of the span lemma is implemented, registered for the canonical Tiger as post hoc, and drafted into C-s.**
 - **The ruling:** contribution (3) carries the local form beside the global one. For the folds it is registered with E1 (C-s.4) before any run; for the canonical Tiger it is reported labelled post hoc.
 - **The statement** (`interpretability/error_bounds.py`, section 5, with the proof): for V(b) = max_k alpha_k . b and alpha_b a maximiser at b, |V(b) - V(b')| <= max(span(alpha_b), span(alpha_b')) / 2 x ||b - b'||_1. For the one-step regret: (span(alpha) + span(beta)) / 2 x eps, with alpha active in Q(., a*) at the exact belief and beta active in Q(., a^) at the decoded one. The policy form sums the per-step local bounds.
   - It holds pair by pair and is never above the global form, which is the case where the largest span of the set replaces the two.
