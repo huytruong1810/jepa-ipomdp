@@ -13,7 +13,8 @@ from ipomdp.domain import (AlphaVectorSet, BatchedPOMDPEnv, TigerAction, action_
                            belief_update, build_tiger_pomdp, observation_distribution, solve_finite_horizon)
 from ipomdp.domain.solver import EXACT_PRUNE_EPSILON
 from ipomdp.interpretability import (ExactBeliefAgent, analyze_beliefs, build_probe_dataset, error_bounds,
-                                     evaluate_probe, fit_linear_probe, lipschitz_constant, q_values)
+                                     evaluate_probe, fit_linear_probe, half_spans, lipschitz_constant, local_bounds,
+                                     q_values)
 from ipomdp.interpretability.belief_probe import ProbeDataset
 from ipomdp.models import BeliefFilter, ObservationHead, RewardHead, TwoHotSymlog, ValueHead
 from ipomdp.planning import BeliefTreeSearch, LearnedSearchModel
@@ -124,6 +125,69 @@ class TestErrorBounds:
         assert report.regret_mean <= report.regret_bound_mean + 1e-9
         # The greedy action over the groups is the action of the best vector.
         assert torch.equal(q_values(per_action, true).argmax(-1), value.greedy_action(true))
+
+
+class TestLocalBounds:
+    """error_bounds.py, section 5: the spans of the vectors active at the two beliefs replace the largest span."""
+
+    @staticmethod
+    def _measured(value, per_action, true, decoded):
+        value_error = (value.value(true) - value.value(decoded)).abs()
+        q_true = q_values(per_action, true)
+        chosen = q_values(per_action, decoded).argmax(-1)
+        return value_error, q_true.max(-1).values - q_true.gather(1, chosen[:, None]).squeeze(1)
+
+    @pytest.mark.parametrize("noise", [0.01, 0.05, 0.2])
+    def test_hold_pair_by_pair_on_the_tiger_and_never_exceed_the_global_form(self, tiger, value_functions, noise):
+        torch.manual_seed(0)
+        value = value_functions[9]
+        per_action = action_value_functions(tiger, value_functions[8], EXACT_PRUNE_EPSILON)
+        true = _random_beliefs(2000, 2)
+        shifted = (true[:, 0] + noise * torch.randn(2000, dtype=torch.float64)).clamp(0, 1)
+        decoded = torch.stack([shifted, 1 - shifted], -1)
+        eps = (true - decoded).abs().sum(-1)
+        value_bound, regret_bound, active = local_bounds(value, per_action, true, decoded)
+        value_error, regret = self._measured(value, per_action, true, decoded)
+        assert (value_error <= value_bound + 1e-9).all() and (regret <= regret_bound + 1e-9).all()
+        l_v, l_q = lipschitz_constant(value), max(lipschitz_constant(q) for q in per_action)
+        assert (value_bound <= l_v * eps + 1e-12).all() and (regret_bound <= 2 * l_q * eps + 1e-12).all()
+        assert (active <= l_v + 1e-12).all() and float(active.min()) < l_v          # a listening vector is narrower
+        report = error_bounds(value, per_action, tiger.discount, true, decoded)
+        assert report.value_error_mean <= report.value_error_bound_local_mean <= report.value_error_bound_mean + 1e-12
+        assert report.regret_mean <= report.regret_bound_local_mean <= report.regret_bound_mean + 1e-12
+        assert report.value_error_max <= report.value_error_bound_local_max + 1e-9
+        assert report.regret_max <= report.regret_bound_local_max + 1e-9
+        assert report.policy_loss_bound_local_mean == pytest.approx(report.regret_bound_local_mean / (1 - tiger.discount))
+        assert report.active_half_span_mean == pytest.approx(float(active.mean()))
+
+    def test_hold_pair_by_pair_for_a_lower_bound_set_grouped_by_action(self):
+        torch.manual_seed(5)
+        states, count, num_actions = 26, 80, 3
+        vectors = torch.randn(count, states, dtype=torch.float64) * torch.rand(count, 1, dtype=torch.float64) * 40
+        actions = torch.arange(count) % num_actions
+        value = AlphaVectorSet(vectors, actions)
+        floor = torch.full((1, states), float(vectors.min()) - 1.0, dtype=torch.float64)
+        per_action = [AlphaVectorSet(torch.cat([vectors[actions == a], floor]),
+                                     torch.full((int((actions == a).sum()) + 1,), a)) for a in range(num_actions)]
+        true = _random_beliefs(4000, states)
+        decoded = 0.8 * true + 0.2 * _random_beliefs(4000, states)
+        value_bound, regret_bound, _ = local_bounds(value, per_action, true, decoded)
+        value_error, regret = self._measured(value, per_action, true, decoded)
+        assert (value_error <= value_bound + 1e-9).all() and (regret <= regret_bound + 1e-9).all()
+        report = error_bounds(value, per_action, 0.95, true, decoded)
+        # Vectors of very different widths: the local form is strictly tighter on average.
+        assert report.value_error_bound_local_mean < 0.9 * report.value_error_bound_mean
+        assert report.regret_bound_local_mean < 0.9 * report.regret_bound_mean
+
+    def test_one_vector_makes_the_local_and_the_global_value_bound_equal_and_tight(self):
+        vector = torch.tensor([[3.0, -1.0, 7.0]], dtype=torch.float64)
+        value = AlphaVectorSet(vector, torch.zeros(1, dtype=torch.int64))
+        assert half_spans(value).tolist() == [4.0] and lipschitz_constant(value) == 4.0
+        true = torch.tensor([[0.0, 1.0, 0.0]], dtype=torch.float64)
+        decoded = torch.tensor([[0.0, 0.0, 1.0]], dtype=torch.float64)          # all mass from the minimum to the maximum
+        value_bound, _, active = local_bounds(value, [value], true, decoded)
+        assert value_bound.tolist() == [8.0] and active.tolist() == [4.0]
+        assert float((value.value(true) - value.value(decoded)).abs()) == 8.0
 
 
 class TestProbes:

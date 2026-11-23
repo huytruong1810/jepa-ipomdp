@@ -8,7 +8,7 @@ from .analysis import (BeliefAnalysis, DecodedBeliefAgent, ExactBeliefAgent, Geo
                        analyze_beliefs, latent_geometry)
 from .belief_probe import (BeliefProbe, ProbeDataset, ProbeReport, build_probe_dataset, evaluate_probe,
                            fit_linear_probe, fit_mlp_probe)
-from .error_bounds import ErrorBoundReport, error_bounds, lipschitz_constant, q_values
+from .error_bounds import ErrorBoundReport, error_bounds, half_spans, lipschitz_constant, local_bounds, q_values
 from .wumpus_latents import (WumpusLatentDataset, WumpusProbe, WumpusProbeReport, build_wumpus_dataset,
                              evaluate_wumpus_probe, fit_linear_wumpus_probe, fit_mlp_wumpus_probe, plot_belief_maps,
                              plot_latent_pca)
@@ -36,8 +36,10 @@ __all__ = [
     "fit_linear_wumpus_probe",
     "fit_mlp_probe",
     "fit_mlp_wumpus_probe",
+    "half_spans",
     "latent_geometry",
     "lipschitz_constant",
+    "local_bounds",
     "plot_belief_maps",
     "plot_latent_pca",
     "q_values",

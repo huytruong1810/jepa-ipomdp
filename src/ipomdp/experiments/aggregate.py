@@ -189,7 +189,10 @@ ITIGER_METRICS: dict[str, tuple[str, ...]] = {
     **{f"{quantity}/{kind}_agent": ("reference", "bounds", f"{kind}/agent", quantity)
        for kind in ("mlp", "linear")
        for quantity in ("value_error_mean", "value_error_bound_mean", "regret_mean", "regret_bound_mean",
-                        "suboptimal_decision_rate", "policy_loss_bound_mean")},
+                        "suboptimal_decision_rate", "policy_loss_bound_mean",
+                        # The local form (interpretability/error_bounds.py, section 5), beside the global one.
+                        "active_half_span_mean", "value_error_bound_local_mean", "regret_bound_local_mean",
+                        "policy_loss_bound_local_mean")},
     "selection_score (biased)": ("checkpoint_eval_return",),
 }
 

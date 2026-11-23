@@ -48,6 +48,8 @@ def print_summary(analysis: BeliefAnalysis) -> None:
               f"regret {bound.regret_max:.3f} <= {bound.regret_bound_max:.3f} | "
               f"expected: value error {bound.value_error_mean:.3f} <= {bound.value_error_bound_mean:.3f}, "
               f"regret {bound.regret_mean:.4f} <= {bound.regret_bound_mean:.4f} | "
+              f"local form (spans of the active vectors, mean half-span {bound.active_half_span_mean:.1f}): value error "
+              f"<= {bound.value_error_bound_local_mean:.3f}, regret <= {bound.regret_bound_local_mean:.4f} | "
               f"suboptimal decisions {bound.suboptimal_decision_rate:.4f}")
     geometry = analysis.geometry
     print(f"  geometry: explained variance {[round(r, 3) for r in geometry.explained_variance_ratio]}; "

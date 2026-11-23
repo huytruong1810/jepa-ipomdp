@@ -64,6 +64,32 @@
 #    - (*) is not assumed for the two benchmark files of the interactive experiments: every one of their vectors
 #      equals its pointer backup to 3.4e-13 (reports/2026-11-16_code_audit/benchmark_improvability.py and .log).
 #    - Consequently V*(b0) - V^psi(b0) <= (U - L)(b0) + the bound of (c), with U the certified upper bound.
+#
+# 5. The Local Form: the Spans of the Active Vectors (2026-11-23):
+#    - The constants of section 2 are the largest half-span of the whole set. One wide vector sets them even where
+#      it is never the maximiser: on the folded interactive problems L_V = L_Q is about 57, from the few vectors that
+#      open a door (span about 110), while the vector active at a visited belief has a half-span of 17 to 19 on
+#      average. The lemma of section 1 gives more than that when it is applied to the right vector.
+#    - Lemma (local form). Let V(b) = max_k alpha_k . b, and let alpha_b be a maximiser at b. For beliefs b, b':
+#           V(b) - V(b') <= alpha_b . (b - b') <= span(alpha_b) / 2 * ||b - b'||_1
+#      (V(b') >= alpha_b . b', then section 1), and the same with b and b' exchanged. Hence
+#           |V(b) - V(b')| <= max(span(alpha_b), span(alpha_b')) / 2 * ||b - b'||_1.
+#      Any maximiser may be taken at a tie. The global bound of section 2 is the case where the largest span of the
+#      set replaces the two.
+#    - (a) local: |V*(b*) - V*(psi)| <= max(span(alpha_{b*}), span(alpha_psi)) / 2 * eps.
+#    - (b) local: with a* = argmax_a Q*(b*, a), a^ = argmax_a Q*(psi, a), alpha the vector active in Q*(., a*) at b*
+#      and beta the vector active in Q*(., a^) at psi,
+#           Q*(b*, a*) - Q*(b*, a^) = [Q*(b*, a*) - Q*(psi, a*)] + [Q*(psi, a*) - Q*(psi, a^)] + [Q*(psi, a^) - Q*(b*, a^)]
+#                                   <= (span(alpha) + span(beta)) / 2 * eps,
+#      because the middle bracket is at most 0 and each outer one is a one-sided difference of the lemma.
+#    - (c) local: the proofs of (c) in sections 2 and 4 sum per-step regrets, so the per-step local bound may be used:
+#           loss <= sum_t gamma^t E[(span(alpha_t) + span(beta_t)) / 2 * eps_t].
+#      As in section 2, the reported number divides the mean of that product on the evaluation data by 1 - gamma: an
+#      estimate, since the data are not the psi-policy's own distribution.
+#    - What it is and is not. The coefficient depends on the pair (b*, psi) through the vectors active at the two
+#      beliefs, so this is a bound per pair and, averaged, a bound on the expected error; it is not a single constant
+#      known before the beliefs are. It needs nothing beyond the vector sets, holds for a lower-bound set exactly as
+#      for V* (section 4), and is never above the global form, pair by pair. Both forms are reported.
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -85,6 +111,40 @@ def q_values(action_values: list[AlphaVectorSet], beliefs: Tensor) -> Tensor:
     return torch.stack([q.value(beliefs) for q in action_values], dim=-1)
 
 
+def half_spans(value_function: AlphaVectorSet) -> Tensor:
+    """span(alpha_k) / 2 of every vector, float64 (K,): the ||.||_1-Lipschitz constant of b -> alpha_k . b."""
+    vectors = value_function.vectors
+    return (vectors.max(dim=1).values - vectors.min(dim=1).values) / 2.0
+
+
+def local_bounds(optimal_value: AlphaVectorSet, optimal_action_values: list[AlphaVectorSet], true_beliefs: Tensor,
+                 decoded_beliefs: Tensor) -> tuple[Tensor, Tensor, Tensor]:
+    """
+    The local form of guarantees (a) and (b), pair by pair (section 5).
+
+    Args:
+        optimal_value, optimal_action_values: as error_bounds.
+        true_beliefs, decoded_beliefs: b* and psi(z), float64 (N, S) on the CPU.
+
+    Returns:
+        value_bound: max(span(alpha_{b*}), span(alpha_psi)) / 2 * eps, shape (N,).
+        regret_bound: (span(alpha) + span(beta)) / 2 * eps with alpha active in Q(., a*) at b* and beta active in
+            Q(., a^) at psi, shape (N,).
+        active: span(alpha_{b*}) / 2, the half-span of the vector of the value set active at the exact belief, (N,).
+    """
+    eps = (true_beliefs - decoded_beliefs).abs().sum(-1)
+    spans = half_spans(optimal_value)
+    active = spans[optimal_value.maximiser(true_beliefs)]
+    value_bound = torch.maximum(active, spans[optimal_value.maximiser(decoded_beliefs)]) * eps
+    best = q_values(optimal_action_values, true_beliefs).argmax(-1)
+    chosen = q_values(optimal_action_values, decoded_beliefs).argmax(-1)
+    at_true = torch.stack([half_spans(q)[q.maximiser(true_beliefs)] for q in optimal_action_values], dim=-1)
+    at_decoded = torch.stack([half_spans(q)[q.maximiser(decoded_beliefs)] for q in optimal_action_values], dim=-1)
+    regret_bound = (at_true.gather(1, best.unsqueeze(1)).squeeze(1)
+                    + at_decoded.gather(1, chosen.unsqueeze(1)).squeeze(1)) * eps
+    return value_bound, regret_bound, active
+
+
 @dataclass(frozen=True)
 class ErrorBoundReport:
     """
@@ -100,6 +160,11 @@ class ErrorBoundReport:
         suboptimal_decision_rate: Fraction of beliefs where the decoded-belief action is not optimal.
         policy_loss_bound: Bound (c) with eps_max.
         policy_loss_bound_mean: Expected-error form of (c) with the measured E[eps] (an estimate).
+        active_half_span_mean: Mean over the exact beliefs of span(alpha_{b*}) / 2 (section 5), to set beside L_V.
+        value_error_bound_local_mean, value_error_bound_local_max: The local form of (a), mean and largest over the
+            pairs. The mean bounds value_error_mean and the largest bounds value_error_max.
+        regret_bound_local_mean, regret_bound_local_max: The local form of (b), likewise for the regret.
+        policy_loss_bound_local_mean: The local form of (c), regret_bound_local_mean / (1 - gamma) (an estimate).
     """
 
     lipschitz_value: float
@@ -117,6 +182,12 @@ class ErrorBoundReport:
     suboptimal_decision_rate: float
     policy_loss_bound: float
     policy_loss_bound_mean: float
+    active_half_span_mean: float
+    value_error_bound_local_mean: float
+    value_error_bound_local_max: float
+    regret_bound_local_mean: float
+    regret_bound_local_max: float
+    policy_loss_bound_local_mean: float
 
 
 def error_bounds(optimal_value: AlphaVectorSet, optimal_action_values: list[AlphaVectorSet], discount: float,
@@ -139,6 +210,7 @@ def error_bounds(optimal_value: AlphaVectorSet, optimal_action_values: list[Alph
     chosen = q_values(optimal_action_values, decoded_beliefs).argmax(-1)
     regret = q_true.max(-1).values - q_true.gather(1, chosen.unsqueeze(1)).squeeze(1)
     eps_max, eps_mean = float(eps.max()), float(eps.mean())
+    local_value, local_regret, active = local_bounds(optimal_value, optimal_action_values, true_beliefs, decoded_beliefs)
     return ErrorBoundReport(
         lipschitz_value=l_v, lipschitz_q=l_q,
         belief_l1_mean=eps_mean, belief_l1_max=eps_max,
@@ -149,4 +221,8 @@ def error_bounds(optimal_value: AlphaVectorSet, optimal_action_values: list[Alph
         suboptimal_decision_rate=float((regret > 1e-9).double().mean()),
         policy_loss_bound=2 * l_q * eps_max / (1.0 - discount),
         policy_loss_bound_mean=2 * l_q * eps_mean / (1.0 - discount),
+        active_half_span_mean=float(active.mean()),
+        value_error_bound_local_mean=float(local_value.mean()), value_error_bound_local_max=float(local_value.max()),
+        regret_bound_local_mean=float(local_regret.mean()), regret_bound_local_max=float(local_regret.max()),
+        policy_loss_bound_local_mean=float(local_regret.mean()) / (1.0 - discount),
     )

@@ -127,11 +127,19 @@ class AlphaVectorSet:
         values = [(block.to(torch.float64) @ vectors).max(dim=-1).values for block in self._blocks(belief)]
         return values[0] if len(values) == 1 else torch.cat(values)
 
-    def greedy_action(self, belief: Tensor) -> Tensor:
-        """Optimal first action for beliefs of shape (B, S); returns int64 shape (B,)."""
+    def maximiser(self, belief: Tensor) -> Tensor:
+        """
+        Index k of a vector with vectors[k] . b = V(b) for beliefs of shape (B, S), the first one on a tie; int64
+        shape (B,). greedy_action is its action; the local error bounds read its span
+        (interpretability/error_bounds.py, section 5).
+        """
         vectors = self.vectors.to(belief.device).T
         best = [(block.to(torch.float64) @ vectors).argmax(dim=-1) for block in self._blocks(belief)]
-        return self.actions.to(belief.device)[best[0] if len(best) == 1 else torch.cat(best)]
+        return best[0] if len(best) == 1 else torch.cat(best)
+
+    def greedy_action(self, belief: Tensor) -> Tensor:
+        """Optimal first action for beliefs of shape (B, S); returns int64 shape (B,)."""
+        return self.actions.to(belief.device)[self.maximiser(belief)]
 
 
 @dataclass(frozen=True)

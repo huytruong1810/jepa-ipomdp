@@ -305,6 +305,13 @@ def print_interactive_summary(analysis: InteractiveAnalysis) -> None:
     for name, reports in analysis.marginals.items():
         print(f"  marginal probe {name:<12} " + "  ".join(f"{m}: KL {r.kl_mean:.5f} L1 {r.l1_mean:.4f}"
                                                          for m, r in reports.items()))
+    # Section 2: bounds on the LOWER BOUND L, global and local form (interpretability/error_bounds.py, 4 and 5).
+    for name, bound in analysis.reference.bounds.items():
+        print(f"  bounds on L, {name:<12} mean L1 {bound.belief_l1_mean:.4f} | value error {bound.value_error_mean:.3f} "
+              f"<= {bound.value_error_bound_local_mean:.3f} (local) <= {bound.value_error_bound_mean:.3f} (L_V "
+              f"{bound.lipschitz_value:.1f}) | regret {bound.regret_mean:.4f} <= {bound.regret_bound_local_mean:.3f} "
+              f"(local) <= {bound.regret_bound_mean:.3f} | policy form on L(b0) - V: {bound.policy_loss_bound_local_mean:.1f} "
+              f"(local), {bound.policy_loss_bound_mean:.1f}")
     print("  control: the same probes on the run's untrained filter (section 5)")
     for name, probe in analysis.untrained.probes.items():
         print(f"  untrained probe {name:<12} interactive-state KL mean {probe.mean_kl:.5f}  L1 mean {probe.mean_l1:.4f}")
