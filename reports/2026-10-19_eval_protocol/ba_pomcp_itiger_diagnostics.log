@@ -1,0 +1,36 @@
+code at commit a52d3f3 (this script itself is added by the commit that adds this log); started 2026-11-23 00:19
+=== models
+truth on the fold: growl accuracy after LISTEN (0.85, 0.85), creak accuracy (0.9, 0.9)
+the registered prior's own means: growl accuracy 0.625, creak accuracy 0.536
+
+itiger/main: per run, means over the 1,000 particles (rows weighted by the evidence they received)
+  run 0: growl accuracy 0.822 (particles 0.821 to 0.822), creak accuracy 0.673, TV of the LISTEN rows 0.305 on 16992 observations; TV of T 0.908 on 20000 transitions
+  run 1: growl accuracy 0.789 (particles 0.788 to 0.790), creak accuracy 0.728, TV of the LISTEN rows 0.264 on 17162 observations; TV of T 0.912 on 20000 transitions
+  run 2: growl accuracy 0.729 (particles 0.727 to 0.730), creak accuracy 0.700, TV of the LISTEN rows 0.288 on 19746 observations; TV of T 0.930 on 20000 transitions
+  run 3: growl accuracy 0.770 (particles 0.769 to 0.771), creak accuracy 0.741, TV of the LISTEN rows 0.245 on 18334 observations; TV of T 0.931 on 20000 transitions
+  run 4: growl accuracy 0.768 (particles 0.768 to 0.769), creak accuracy 0.709, TV of the LISTEN rows 0.327 on 17704 observations; TV of T 0.900 on 20000 transitions
+  run 5: growl accuracy 0.715 (particles 0.714 to 0.717), creak accuracy 0.716, TV of the LISTEN rows 0.300 on 19170 observations; TV of T 0.887 on 20000 transitions
+  run 6: growl accuracy 0.760 (particles 0.759 to 0.761), creak accuracy 0.777, TV of the LISTEN rows 0.259 on 17855 observations; TV of T 0.911 on 20000 transitions
+  run 7: growl accuracy 0.785 (particles 0.784 to 0.786), creak accuracy 0.706, TV of the LISTEN rows 0.294 on 18473 observations; TV of T 0.881 on 20000 transitions
+  run 8: growl accuracy 0.788 (particles 0.787 to 0.791), creak accuracy 0.703, TV of the LISTEN rows 0.287 on 18358 observations; TV of T 0.912 on 20000 transitions
+  run 9: growl accuracy 0.791 (particles 0.790 to 0.792), creak accuracy 0.716, TV of the LISTEN rows 0.269 on 17668 observations; TV of T 0.905 on 20000 transitions
+  over runs: growl accuracy 0.715 to 0.822; creak accuracy 0.673 to 0.777; mirrored runs (growl accuracy under 0.5): 0 of 10
+
+itiger/known_t: per run, means over the 1,000 particles (rows weighted by the evidence they received)
+  run 0: growl accuracy 0.840 (particles 0.839 to 0.840), creak accuracy 0.852, TV of the LISTEN rows 0.100 on 13953 observations; TV of T nan on nan transitions
+  run 1: growl accuracy 0.856 (particles 0.856 to 0.857), creak accuracy 0.852, TV of the LISTEN rows 0.094 on 13436 observations; TV of T nan on nan transitions
+  run 2: growl accuracy 0.836 (particles 0.835 to 0.836), creak accuracy 0.869, TV of the LISTEN rows 0.075 on 14179 observations; TV of T nan on nan transitions
+  run 3: growl accuracy 0.851 (particles 0.850 to 0.851), creak accuracy 0.833, TV of the LISTEN rows 0.114 on 13667 observations; TV of T nan on nan transitions
+  run 4: growl accuracy 0.836 (particles 0.835 to 0.836), creak accuracy 0.854, TV of the LISTEN rows 0.110 on 14011 observations; TV of T nan on nan transitions
+  run 5: growl accuracy 0.844 (particles 0.843 to 0.844), creak accuracy 0.856, TV of the LISTEN rows 0.083 on 13904 observations; TV of T nan on nan transitions
+  run 6: growl accuracy 0.835 (particles 0.834 to 0.835), creak accuracy 0.866, TV of the LISTEN rows 0.079 on 14197 observations; TV of T nan on nan transitions
+  run 7: growl accuracy 0.857 (particles 0.856 to 0.858), creak accuracy 0.854, TV of the LISTEN rows 0.091 on 13452 observations; TV of T nan on nan transitions
+  run 8: growl accuracy 0.845 (particles 0.844 to 0.846), creak accuracy 0.861, TV of the LISTEN rows 0.087 on 13912 observations; TV of T nan on nan transitions
+  run 9: growl accuracy 0.838 (particles 0.838 to 0.839), creak accuracy 0.860, TV of the LISTEN rows 0.089 on 14028 observations; TV of T nan on nan transitions
+  over runs: growl accuracy 0.835 to 0.857; creak accuracy 0.833 to 0.869; mirrored runs (growl accuracy under 0.5): 0 of 10
+
+=== true_model (4 workers)
+reference agent: 16.306 on the 256 paired episodes (C-r readout: 16.306); always listening: -19.882
+BA-POMCP with the TRUE model at point-mass confidence (EXPECTED_MDP, 1000 simulations): return -19.112; gap -35.419 +- 6.538
+episodes in which it never opens a door (return equal to always listening): 0.000; episodes with gap < -50: 0.367; episodes at or above the reference agent: 0.316
+C-r arms with learned models (read once): main -30.411 [-33.433, -27.388], known_t -34.809 [-39.712, -29.906] over 10 runs

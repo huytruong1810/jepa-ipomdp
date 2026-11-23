@@ -402,6 +402,19 @@ The benchmark of the 26-state fold (`runs/benchmarks/itiger_level1.pt`, fold dig
 - **Two numbers that need an explanation** (the registered readout cannot give one; post hoc diagnostics follow below when they are run, labelled as such):
   1. The upper reference is not above the main arm. Post hoc Welch on the per-run gaps, known_t minus main: -4.399 [-9.826, +1.029] (15.0 df), so the difference is within the noise of ten runs, but its sign is the opposite of what more knowledge should give.
   2. known_t's return falls during its own learning period (-5.06 to -13.83), while main's rises.
+- **Post hoc diagnostics** (written after the readout, not registered; `reports/2026-10-19_eval_protocol/ba_pomcp_itiger_diagnostics.py` and `.log`):
+  - **A scale for both arms:** always listening is worth -19.88 over the 100-step window. Main (-14.10) and known_t (-18.50) sit between "never open a door" and a few points above it.
+  - **1. What each run learned.** Posterior means after the learning period, averaged over the 1,000 particles, with rows weighted by the evidence they received:
+    - No run converged to the mirrored model (growl accuracy under 0.5), which the Tiger readout had found once.
+    - known_t learned the observation model nearly exactly: growl accuracy 0.835 to 0.857 over the ten runs (truth 0.85; the prior's mean is 0.625), creak accuracy 0.833 to 0.869 (truth 0.9; prior 0.536). So its low return is not a learning failure.
+    - main learned it partly: growl accuracy 0.715 to 0.822, creak accuracy 0.673 to 0.777.
+    - main's transition rows cannot be scored against the truth row by row. With T uninformed, fold states that share an observation row can swap labels freely, so the total-variation distance the script prints (0.88 to 0.93) measures the relabelling, not what was learned.
+  - **2. The deficit is the search, not the learning.** BA-POMCP with the TRUE model at point-mass confidence, everything else as the main arm, returns -19.11 on the same 256 episodes: a gap of -35.419 +- 6.538 to the reference agent (1.96 s.e. over episodes; one planner). That is as much as the arms that learned their models (-30.411 and -34.809).
+    - It opens doors in every episode, and in 36.7% of them its gap is under -50 (a wrong door at least once); 31.6% of its episodes are at or above the reference agent's return. On the canonical Tiger the same check found a wrong door in 7.0% of episodes.
+    - So 1,000 simulations to a planning horizon of 20 do not plan this 26-state problem, whatever model they are given.
+  - **What this says about the two numbers.**
+    - known_t is not above main because both sit at the level the search allows. With a nearly exact model, known_t lands on the true-model level (-34.8 against -35.4), and main (-30.4) lies within the noise of it.
+    - known_t's return falls during learning because it moves towards that level as its model becomes right. Its early, wrong model (growl accuracy 0.625) made it open less often. The script does not measure how often each arm opened, so this last sentence is a reading, not a measurement.
 
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
