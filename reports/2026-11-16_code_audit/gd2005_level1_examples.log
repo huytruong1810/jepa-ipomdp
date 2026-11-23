@@ -1,0 +1,20 @@
+commit 2d49583; Gmytrasiewicz & Doshi (2005), Section 7.3: agent i at level 1, undiscounted, no information about j's belief (uniform over p_j)
+
+(a) j's action law with two steps to go, after i listens and hears <GL,S> from p_i = 0.5; paper {'OL': 0.009076, 'L': 0.96591, 'OR': 0.02501}
+  j = the POMDP with noise (0.8, 0.1, 0.1), our level 0
+    j's thresholds over p_j(TL) with 1, 2, 3 steps to go: [[0.1, 0.9], [0.0449, 0.358, 0.642, 0.9551], [0.0449, 0.138, 0.1755, 0.8245, 0.862, 0.9551]]
+    j's action law at the first step: L 0.910194, OL 0.044903, OR 0.044903
+    after <GL,S>: P_i(TL) = 0.85000; j's law: OL 0.025929, L 0.898319, OR 0.075753
+  j = the single-agent POMDP (the other agent always listens)
+    j's thresholds over p_j(TL) with 1, 2, 3 steps to go: [[0.1, 0.9], [0.0192, 0.3864, 0.6136, 0.9808], [0.0034, 0.1, 0.2189, 0.7811, 0.9, 0.9966]]
+    j's action law at the first step: L 0.993103, OL 0.003448, OR 0.003448
+    after <GL,S>: P_i(TL) = 0.85000; j's law: OL 0.000000, L 1.000000, OR 0.000000
+
+(b) i's value along p_i(TL) with j = the POMDP with noise; kinks are the boundaries between optimal plans
+  horizon 1: fold of 12 states (j has 4 nodes); V(0) 10.0000, V(0.5) -1.0000, V(1) 10.0000; first action OPEN_LEFT / LISTEN / OPEN_RIGHT, changing at [0.1, 0.9]
+    kinks: [0.1, 0.9]
+  horizon 2: fold of 26 states (j has 9 nodes); V(0) 9.0000, V(0.5) -2.0000, V(1) 9.0000; first action OPEN_LEFT / LISTEN / OPEN_RIGHT, changing at [0.0312, 0.9689]
+    kinks: [0.0311, 0.2798, 0.3857, 0.6143, 0.7202, 0.9689]
+  horizon 3: fold of 44 states (j has 16 nodes); V(0) 8.0000, V(0.5) 1.9318, V(1) 8.0000; first action OPEN_LEFT / LISTEN / OPEN_RIGHT, changing at [0.0183, 0.9818]
+    kinks: [0.0182, 0.0451, 0.0669, 0.0973, 0.1588, 0.2177, 0.2949, 0.3816, 0.6184, 0.7051, 0.7823, 0.8412, 0.9027, 0.9331, 0.9549, 0.9818]
+  paper, Fig. 11 (horizon 3): [0.029, 0.089, 0.211, 0.789, 0.911, 0.971], opening a door outside [0.029, 0.971]
