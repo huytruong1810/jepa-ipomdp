@@ -105,6 +105,26 @@ The solver's witness LP becomes public; nothing numeric changes.
 
 **Reference agent at the paper's threshold (risk 0.4; `tests/test_wumpus_agents.py`, slow).** Against an independent exact filter, every gamble had an exact danger <= 0.4. Over 64 games, only 6 of its steps were gambles; the largest danger taken was 1/3, and no game ended in a death. It won 68.8% of the games against 59.4% at risk 0.
 
+## Phase 5 (training loop, remedies, baseline): review started 2026-11-23, in progress
+
+**Scope so far.** Only the review, and first the path a default-configuration run takes, because E1 trains through it. The seam refactor of the plan (remedies into their own modules) changes the recipe path and waits for the GPU gate, like every code change below.
+- Read in full: `seeding.py`, `checkpointing.py`, `rollout.py`, `episode_buffer.py`.
+- Read as code, not yet against every header section: `trainer.py` from line 366 (the constructor, the value targets and `train_step` with all its option branches) and `run.py` from line 606 (construction, the retrain, collection, evaluation, the state dictionary).
+- Not read yet: the header of `trainer.py` after section 2i and the header and `RunConfig` of `run.py`, `privileged.py`, `baselines/recurrent_dqn.py`, the four test files, `conf/config.yaml`.
+
+**Nothing found so far changes a stored number or stands in the way of E1.** The trainer and the run take every size from the domain (actions, observations, value bound, discount); nothing is specific to the canonical Tiger. On Interactive Tiger a value-target expansion has 18 children per latent (3 actions x 6 observations) against 6 on Tiger, about 116,000 child latents per update at the default batch: no chunking is needed there.
+
+**Findings, all deferred to the code batch behind the GPU gate.**
+1. `EpisodeBuffer.add` accepts more episodes than its capacity and then writes duplicate slots in one indexed assignment. Measured on the CPU (capacity 3, five episodes): the later episodes win, as a ring should, but the order of duplicate writes is not defined for an indexed assignment, least of all on CUDA. No configuration reaches it (64 episodes per collection, capacities in the thousands). Change: raise.
+2. `EpisodeBuffer.load_state_dict` keeps the tensors of the dictionary it is given when the device is the CPU (`.to` returns the same tensor), and checks no shape. Measured: the restored buffer shares storage with the dictionary, and a buffer of capacity 7 accepts a state of capacity 3 (the error comes later, as an index out of range in `add`). Every resume goes through a file, so no run is affected. Change: clone and check shapes, with the simulators' restore (Phase 1, deferred).
+3. `save_checkpoint` writes to a temporary name and renames it, which is atomic against a crash of the process. Nothing is flushed before the rename, so the header's "a crash never leaves a truncated checkpoint" does not cover a crash of the host (two since 2026-11-12). A truncated file would fail loudly at load, and the sweep wrapper retrains the seed. Change: flush the file and its directory before the rename.
+
+**Correct as read.**
+- `seeding.py`: a 63-bit hash of (base, stream) by numpy's SeedSequence; ten run streams; the analysis streams use another base. Tested (distinct across bases and streams; neighbouring runs share no simulator stream).
+- `rollout.py`: one routine for collection, evaluation and analysis; an episode that does not truncate at `max_steps` raises; returns are discounted in float64.
+- `trainer.py`, default path: the latents are unrolled once under autocast; the JEPA target comes from the EMA filter without gradient; the value and observation heads read detached latents in JEPA mode and the observation head feeds the filter in decoder mode; the value target is the planner's own expansion with the EMA value head, computed in float32 without autocast for every latent z_0..z_T; one joint gradient norm; a non-finite total raises.
+- `run.py`, core: the acting copies are updated after every optimiser step; warm-up uses the uniform agent; temperature and epsilon decay after each planned collection; the state dictionary holds every network, the optimiser, the buffer, both simulators, the three agents and the global generators.
+
 ## Phase 6 (interpretability and error bounds): reviewed 2026-11-23, three items deferred
 
 Read in full: `analysis.py`, `belief_probe.py`, `error_bounds.py`, `wumpus_latents.py`, `__init__.py`, `tests/test_interpretability.py`. This is the code E1's analysis runs through, so it was reviewed before Phase 5. No finding changes a stored number.
@@ -177,13 +197,13 @@ Read in full: `analysis.py`, `belief_probe.py`, `error_bounds.py`, `wumpus_laten
 | 5 training loop, remedies, baseline | `tests/test_ba_pomcp.py` | NEW 2026-11-20. 2026-11-21: the slow test "the point-mass prior plays the optimal return" was wrong in substance (it passed only because 5 standard errors over 32 episodes exceeded the real 6.2 deficit) and is removed; its header names the measured deficit. | 15 fast tests (5 s): prior validation, count ratios, sampling never returns a structural zero, exact count bookkeeping in the update, an impossible observation raises, the symmetric uninformed prior stays at 1/2, the point-mass prior chooses the optimal action at the six reachable beliefs, reproducibility, and simulator rows independent of the other rows' actions. | 15 passed. |
 | 5 training loop, remedies, baseline | `src/ipomdp/baselines/recurrent_dqn.py` | | | |
 | 5 training loop, remedies, baseline | `src/ipomdp/training/__init__.py` | | | |
-| 5 training loop, remedies, baseline | `src/ipomdp/training/checkpointing.py` | | | |
-| 5 training loop, remedies, baseline | `src/ipomdp/training/episode_buffer.py` | | | |
+| 5 training loop, remedies, baseline | `src/ipomdp/training/checkpointing.py` | Correct selection rules. Finding 3: atomic against a process crash, not against a host crash (nothing is flushed before the rename). | Deferred: flush the file and its directory before the rename. | `test_roundtrip_and_atomic_write`, `test_missing_checkpoint_raises`, the three selection tests. |
+| 5 training loop, remedies, baseline | `src/ipomdp/training/episode_buffer.py` | Findings 1 and 2: an overfull `add` writes duplicate slots; `load_state_dict` aliases the given tensors on the CPU and checks no shape. Neither is reached by a run. | Deferred: raise on more episodes than the capacity; clone and check shapes on restore. | `test_add_sample_and_wraparound`, `test_rejects_wrong_episode_length`, `test_sampling_is_seeded`; the three behaviours measured on the CPU (phase section). |
 | 5 training loop, remedies, baseline | `src/ipomdp/training/privileged.py` | | | |
-| 5 training loop, remedies, baseline | `src/ipomdp/training/rollout.py` | | | |
-| 5 training loop, remedies, baseline | `src/ipomdp/training/run.py` | | | |
-| 5 training loop, remedies, baseline | `src/ipomdp/training/seeding.py` | | | |
-| 5 training loop, remedies, baseline | `src/ipomdp/training/trainer.py` | | | |
+| 5 training loop, remedies, baseline | `src/ipomdp/training/rollout.py` | Correct (phase section). | None. | Used by every training, evaluation and analysis test; `test_evaluation_reports_discounted_return`. |
+| 5 training loop, remedies, baseline | `src/ipomdp/training/run.py` | IN PROGRESS. The code from line 606 is read; construction, collection, evaluation and the state dictionary are correct as read (phase section). The header and `RunConfig` are still to do. | None yet. | `tests/test_training_run.py`, not yet read. |
+| 5 training loop, remedies, baseline | `src/ipomdp/training/seeding.py` | Correct (phase section). | None. | `test_stream_seeds_are_distinct_across_bases_and_streams`, `test_neighbouring_runs_do_not_share_simulator_streams`. |
+| 5 training loop, remedies, baseline | `src/ipomdp/training/trainer.py` | IN PROGRESS. The code from line 366 is read; the default path is correct as read (phase section). The header after section 2i and the option branches against their header sections are still to do. | None yet. | `tests/test_training.py` (27 tests), not yet read. |
 | 5 training loop, remedies, baseline | `tests/test_baselines.py` | | | |
 | 5 training loop, remedies, baseline | `tests/test_training.py` | | | |
 | 5 training loop, remedies, baseline | `tests/test_training_run.py` | | | |
