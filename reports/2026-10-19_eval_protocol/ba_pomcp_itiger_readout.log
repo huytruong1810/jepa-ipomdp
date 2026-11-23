@@ -1,0 +1,11 @@
+commit 6b1ddae0689efafc5f18717aebf6c136b24473f6; read once, 2026-11-23 00:15:57; benchmark cb62c10209e46b0e
+certified bracket [16.5510, 19.6692] (lower: unseeded HSVI, 1000 trials, epsilon 0.5, commit 04be051; upper: information relaxation, delay 2 (itiger_benchmark.log, b083a8c)); reference agent 16.306 on the 256 paired episodes
+
+itiger/main: return -14.104; gap to the reference agent -30.411 [-33.433, -27.388] (Student-t over 10 runs); per run [-28.033, -24.769, -32.454, -30.064, -38.097, -25.641, -26.687, -30.763, -33.539, -34.06]
+  mean return against the bracket: -14.104 in [16.5510, 19.6692]
+  learning curve (mean over runs, per 2,000 steps): -18.66, -17.51, -14.97, -16.35, -14.00, -8.80, -16.37, -15.60, -14.10, -12.81
+
+itiger/known_t: return -18.503; gap to the reference agent -34.809 [-39.712, -29.906] (Student-t over 10 runs); per run [-32.762, -32.848, -26.762, -34.647, -42.211, -41.564, -22.364, -44.339, -36.588, -34.007]
+  mean return against the bracket: -18.503 in [16.5510, 19.6692]
+  learning curve (mean over runs, per 2,000 steps): -5.06, -8.02, -8.32, -17.70, -8.27, -9.82, -14.37, -15.51, -17.94, -13.83
+exit 0

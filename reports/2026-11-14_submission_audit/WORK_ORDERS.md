@@ -2,6 +2,34 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
+
+**E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
+- Certified bracket of V*(b0) on the 26-state fold: **[16.5510, 19.6692]**. 49,909 lower-bound vectors after 1,000 HSVI trials; fold digest 957782ffdac6d103. The file loads, and its L(b0) recomputes from the stored vectors.
+- Log: `reports/2026-11-16_code_audit/itiger_benchmark_artifact_rerun.log`. The run spans three launches (`fc7c793`, `d10b21b`, `04be051`): it was paused once for memory and stopped once by the host crash, and continued from its checkpoint each time. The search code was the same at all three commits.
+- A cross-check that cost nothing: the first, failed run had also ended with 49,909 vectors, as a deterministic search must.
+
+**C-r I-Tiger, read once** (PROTOCOL.md "C-r result, I-Tiger"; log `reports/2026-10-19_eval_protocol/ba_pomcp_itiger_readout.log`).
+- The reference agent scores 16.306 on the 256 paired episodes. Gap to it per episode, Student-t over 10 runs:
+  - main (T uninformed, O oriented): return -14.10, gap -30.411 [-33.433, -27.388];
+  - known_t (T known as well): return -18.50, gap -34.809 [-39.712, -29.906].
+- No learned agent of ours exists on this problem yet; that comparison comes with E1.
+- **Two numbers I flagged in the protocol, to be explained by post hoc diagnostics (labelled as such):**
+  - the upper reference is not above the main arm (post hoc Welch, known_t minus main: -4.399 [-9.826, +1.029]);
+  - known_t's return falls during its own learning period (-5.06 to -13.83 per 2,000-step block).
+- Planned diagnostics, CPU only: the accuracy of each run's learned O and T, and BA-POMCP with the true model on the same episodes (search against learning), as was done on Tiger.
+
+**Level 2.** The user ruled on 2026-11-22 that E1 also covers level 2, after I had reported that the level-2 problem cannot be built as coded and had recommended level 1 only.
+- **What blocks the coded route:** j's level-1 controller needs a bracket of width 0.5, and HSVI's upper end stalls at 43.6 against 16.55 on that fold.
+- **Measured so far** (scratch scripts; they become tracked with the implementation):
+  - j's level-1 problem equals i's (same fold digest), so the benchmark's vectors are j's lower bound too.
+  - Extracting a controller from that lower bound fails. `stationary_graph` on the first 828 and 2,157 vectors at prune epsilons 0.05 to 0.5 gives 26 to 71 nodes with exact values between -14.3 and +5.1 (the lower bound there is 15.8 to 16.2): one witness belief per node does not fix a successor in a 26-dimensional belief space. The lower bound's own pointer controller is a plan tree: 26,274 reachable nodes of 39,941 at trial 770, none mergeable, each path ending in "listen forever" after 65 to 13,823 steps.
+  - Small controllers evaluated exactly: among 16 growl counters (thresholds 1 to 4, four rules for a heard creak), the best is threshold 2 with "restart from the growl heard with the creak": **5 nodes, exact value 15.3567**, against j's optimum in [16.55, 19.67]. An exact local search over single changes of an action or a successor, with up to 12 spare nodes, reaches 15.4516; 24 random starts end at -20 (always listen) or at 15.40 to 15.42.
+  - With the 5-node controller, i's level-2 fold has 14 states (digest 040365f4b6004495). HSVI after 100 trials brackets it in [13.24, 48.19]: the upper end stalls again, so the relaxation's bound is needed there too.
+- **Open, for the user:** which controller defines j at level 1. I work with the 5-node growl counter until told otherwise.
+
+**No paper number and no ledger value changed.**
+
 ## STATUS 2026-11-22 18:45 (the manager seat) — the host crashed at 03:47; nothing of jepa is lost; the benchmark run continues from trial 760
 
 **The crash.**

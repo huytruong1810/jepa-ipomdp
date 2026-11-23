@@ -386,6 +386,23 @@ On the 256 paired episodes of seed 11 the optimal agent scores 22.375, as in C-q
      - Its root decisions are optimal at each of the six beliefs the optimal policy reaches. The loss comes from search noise over whole episodes: a UCB constant of 20 (max R - min R) explores almost uniformly, and a Monte Carlo average sometimes opens a door on the wrong side.
      - Our planner (expectimax over exact observation branching with a learned value leaf) is near the optimum at 50 simulations (C-q.3).
 
+## C-r result, I-Tiger (read once 2026-11-23 00:16; `reports/2026-10-19_eval_protocol/ba_pomcp_itiger_readout.log`; campaign at 5609947, log beside it): BOTH BA-POMCP ARMS ABOUT 30 PER EPISODE BELOW THE REFERENCE AGENT
+
+The benchmark of the 26-state fold (`runs/benchmarks/itiger_level1.pt`, fold digest 957782ffdac6d103): the certified bracket of V*(b0) is [16.5510, 19.6692]. Its lower end is HSVI's after 1,000 trials (49,909 lower-bound vectors; `reports/2026-11-16_code_audit/itiger_benchmark_artifact_rerun.log`), its upper end the information relaxation at delay 2. The reference agent (exact filter, the best lower-bound vector's action) scores 16.306 on the 256 paired episodes of seed 11. Gap to the reference agent per episode, Student-t 95% over 10 runs:
+
+| Arm | Return | Gap to the reference agent |
+|---|---|---|
+| main (T uninformed, O oriented, EXPECTED_MDP, 1000 simulations) | -14.10 | -30.411 [-33.433, -27.388] |
+| known_t (T known as well; the upper reference) | -18.50 | -34.809 [-39.712, -29.906] |
+
+- Per-run values are in the log. Both arms' mean returns lie about 30 below the lower end of the bracket.
+- Learning curves (mean over runs, per 2,000 environment steps): main goes from -18.66 in the first block to -12.81 in the last; known_t goes from -5.06 to -13.83.
+- No learned agent of ours exists on this problem yet, so by the registration BA-POMCP stands against the bracket. The comparison with our agent follows with the first interactive experiment.
+- All 180 jobs of the campaign finished (2 arms x 10 runs x one learning period and 8 evaluation chunks); the campaign log has no error.
+- **Two numbers that need an explanation** (the registered readout cannot give one; post hoc diagnostics follow below when they are run, labelled as such):
+  1. The upper reference is not above the main arm. Post hoc Welch on the per-run gaps, known_t minus main: -4.399 [-9.826, +1.029] (15.0 df), so the difference is within the noise of ten runs, but its sign is the opposite of what more knowledge should give.
+  2. known_t's return falls during its own learning period (-5.06 to -13.83), while main's rises.
+
 ## Change log
 Any change after the first held-out read is logged here with its date and reason. A change makes the claims it affects exploratory.
 
