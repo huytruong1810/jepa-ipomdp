@@ -52,6 +52,17 @@
 - **Not implemented from the plan:** geometry per marginal on the interactive state. It can be computed later from the stored runs on the CPU, labelled post hoc.
 - **Tests added:** the lemma at 14 and 26 states; the bounds on a lower-bound set grouped by action; an exactly informative latent over 14 states; the non-finite case; the pointer equation of a bracket; and the two the plan listed for Wumpus (the MLP probe, and a tiny run analysed end to end).
 
+**Addendum 2026-11-23 16:50: user ruling on the proposal of 15:35 ("Add it"): the local form of the span lemma is implemented, registered for the canonical Tiger as post hoc, and drafted into C-s.**
+- **The ruling:** contribution (3) carries the local form beside the global one. For the folds it is registered with E1 (C-s.4) before any run; for the canonical Tiger it is reported labelled post hoc.
+- **The statement** (`interpretability/error_bounds.py`, section 5, with the proof): for V(b) = max_k alpha_k . b and alpha_b a maximiser at b, |V(b) - V(b')| <= max(span(alpha_b), span(alpha_b')) / 2 x ||b - b'||_1. For the one-step regret: (span(alpha) + span(beta)) / 2 x eps, with alpha active in Q(., a*) at the exact belief and beta active in Q(., a^) at the decoded one. The policy form sums the per-step local bounds.
+  - It holds pair by pair and is never above the global form, which is the case where the largest span of the set replaces the two.
+  - It is a bound per pair and, averaged, on the expected error. It is not one constant known before the beliefs are: the paper should say "local" or "data-dependent" and keep the global constant as the a priori statement.
+  - It needs only the vector sets, so it holds for a lower-bound set as for V*.
+- **Code** (`1101057`; fast suite 335 passed, golden 51): `local_bounds` and six new fields of the bound report beside the old ones; `AlphaVectorSet.maximiser`. Every earlier field is computed by the same expressions: a stand-in fold report equals the stored one field for field apart from the new keys. New canonical Tiger reports gain the six keys; the stored reports and the ledger are not touched.
+- **C-q.4, registered at `440adad` before its first run on the stored runs, post hoc:** the local form on the ten canonical JEPA runs, `analyze_beliefs` as the stored analysis called it, on the CPU, with the global values printed beside the stored ones (the GPU drew other episodes for the same seed). No pass rule. It is RUNNING since 16:47 as two CPU units (five seeds each, one thread, nice 19); the result follows in its own block, read once.
+- **C-s draft:** C-s.4 names both forms and states in advance what the benchmark files alone give (L_Q 57.75 / 56.67; the active vector's half-span averages 18.9 / 16.8 at the reference agent's beliefs). The Interactive Tiger metric table, both console summaries and the readout draft carry the local form.
+- **Ledger:** no id is added. If the paper cites C-q.4, order the ids and I add them from the script's JSON.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
