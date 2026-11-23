@@ -33,6 +33,12 @@
 #      growls reaches R^2 = 0.93 on canonical Tiger.
 #    - L1 distance ||b* - psi(z)||_1 (mean, 99th percentile, max): the quantity the Hoelder-type
 #      value and regret bounds are linear in (error_bounds.py).
+#    - The table per distinct exact posterior is keyed by P(s = 0 | h), which identifies the posterior in a
+#      two-state problem only. With more states (the folded interactive problems have 14 and 26) that key says
+#      nothing, and the table held up to 10,001 rows per probe, megabytes in every report: it is None there. The
+#      marginal reports of experiments/interactive_analysis.py are the per-factor readout of those problems.
+#    - A non-finite divergence raises FloatingPointError. A diverged probe would otherwise reach the report as NaN
+#      (torch.quantile returns NaN on a NaN input), and the aggregate over seeds would carry it silently.
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -63,7 +69,8 @@ class ProbeReport:
     Attributes:
         mean_kl, max_kl: KL(b* || psi(z)) in nats.
         mean_l1, p99_l1, max_l1: ||b* - psi(z)||_1.
-        by_posterior: {rounded exact P(s = 0 | h): (count, mean KL, mean L1)}.
+        by_posterior: {rounded exact P(s = 0 | h): (count, mean KL, mean L1)} in a two-state problem, else None
+            (section 4).
     """
 
     mean_kl: float
@@ -71,7 +78,7 @@ class ProbeReport:
     mean_l1: float
     p99_l1: float
     max_l1: float
-    by_posterior: dict[float, tuple[int, float, float]]
+    by_posterior: dict[float, tuple[int, float, float]] | None
 
 
 @torch.no_grad()
@@ -158,10 +165,14 @@ def evaluate_probe(probe: BeliefProbe, dataset: ProbeDataset) -> ProbeReport:
     log_model = probe.log_probs(dataset.latents).double()
     kl = (exact * (exact.clamp(min=1e-12).log() - log_model)).sum(-1)
     l1 = (exact - log_model.exp()).abs().sum(-1)
-    key = exact[:, 0].round(decimals=4)
-    by_posterior = {}
-    for value in key.unique().tolist():
-        rows = key == value
-        by_posterior[value] = (int(rows.sum()), float(kl[rows].mean()), float(l1[rows].mean()))
+    if not (bool(torch.isfinite(kl).all()) and bool(torch.isfinite(l1).all())):
+        raise FloatingPointError("the probe's divergence from the exact posteriors is not finite (section 4).")
+    by_posterior = None
+    if exact.shape[1] == 2:
+        key = exact[:, 0].round(decimals=4)
+        by_posterior = {}
+        for value in key.unique().tolist():
+            rows = key == value
+            by_posterior[value] = (int(rows.sum()), float(kl[rows].mean()), float(l1[rows].mean()))
     return ProbeReport(float(kl.mean()), float(kl.max()), float(l1.mean()), float(torch.quantile(l1, 0.99)),
                        float(l1.max()), by_posterior)

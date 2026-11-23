@@ -21,9 +21,14 @@
 #      R_min / (1 - gamma): every policy's value is at least that, so every set stays a lower bound of its Q*(., a), none
 #      is empty, and the constant never beats a plan vector. The greedy action over the groups is then the action of the
 #      best vector, i.e. the reference agent above.
-#    - Consequently the span-Holder bounds (interpretability/error_bounds.py) bound a decoded-belief agent's loss
-#      against this REFERENCE, not against the unknown optimum, and the reported bracket width bounds only
-#      V*(b0) - L(b0). The report names both.
+#    - Consequently the span-Holder bounds (interpretability/error_bounds.py, section 4) are statements about the
+#      lower bound, not about the unknown optimum: the value error is that of the function L, the regret is measured
+#      in the per-action lower bounds, and the policy form bounds a decoded-belief agent's loss against L(b0), the
+#      value the reference agent attains or exceeds. The reported bracket width bounds V*(b0) - L(b0); adding it to
+#      the policy bound gives a bound on the loss against the optimum. The report names both.
+#    - Both the reference agent's guarantee and the policy bound need every vector to be the value of its own
+#      pointer plan in the stored set. That is checked on the two benchmark files of the experiments, to 3.4e-13
+#      (reports/2026-11-16_code_audit/benchmark_improvability.py and .log), not assumed.
 #
 # 3. Interactive Marginals (the theory-of-mind readout):
 #    - The fold's state is (s, n_j, a_j_prev). The probes of interpretability/analysis.py decode the whole interactive

@@ -42,6 +42,28 @@
 #      bound together with the measured return of the decoded-belief policy in the simulator
 #      (analysis.py). A bound that is far above its measurement is honest but loose; a
 #      measurement above its bound would indicate a bug.
+#
+# 4. With a Lower Bound in Place of V* and Q* (the folded interactive problems):
+#    - A folded interactive problem has no exact solution (experiments/interactive_analysis.py). The vector sets
+#      passed in are then a certified lower bound, L(b) = max_k alpha_k . b <= V*(b), and per action the vectors of
+#      that action, Q_L(b, a) <= Q*(b, a). What the three guarantees say in that case:
+#        (a) is a statement about the function L: |L(b*) - L(psi(z))| <= L_V eps. Nothing about V*.
+#        (b) is a regret in Q_L: Q_L(b*, a_L) - Q_L(b*, a^) <= 2 L_Q eps, with a_L the action of the best vector.
+#            The proof of section 2 uses only that each Q_L(., a) is Lipschitz.
+#        (c) bounds the loss against the LOWER BOUND at b0, not against the optimum and not against the value of
+#            the agent that plays a_L (which is at least L(b0)):
+#               L(b0) - V^psi(b0) <= 2 L_Q sum_t gamma^t E[eps_t].
+#    - (c) needs one property of the set: every vector is the value of its own pointer plan within the set,
+#      alpha_k = R(., a_k) + gamma sum_o M_{a_k,o} alpha_{succ(k,o)}, as the vectors of a point-based backup are
+#      (domain/bounds.py). Then, for every belief and action,
+#           Q_L(b, a) <= R(b, a) + gamma sum_o P(o | b, a) L(tau(b, a, o)).                                    (*)
+#      Proof of (c) from (*): along the psi-policy, L(b_t) = Q_L(b_t, a^_t) + regret_t
+#      <= r(b_t, a^_t) + gamma E[L(b_{t+1})] + regret_t; unrolling, with L bounded, gives
+#      L(b0) <= V^psi(b0) + sum_t gamma^t E[regret_t], and regret_t <= 2 L_Q eps_t by (b).
+#    - With regret 0 the same argument shows that the agent playing a_L has value at least L(b0).
+#    - (*) is not assumed for the two benchmark files of the interactive experiments: every one of their vectors
+#      equals its pointer backup to 3.4e-13 (reports/2026-11-16_code_audit/benchmark_improvability.py and .log).
+#    - Consequently V*(b0) - V^psi(b0) <= (U - L)(b0) + the bound of (c), with U the certified upper bound.
 # ==============================================================================
 
 from dataclasses import dataclass

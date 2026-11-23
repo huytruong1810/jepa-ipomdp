@@ -765,6 +765,72 @@ class TestLearningStack:
         plt.close(plot_latent_pca(data))
 
 
+    def test_mlp_probe_decodes_a_latent_that_holds_its_targets(self):
+        """
+        wumpus_latents.py, section 2: when the latent holds the hunter's cell, heading, arrow and the wumpus's life
+        (one-hot, with noise dimensions beside them) and the hazard marginals are a function of the cell, the MLP probe
+        reads all of them on held-out rows and beats both constant predictors on the hazards.
+        """
+        from ipomdp.interpretability import WumpusLatentDataset, evaluate_wumpus_probe, fit_mlp_wumpus_probe
+        table = torch.rand(16, 48, dtype=torch.float64, generator=torch.Generator().manual_seed(1))
+
+        def dataset(n: int, seed: int) -> WumpusLatentDataset:
+            g = torch.Generator().manual_seed(seed)
+            cell, heading = torch.randint(16, (n,), generator=g), torch.randint(4, (n,), generator=g)
+            arrow, alive = torch.rand(n, generator=g) < 0.5, torch.rand(n, generator=g) < 0.5
+            latents = torch.cat([torch.nn.functional.one_hot(cell, 16).float(),
+                                 torch.nn.functional.one_hot(heading, 4).float(), arrow.float()[:, None],
+                                 alive.float()[:, None], torch.randn(n, 4, generator=g)], dim=1)
+            return WumpusLatentDataset(latents, table[cell], cell, heading, arrow, alive,
+                                       torch.zeros(n, dtype=torch.float64), torch.arange(n), torch.zeros(n, dtype=torch.int64))
+
+        fit, held = dataset(2000, 2), dataset(1000, 3)
+        report = evaluate_wumpus_probe(fit_mlp_wumpus_probe(fit, steps=400, hidden=64), fit, held)
+        assert report.rows == 1000
+        assert min(report.cell_accuracy, report.heading_accuracy, report.arrow_accuracy, report.alive_accuracy) > 0.99
+        for name in ("pit", "wumpus", "gold"):
+            assert report.hazard_error[name] < 0.05 < report.median_constant_error[name] <= report.constant_error[name] + 1e-12
+
+    def test_a_tiny_wumpus_run_is_analysed_end_to_end(self, tmp_path):
+        """
+        experiments/wumpus.py through a run directory: a tiny env=wumpus run is trained one collection, saved like
+        main.py and analysed. The report holds every agent and probe, games.npz holds one row per game and agent, and
+        the two agree; the reference agent that never gambles never dies.
+        """
+        import json
+        from pathlib import Path as _Path
+        import numpy as np
+        from hydra import compose, initialize_config_dir
+        from omegaconf import OmegaConf
+        from ipomdp.experiments import WumpusAnalysisSettings, analyze_wumpus_run, build_training_run
+        from ipomdp.training import save_checkpoint
+        overrides = ["env=wumpus", "env.max_steps=8", "training.env_batch_size=4", "training.warmup_episodes=4",
+                     "training.batch_size=4", "training.updates_per_collection=2", "training.eval_episodes=4",
+                     "model.latent_dim=8", "model.hidden_dim=16", "mcts.num_simulations=4"]
+        with initialize_config_dir(config_dir=str(_Path(__file__).resolve().parents[1] / "conf"), version_base=None):
+            cfg = compose(config_name="config", overrides=overrides)
+        _, run = build_training_run(cfg, CPU)
+        run.collect_and_train()
+        (tmp_path / ".hydra").mkdir()
+        OmegaConf.save(cfg, tmp_path / ".hydra" / "config.yaml")
+        save_checkpoint(tmp_path / "checkpoints" / "best.pt", {
+            "collection": 1, "eval_return": 0.0, "networks": {name: net.state_dict() for name, net in run.networks.items()}})
+        settings = WumpusAnalysisSettings(episodes=8, mlp_probe_steps=10, seed=1)
+        report = analyze_wumpus_run(tmp_path, settings, CPU)
+        stored = json.loads((tmp_path / "analysis" / "report.json").read_text())
+        agents = {"learned_planner", "random", "reference_risk0", "reference_risk0.4", "reference_risk1"}
+        assert set(report["returns"]) == set(stored["returns"]) == agents
+        assert set(report["probes"]) == {"linear_random", "mlp_random", "linear_agent", "mlp_agent"}
+        assert stored["settings"]["episodes"] == 8 and stored["checkpoint"] == "best.pt" and stored["checkpoint_collection"] == 1
+        with np.load(tmp_path / "analysis" / "games.npz") as games:
+            for agent in agents:
+                assert games[f"{agent}.return"].shape == (8,)
+                assert float(games[f"{agent}.return"].mean()) == pytest.approx(report["returns"][agent]["discounted_return"])
+                assert float(games[f"{agent}.died"].mean()) == pytest.approx(report["returns"][agent]["death_rate"])
+            assert not games["reference_risk0.died"].any()
+        assert (tmp_path / "analysis" / "belief_maps.png").exists() and (tmp_path / "analysis" / "latent_pca.png").exists()
+
+
 class TestReferenceAgent:
     """The exact-belief reference agent (agents/wumpus_reference.py): safe by construction, and it uses the arrow."""
 

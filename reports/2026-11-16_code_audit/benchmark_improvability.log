@@ -1,0 +1,17 @@
+commit 0165b05
+
+level 1: 26 states, 49909 vectors, bracket [16.5510, 19.6692], fold digest 957782ffdac6d103
+  action LISTEN: 37995 vectors, largest |alpha_k - pointer backup| 1.421e-14
+  action OPEN_LEFT: 5738 vectors, largest |alpha_k - pointer backup| 3.411e-13
+  action OPEN_RIGHT: 6176 vectors, largest |alpha_k - pointer backup| 2.274e-13
+  exact check: largest residual over all vectors and states 3.411e-13 (values reach 955.0)
+  sampled check at 12801 beliefs (b0, the reference agent's, a random agent's): smallest slack of (*) over all actions -5.684e-14; at the reference agent's own action: smallest -2.132e-14, mean 0.0019
+  (140 s)
+
+level 2: 14 states, 67241 vectors, bracket [13.2627, 14.2574], fold digest 040365f4b6004495
+  action LISTEN: 47302 vectors, largest |alpha_k - pointer backup| 1.421e-14
+  action OPEN_LEFT: 9900 vectors, largest |alpha_k - pointer backup| 2.274e-13
+  action OPEN_RIGHT: 10039 vectors, largest |alpha_k - pointer backup| 2.274e-13
+  exact check: largest residual over all vectors and states 2.274e-13 (values reach 955.0)
+  sampled check at 12801 beliefs (b0, the reference agent's, a random agent's): smallest slack of (*) over all actions -7.105e-14; at the reference agent's own action: smallest -1.421e-14, mean 0.0001
+  (212 s)

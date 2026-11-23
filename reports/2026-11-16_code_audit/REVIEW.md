@@ -105,6 +105,36 @@ The solver's witness LP becomes public; nothing numeric changes.
 
 **Reference agent at the paper's threshold (risk 0.4; `tests/test_wumpus_agents.py`, slow).** Against an independent exact filter, every gamble had an exact danger <= 0.4. Over 64 games, only 6 of its steps were gambles; the largest danger taken was 1/3, and no game ended in a death. It won 68.8% of the games against 59.4% at risk 0.
 
+## Phase 6 (interpretability and error bounds): reviewed 2026-11-23, three items deferred
+
+Read in full: `analysis.py`, `belief_probe.py`, `error_bounds.py`, `wumpus_latents.py`, `__init__.py`, `tests/test_interpretability.py`. This is the code E1's analysis runs through, so it was reviewed before Phase 5. No finding changes a stored number.
+
+**Findings.**
+1. **On a folded problem the span bounds are statements about the lower bound, and the policy form was described against the wrong quantity.** The vector sets passed in are then a certified lower bound L and its per-action parts, not V* and Q*.
+   - The value error is that of the function L. The regret is measured in the per-action lower bounds. Both follow from the Lipschitz argument alone.
+   - The policy form bounds L(b0) - V^psi(b0): the loss against the certified lower bound, not against the optimum and not against the reference agent's value (which is at least L(b0)). `interactive_analysis.py` had said "against this reference".
+   - It needs one property of the set: every vector is the value of its own pointer plan within the set. Then Q_L(b, a) <= R(b, a) + gamma sum_o P(o | b, a) L(tau(b, a, o)) at every belief, and unrolling along the decoded-belief policy gives the bound (`error_bounds.py`, section 4, with the proof).
+   - **Checked, not assumed:** on both benchmark files every vector equals its pointer backup to 3.4e-13, and the inequality has no negative slack beyond 7e-14 at 12,801 visited beliefs per level (`benchmark_improvability.py` and `.log`). The same property is tested on a Tiger bracket.
+   - The E1 readout draft and the registration draft (C-s.4) now say this, and print L(b0) minus the decoded-belief agent's return as the measured counterpart.
+2. **`ProbeReport.by_posterior` is keyed by P(s = 0 | h),** which identifies the posterior in a two-state problem only. On a fold it was a meaningless table of up to 10,001 rows per probe, megabytes per report. It is None for more than two states; Tiger reports are unchanged.
+3. **A diverged probe reached the report as NaN** (`torch.quantile` returns NaN on a NaN input). `evaluate_probe` raises FloatingPointError on a non-finite divergence.
+4. **Memory:** `error_bounds` evaluates the value set at every evaluation belief at once, 19 GB and 26 GB on the two folds. Fixed in the solver (`5c24ffe`, Phase 1 row of `solver.py`).
+5. **How loose the bounds will be on the folds (measured on the benchmark files alone, no learned agent).** L_V = L_Q = 57.75 at level 1 and 56.67 at level 2, set by a few vectors that open a door (span about 110). The policy form is therefore 2,310 times the mean decoding error, against a value range of 2,200: it says something only below a mean L1 error of about 0.01. The value-error and one-step forms are 58 and 116 times the error.
+   - A local form of the lemma is valid and tighter: |L(b) - L(b')| <= max(span of the vector active at b, span of the vector active at b') / 2 x ||b - b'||_1. At the beliefs the reference agent visits, the active vector's half-span averages 18.9 at level 1 and 16.8 at level 2 (maximum 57.6), so the expected form would be about three times tighter. Not implemented: it changes what contribution (3) states, which is the audit session's decision (WORK_ORDERS).
+
+**Deferred until W11 is read.** Seeds 10-14 must be analysed by the code that analysed seeds 5-9, so `wumpus_latents.py` is not edited before that read.
+- `evaluate_wumpus_probe` returns NaN for the 99th percentile above 2^24 elements instead of raising. It is never reached at the paper's sizes (417,792 elements per object at 512 games).
+- One probe-fitting core: `belief_probe.py` and `wumpus_latents.py` hold the same standardisation, L-BFGS and Adam loops twice. A shared core must keep the order of the random draws.
+- One PCA: `latent_geometry` and `plot_latent_pca` each take their own SVD.
+
+**Not implemented from the plan:** geometry per marginal on the interactive state. `GeometryReport`'s rank correlations exist for two-state problems only (null in an itiger report). The marginal probes are the per-factor readout; a per-marginal geometry can be computed later from the stored runs on the CPU, labelled post hoc.
+
+**Observations without a change.**
+- `fit_mlp_probe` and `fit_mlp_wumpus_probe` reseed the GLOBAL generator (`torch.manual_seed`), a side effect on whatever draws next. `fit_linear_probe` starts from the generator's current state, so its result depends on the call order within the optimiser's tolerance (the problem is convex).
+- The decoded-belief agent acts on the probe fitted on RANDOM histories (documented in `analysis.py`), while the bounds are evaluated with the probe fitted on the agent's histories.
+
+**Tests added** (fast): the lemma at 14 and 26 states; the bounds on a lower-bound set grouped by action with the floor vector, at three noise levels; an exactly informative latent over 14 states; a non-finite divergence raises; the pointer equation of a bracket's vectors (`tests/test_interactive.py`); the MLP Wumpus probe on a latent that holds its targets; a tiny Wumpus run analysed end to end through its run directory (`tests/test_wumpus.py`). The last two are the plan's "new tests for `fit_mlp_wumpus_probe` and `analyze_wumpus_run`".
+
 ## Files
 
 | Phase | File | Findings | Change | Check |
@@ -158,12 +188,12 @@ The solver's witness LP becomes public; nothing numeric changes.
 | 5 training loop, remedies, baseline | `tests/test_training.py` | | | |
 | 5 training loop, remedies, baseline | `tests/test_training_run.py` | | | |
 | 5 training loop, remedies, baseline | `tests/test_world_model_acceptance.py` | | | |
-| 6 interpretability and error bounds | `src/ipomdp/interpretability/__init__.py` | | | |
-| 6 interpretability and error bounds | `src/ipomdp/interpretability/analysis.py` | | | |
-| 6 interpretability and error bounds | `src/ipomdp/interpretability/belief_probe.py` | | | |
-| 6 interpretability and error bounds | `src/ipomdp/interpretability/error_bounds.py` | | | |
-| 6 interpretability and error bounds | `src/ipomdp/interpretability/wumpus_latents.py` | | | |
-| 6 interpretability and error bounds | `tests/test_interpretability.py` | | | |
+| 6 interpretability and error bounds | `src/ipomdp/interpretability/__init__.py` | Correct: the 27 imported names and the 27 names of `__all__` are the same set. | None. | Import in every test of the phase. |
+| 6 interpretability and error bounds | `src/ipomdp/interpretability/analysis.py` | Correct as read: the three agents share one simulator stream; the minimality ratio groups by the exact posterior rounded to 6 decimals; rank correlations only for two states. On a fold its "optimal" row is the reference agent and its bounds are about the lower bound (phase section, finding 1). Geometry per marginal is not implemented. | None in this file (the reading is fixed in `error_bounds.py` section 4 and `interactive_analysis.py` section 2). | `TestBeliefAnalysis`, `TestGeometry`; the end-to-end sweeps on the CPU stand-ins at 16 and at 512 episodes. |
+| 6 interpretability and error bounds | `src/ipomdp/interpretability/belief_probe.py` | Findings 2 and 3 of the phase section: the two-state table on many-state problems; NaN instead of an error. Both MLP fits reseed the global generator (observation). | `by_posterior` is None for more than two states; a non-finite divergence raises. Tiger reports unchanged. One probe-fitting core with `wumpus_latents.py` is deferred until W11 is read. | `TestProbes` (two states with the table, 14 states without, the non-finite case). |
+| 6 interpretability and error bounds | `src/ipomdp/interpretability/error_bounds.py` | The lemma and the three guarantees are correct for V* and Q*. Finding 1: what they state for a lower-bound set, and the property the policy form needs. Finding 4: memory, fixed in the solver. Finding 5: how loose they are on the folds, and a tighter local form (not implemented). | Comment only: header section 4 with the proof (code identical to HEAD by AST comparison). | `TestLipschitzLemma` at 2, 3, 5, 14 and 26 states; `TestErrorBounds` (Tiger, and a lower-bound set grouped by action); `benchmark_improvability.log` on both benchmark files. |
+| 6 interpretability and error bounds | `src/ipomdp/interpretability/wumpus_latents.py` | Correct as read: only running games enter; the median constant is the best constant under mean absolute error; the replay is chunked. Three items deferred until W11 is read: the NaN in place of an error for the 99th percentile above 2^24 elements, the duplicated probe-fitting core, the second PCA. | None before W11's read. | `test_probe_dataset_and_figures`; new: `test_mlp_probe_decodes_a_latent_that_holds_its_targets`, `test_a_tiny_wumpus_run_is_analysed_end_to_end`. |
+| 6 interpretability and error bounds | `tests/test_interpretability.py` | Covered the lemma, the per-action sets, the bounds and the probes on two states only; nothing at the size of a fold and no failure case. | Three tests added and the lemma extended to 14 and 26 states (phase section). | Fast suite. |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `README.md` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `analyze.py` | E1 plumbing (2026-11-20): an itiger run went to analyze_run and would have started an exact solve of the fold, which is out of reach. | itiger runs go to `analyze_interactive_run` and need `--benchmark`; the flag is refused for other domains. Phase 7 review still open. | `--help`; the slow end-to-end test in `tests/test_interactive_analysis.py`. |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `conf/config.yaml` | | | |

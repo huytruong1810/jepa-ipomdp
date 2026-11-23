@@ -39,7 +39,7 @@ def _random_beliefs(n: int, states: int) -> torch.Tensor:
 
 class TestLipschitzLemma:
 
-    @pytest.mark.parametrize("states", [2, 3, 5])
+    @pytest.mark.parametrize("states", [2, 3, 5, 14, 26])            # 14 and 26: the folded interactive problems
     def test_span_hoelder_bound_holds_and_is_tight(self, states):
         torch.manual_seed(states)
         vectors = torch.randn(7, states, dtype=torch.float64) * 10
@@ -98,6 +98,34 @@ class TestErrorBounds:
         assert report.policy_loss_bound == pytest.approx(report.regret_bound_max / (1 - tiger.discount))
 
 
+    @pytest.mark.parametrize("noise", [0.01, 0.05, 0.2])
+    def test_bounds_hold_for_a_lower_bound_set_grouped_by_action(self, noise):
+        """
+        error_bounds.py, section 4: with a lower bound's vectors grouped by action (each group with the constant floor
+        vector, as experiments/interactive_analysis.py builds them) the value error and the regret in the per-action
+        lower bounds stay under their bounds, and the two Lipschitz constants coincide.
+        """
+        torch.manual_seed(3)
+        states, count, num_actions = 14, 60, 3
+        vectors = torch.randn(count, states, dtype=torch.float64) * 20
+        actions = torch.arange(count) % num_actions
+        value = AlphaVectorSet(vectors, actions)
+        floor = torch.full((1, states), float(vectors.min()) - 1.0, dtype=torch.float64)
+        per_action = [AlphaVectorSet(torch.cat([vectors[actions == a], floor]),
+                                     torch.full((int((actions == a).sum()) + 1,), a)) for a in range(num_actions)]
+        true = _random_beliefs(3000, states)
+        decoded = (1 - noise) * true + noise * _random_beliefs(3000, states)
+        report = error_bounds(value, per_action, 0.95, true, decoded)
+        assert report.lipschitz_q == report.lipschitz_value
+        assert 0.0 < report.belief_l1_max <= 2 * noise + 1e-12
+        assert report.value_error_max <= report.value_error_bound_max + 1e-9
+        assert report.regret_max <= report.regret_bound_max + 1e-9
+        assert report.value_error_mean <= report.value_error_bound_mean + 1e-9
+        assert report.regret_mean <= report.regret_bound_mean + 1e-9
+        # The greedy action over the groups is the action of the best vector.
+        assert torch.equal(q_values(per_action, true).argmax(-1), value.greedy_action(true))
+
+
 class TestProbes:
 
     def test_dataset_replays_exact_posteriors(self, tiger):
@@ -120,6 +148,30 @@ class TestProbes:
             return ProbeDataset(latents, torch.stack([p, 1 - p], -1))
         report = evaluate_probe(fit_linear_probe(dataset(4000)), dataset(4000))
         assert report.mean_kl < 1e-4 and report.max_l1 < 0.02
+        assert report.by_posterior is not None and sum(count for count, _, _ in report.by_posterior.values()) == 4000
+
+    def test_linear_probe_recovers_an_exactly_informative_latent_over_many_states(self):
+        # latent = log posterior over 14 states (centred): the linear-softmax probe can represent b* exactly, so its
+        # held-out error is the optimiser's. The two-state table does not exist for such a problem.
+        torch.manual_seed(0)
+        def dataset(n):
+            posteriors = _random_beliefs(n, 14).clamp(min=1e-4)
+            posteriors = posteriors / posteriors.sum(-1, keepdim=True)
+            log = posteriors.log()
+            return ProbeDataset((log - log.mean(-1, keepdim=True)).float(), posteriors)
+        report = evaluate_probe(fit_linear_probe(dataset(4000)), dataset(4000))
+        assert report.mean_kl < 1e-3 and report.mean_l1 < 0.03
+        assert report.by_posterior is None
+
+    def test_a_non_finite_divergence_raises(self):
+        torch.manual_seed(0)
+        posteriors = _random_beliefs(50, 2)
+        data = ProbeDataset(torch.randn(50, 4), posteriors)
+        probe = fit_linear_probe(data)
+        with torch.no_grad():
+            probe.network.weight[0, 0] = float("nan")
+        with pytest.raises(FloatingPointError):
+            evaluate_probe(probe, data)
 
 
 class TestBeliefAnalysis:

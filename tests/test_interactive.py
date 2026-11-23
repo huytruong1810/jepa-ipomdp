@@ -305,6 +305,31 @@ class TestBracket:
         assert compact.num_nodes < bracket.controller.num_nodes
         assert value <= 19.3713 + 1e-4 and bracket.upper - value < 1.0
 
+    def test_every_lower_bound_vector_is_the_value_of_its_pointer_plan(self):
+        """
+        The property behind a reference agent's guarantee and the policy form of the span bounds
+        (interpretability/error_bounds.py, section 4): alpha_k = R(., a_k) + gamma sum_o M_{a_k,o} alpha_{succ(k,o)}
+        within the returned set, hence Q_L(b, a) <= R(b, a) + gamma sum_o P(o|b,a) L(tau(b,a,o)) at every belief.
+        """
+        model = build_tiger_pomdp()
+        bracket = hsvi_vector_bracket(model, 0.01, 8)
+        vectors, actions, successors = bracket.lower_vectors, bracket.actions, bracket.successors
+        step = torch.einsum("ast,ato->aost", model.transition, model.observation)       # M_{a,o}[s, s']
+        backed = model.reward[actions].clone()
+        for o in range(model.num_observations):
+            backed += model.discount * torch.einsum("kst,kt->ks", step[actions, o], vectors[successors[:, o]])
+        assert torch.allclose(vectors, backed, atol=1e-10, rtol=0.0)
+        # The consequence, at a grid of beliefs and for every action.
+        value = AlphaVectorSet(vectors, actions)
+        grid = torch.linspace(0, 1, 201, dtype=F64)
+        beliefs = torch.stack([grid, 1 - grid], -1)
+        for a in range(model.num_actions):
+            lookahead = beliefs @ model.reward[a]
+            for o in range(model.num_observations):
+                lookahead = lookahead + model.discount * value.value(beliefs @ step[a, o])
+            own = AlphaVectorSet(vectors[actions == a], actions[actions == a]).value(beliefs)
+            assert (own <= lookahead + 1e-9).all()
+
     def test_a_checkpointed_search_continues_to_the_uninterrupted_result(self, tmp_path):
         # bounds.py, section 7: trials draw no random numbers and a checkpoint restores every array bit for bit, so
         # three trials, a stop and three more must equal six trials in one go. A width of 0.01 is not reached in six
