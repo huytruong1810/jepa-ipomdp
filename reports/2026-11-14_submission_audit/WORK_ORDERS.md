@@ -23,6 +23,16 @@
 
 **The GPU hold stands** (`runs/week/PAUSE`, the user's). Order when it lifts: W11 (C-o), the GPU fingerprint stage for the deferred code batch, the I-Tiger smoke, E1. My estimate is unchanged: the hold has to lift by about 2026-11-27 for E1 to read out by 2026-12-05.
 
+**Addendum 2026-11-23 08:45: a statement the paper may make about the published examples, and two more checks.**
+- **The level-1 examples of Gmytrasiewicz & Doshi (2005, Section 7.3) are computed and NOT reproduced** (`reports/2026-11-16_code_audit/gd2005_level1_examples.py` and `.log`, `1c67276`; seconds on the CPU). This closes the open "Fig. 11" item of Phase 1 with a negative result.
+  - What is reproduced from that paper: Table 1 exactly (tested, and cross-checked against ipomcp's independent code to 2.8e-14), and Fig. 4, the horizon-3 policy of the POMDP with noise (level 0), within 0.003.
+  - Fig. 11 (agent i at level 1, horizon 3, undiscounted, no information about j's belief): the paper opens a door outside [0.029, 0.971] of p_i(TL) and shows seven regions. Our fold opens outside [0.0182, 0.9818] and its value has 16 kinks. The value's endpoints (8) and centre (1.93) agree with the axis of the paper's Fig. 10.
+  - The paper's action law of j with two steps to go, after i hears a growl left and no creak: OL 0.009076, L 0.96591, OR 0.02501. Ours: 0.0259 / 0.8983 / 0.0758. If level 0 is read as the single-agent POMDP instead, L is 1. The paper's value lies between the two readings; we could not identify its convention.
+  - **For the paper:** "the tables are those of Table 1, and the level-0 policy of Fig. 4 is reproduced" is supported. "The level-1 examples are reproduced" is not, and should not be written. The experiments do not depend on those examples: they use Table 1 at gamma 0.95 with controllers certified by exact evaluation.
+  - Method note: the alpha-vector solve of the 44-state horizon-3 fold, which was once killed for memory, is not needed. The value along the figure's belief segment is evaluated by exact expectimax (3 actions x 6 observations, depth 3).
+- **`policy_graph.envelope` raises on duplicate vectors** (`2d49583`; the open item of the 2026-11-21 review). It used to drop both copies. No caller passes duplicates, so no result changes: the fast and the two slow tests of the interactive problems pass, golden 51.
+- **Level 2 runs end to end on the CPU:** `main.py env=itiger env.level=2` at tiny settings exits 0, and its analysis against `runs/benchmarks/itiger_level2.pt` completes; the level-1 file is refused for that run by its fold digest.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
