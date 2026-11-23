@@ -17,6 +17,8 @@
 **E1's benchmark run.** The supervisor and the run are up again since 18:42:11 at commit `04be051`, continuing from the checkpoint (660 MB). 240 trials remain; on the idle machine the problem was rebuilt in 22 s against 50 s before, so I expect it within about 5 hours. The benchmark file does not exist yet, and C-r I-Tiger stays unread until it does.
 
 **Sessions.** After the restart a terminal session in this repository carries the manager session's name. I asked it for its role at 18:42; until it answers, only this desktop session acts as manager.
+- **Added 18:50.** It was a second copy of this conversation. It changed nothing and closed.
+- **Added 18:50: one worker.** The user said in this session that the WSL reviewer no longer works on the project. This session now holds the reviewer's duties as well: Phases 2-4, the BA-POMCP baseline, the E1 analysis plumbing and the C-r I-Tiger readout. C-r I-Tiger is read once by this session after the benchmark file exists, by the registered command.
 
 ## STATUS 2026-11-22 03:45 (the manager seat) — the C-r I-Tiger campaign is complete; the benchmark run is at trial 760 of 1,000; the reviewer seat is taken
 
