@@ -355,6 +355,28 @@ class TestExactSolver:
         with pytest.raises(ValueError):
             solve_infinite_horizon(tiger, tolerance=1e-6, prune_epsilon=1e-6)
 
+    def test_a_large_product_is_evaluated_in_blocks_with_the_same_result(self, monkeypatch):
+        """
+        solver.py, section 6: a set evaluated at more beliefs than one block holds gives the values and actions of
+        the one-piece product (values to the round-off of the matrix kernel), and a call that fits is not cut.
+        """
+        import ipomdp.domain.solver as solver
+        generator = torch.Generator().manual_seed(0)
+        value_function = AlphaVectorSet(torch.randn(7, 5, generator=generator, dtype=torch.float64),
+                                        torch.arange(7) % 3)
+        beliefs = torch.rand(50, 5, generator=generator, dtype=torch.float64)
+        beliefs = beliefs / beliefs.sum(-1, keepdim=True)
+        assert len(value_function._blocks(beliefs)) == 1 and value_function._blocks(beliefs)[0] is beliefs
+        values, actions = value_function.value(beliefs), value_function.greedy_action(beliefs)
+        monkeypatch.setattr(solver, "PRODUCT_ELEMENTS", 7 * 8)             # 8 beliefs per block: 7 blocks, the last of 2
+        blocks = value_function._blocks(beliefs)
+        assert [len(block) for block in blocks] == [8] * 6 + [2]
+        assert torch.allclose(value_function.value(beliefs), values, rtol=0.0, atol=1e-12)
+        assert torch.equal(value_function.greedy_action(beliefs), actions)
+        monkeypatch.setattr(solver, "PRODUCT_ELEMENTS", 1)                 # never fewer than one belief per block
+        assert len(value_function._blocks(beliefs)) == 50
+        assert torch.allclose(value_function.value(beliefs), values, rtol=0.0, atol=1e-12)
+
 
 # ----------------------------------------------------------------------------------------------
 # 5. End-to-end agreement: simulator + filter + solver

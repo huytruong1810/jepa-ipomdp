@@ -61,6 +61,18 @@
 #      holds to 1e-12 on random vector sets and V_h equals an independent expectimax to 1e-9 (tests/test_domain.py).
 #    - On the canonical Tiger, eps = 1e-6 certifies V* to 0.01 in about 2.5 minutes on one CPU thread (and to 1e-4
 #      in the slow test), whereas eps = 1e-9 keeps many vectors with negligible advantage mid-horizon.
+#
+# 6. Evaluating a Large Set at Many Beliefs (AlphaVectorSet.value, greedy_action):
+#    - V(b) = max_k alpha_k . b is one matrix product of B beliefs with K vectors, B x K float64 entries. The sets
+#      of this solver are small (the canonical Tiger's V* has tens of vectors). The lower bound of a folded
+#      interactive problem is not (domain/bounds.py: 49,909 vectors at level 1, 67,241 at level 2), and the
+#      interpretability analysis evaluates it at every belief of 512 episodes of 100 steps at once
+#      (interpretability/error_bounds.py): 51,200 x 49,909 entries are 20 GB in one tensor.
+#    - The product is therefore taken in row blocks of at most PRODUCT_ELEMENTS entries (2^26, 512 MB of float64)
+#      and the maximum is reduced block by block. A call whose product fits in one block evaluates exactly the
+#      expression this class always evaluated, so every result on the canonical Tiger is bit-identical; a call above
+#      the limit differs from the one-piece product at most by the round-off of the matrix kernel
+#      (tests/test_domain.py compares the two).
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -82,6 +94,9 @@ EXACT_PRUNE_EPSILON = 1e-9
 _NUM_SEED_BELIEFS = 256
 _SEED_BELIEF_RNG_SEED = 0
 
+# Largest belief-by-vector product AlphaVectorSet evaluates in one piece (section 6): 2^26 float64 entries, 512 MB.
+PRODUCT_ELEMENTS = 2 ** 26
+
 
 @dataclass(frozen=True)
 class AlphaVectorSet:
@@ -96,14 +111,27 @@ class AlphaVectorSet:
     vectors: Tensor
     actions: Tensor
 
+    def _blocks(self, belief: Tensor) -> list[Tensor]:
+        """
+        Section 6: `belief` (B, S) cut into row blocks whose products with the K vectors hold at most
+        PRODUCT_ELEMENTS entries each. One block, `belief` itself, whenever the whole product fits.
+        """
+        rows = max(1, PRODUCT_ELEMENTS // self.vectors.shape[0])
+        if belief.ndim != 2 or belief.shape[0] <= rows:
+            return [belief]
+        return list(belief.split(rows))
+
     def value(self, belief: Tensor) -> Tensor:
         """V(b) for beliefs of shape (B, S); returns shape (B,)."""
-        return (belief.to(torch.float64) @ self.vectors.to(belief.device).T).max(dim=-1).values
+        vectors = self.vectors.to(belief.device).T
+        values = [(block.to(torch.float64) @ vectors).max(dim=-1).values for block in self._blocks(belief)]
+        return values[0] if len(values) == 1 else torch.cat(values)
 
     def greedy_action(self, belief: Tensor) -> Tensor:
         """Optimal first action for beliefs of shape (B, S); returns int64 shape (B,)."""
-        best = (belief.to(torch.float64) @ self.vectors.to(belief.device).T).argmax(dim=-1)
-        return self.actions.to(belief.device)[best]
+        vectors = self.vectors.to(belief.device).T
+        best = [(block.to(torch.float64) @ vectors).argmax(dim=-1) for block in self._blocks(belief)]
+        return self.actions.to(belief.device)[best[0] if len(best) == 1 else torch.cat(best)]
 
 
 @dataclass(frozen=True)
