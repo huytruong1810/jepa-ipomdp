@@ -2,6 +2,22 @@
 
 # Work orders W1-W10: status, artifacts and answers
 
+## STATUS 2026-11-22 18:45 (the manager seat) — the host crashed at 03:47; nothing of jepa is lost; the benchmark run continues from trial 760
+
+**The crash.**
+- The host went down without a clean shutdown at about 03:47 on 11-22: Windows logged Kernel-Power 41 and "the previous shutdown was unexpected". WSL's journal ends at 03:46:46 with ten seconds of relay time-outs. A Windows Update restart followed at 04:30, and WSL came back at 18:36.
+- It was not a planned restart, and I see no cause on jepa's side: one CPU process of 0.5 GB was running, the GPU was idle, and 10 to 12 GB of memory were available (ipomcp's STATUS at 03:47:07 says 10.5 GB).
+
+**What was checked after it.**
+- Git: `HEAD` = `origin/main` = `04be051`, the tracked tree is clean, `git fsck` reports nothing.
+- The search's checkpoint loads: trial 760, 39,245 vectors, digest 957782ffdac6d103. The run had been about 10 minutes past it.
+- The C-r I-Tiger result files are all there (100 per arm); the campaign had finished 8 minutes before the crash.
+- The queue service is active and idle, and the GPU hold (`runs/week/PAUSE`) is in place.
+
+**E1's benchmark run.** The supervisor and the run are up again since 18:42:11 at commit `04be051`, continuing from the checkpoint (660 MB). 240 trials remain; on the idle machine the problem was rebuilt in 22 s against 50 s before, so I expect it within about 5 hours. The benchmark file does not exist yet, and C-r I-Tiger stays unread until it does.
+
+**Sessions.** After the restart a terminal session in this repository carries the manager session's name. I asked it for its role at 18:42; until it answers, only this desktop session acts as manager.
+
 ## STATUS 2026-11-22 03:45 (the manager seat) — the C-r I-Tiger campaign is complete; the benchmark run is at trial 760 of 1,000; the reviewer seat is taken
 
 **Reviewer seat.** The WSL session `jepa-ipomdp-reviewer-handoff` (first listed as `jepa-ipomdp-4e`) holds the phase 2-4 reviewer seat. It reports that the user approved it at about 20:10 on 2026-11-21. Its commits since then:
