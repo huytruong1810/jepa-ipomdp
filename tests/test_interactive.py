@@ -135,6 +135,20 @@ def _level_zero_noise(gamma: float) -> FinitePOMDP:
 
 class TestPolicyGraphs:
 
+    def test_envelope_drops_a_vector_without_a_region_and_refuses_duplicates(self):
+        """
+        policy_graph.py, section 4: a vector under the others everywhere is dropped and the value is unchanged; two
+        equal vectors raise, because each has margin 0 against the other and both would be dropped.
+        """
+        actions = torch.arange(3)
+        covered = AlphaVectorSet(torch.tensor([[1.0, 0.0], [0.4, 0.4], [0.0, 1.0]], dtype=torch.float64), actions)
+        kept = envelope(covered)
+        assert kept.actions.tolist() == [0, 2]
+        beliefs = torch.tensor([[1.0, 0.0], [0.5, 0.5], [0.0, 1.0]], dtype=torch.float64)
+        assert torch.equal(kept.value(beliefs), covered.value(beliefs))
+        with pytest.raises(ValueError):
+            envelope(AlphaVectorSet(torch.tensor([[1.0, 0.0], [1.0, 0.0], [0.0, 1.0]], dtype=torch.float64), actions))
+
     def test_plan_graph_reproduces_every_plan_value(self):
         model = _level_zero_noise(0.9)
         value_functions = [envelope(g) for g in solve_finite_horizon(model, 3)]

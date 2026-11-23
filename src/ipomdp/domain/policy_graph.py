@@ -41,6 +41,10 @@
 #      changes no value, so envelope() drops every vector whose witness margin against all the others is not
 #      positive. Both extractions take envelopes; plan_graph raises on a vector without a region, so a caller that
 #      forgot envelope() fails loudly instead of building a node no belief ever starts in.
+#    - envelope() needs pairwise different vectors and raises otherwise. Two equal vectors have margin 0 against each
+#      other, so the rule above would drop BOTH and the value would fall wherever they are maximal: on
+#      {(1,0), (1,0), (0,1)} only (0,1) would remain and the value at (1,0) would fall from 1 to 0. solver.prune removes
+#      exact duplicates first, so a pruned set, which is what every caller passes, always qualifies.
 #
 # 5. Initial Nodes From a Prior Over Beliefs:
 #    - The modelling agent's uncertainty about the other's beliefs becomes a law over the other's first node:
@@ -120,10 +124,17 @@ def constant_policy(action_probs: Tensor, num_observations: int, name: str) -> P
 
 
 def envelope(value_function: AlphaVectorSet) -> AlphaVectorSet:
-    """The vectors that own a region of max_k alpha_k . b, in their original order (section 4)."""
+    """
+    The vectors that own a region of max_k alpha_k . b, in their original order (section 4). Raises on two equal
+    vectors: pass a pruned set (solver.prune removes exact duplicates).
+    """
     vectors = value_function.vectors.numpy()
     if len(vectors) == 1:
         return value_function
+    if len(np.unique(vectors, axis=0)) != len(vectors):
+        raise ValueError(f"{len(vectors) - len(np.unique(vectors, axis=0))} of the {len(vectors)} vectors repeat another "
+                         "one: each copy has margin 0 against the other and both would be dropped (section 4). "
+                         "Prune the set first.")
     keep = [k for k in range(len(vectors)) if witness(vectors[k], np.delete(vectors, k, axis=0))[0] > 0.0]
     return AlphaVectorSet(value_function.vectors[keep].clone(), value_function.actions[keep].clone())
 

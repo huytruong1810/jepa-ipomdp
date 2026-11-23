@@ -72,7 +72,7 @@ The solver's witness LP becomes public; nothing numeric changes.
 - the level-2 benchmark (bracket of the 14-state fold; `itiger_benchmark.py --level 2`);
 - the Fig. 11 thresholds (a slow test). `solver.prune` compares all pairs of vectors in two K x K x S boolean arrays, 4.4 GB each at K = 10,000 on a 44-state fold. That is a candidate cause of the horizon-3 level-1 solve that was killed for memory; it has not been measured;
 - the deferred code changes above, and one seeded-generator helper for the seven copies (`env.py:81`, `wumpus.py:356`, `episode_buffer.py:94`, `planning_agent.py:92`, `uniform_agent.py:27`, `wumpus_exact_model.py:178`, `recurrent_dqn.py:268`);
-- from the rows of the five new modules (read on 2026-11-21 by a session that did not write them): `envelope` raises on duplicates. DONE 2026-11-23: `Bracket` keeps its successors as an index array.
+- from the rows of the five new modules (read on 2026-11-21 by a session that did not write them): DONE 2026-11-23: `envelope` raises on duplicate vectors (policy_graph.py section 4; `test_envelope_drops_a_vector_without_a_region_and_refuses_duplicates`; the two slow tests of the experiment's level-1 and level-2 problems pass unchanged). DONE 2026-11-23: `Bracket` keeps its successors as an index array.
 
 ## Phases 2-4 (belief filter, world model, planner): in progress, 2026-11-19
 
