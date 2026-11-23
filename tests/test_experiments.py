@@ -1,6 +1,7 @@
 # ABSOLUTE PATH: tests/test_experiments.py
 """Phase-7 checks for the experiments layer: config -> run, run-directory reload, seed aggregation."""
 
+import json
 from pathlib import Path
 
 from hydra import compose, initialize_config_dir
@@ -10,10 +11,11 @@ import torch
 
 import numpy as np
 
-from ipomdp.experiments import (TIGER_GAPS, TIGER_METRICS, WUMPUS_GAME_METRICS, WUMPUS_GAPS, WUMPUS_METRICS, aggregate_games,
-                                aggregate_reports, build_run_config, build_training_run, crossed_bootstrap,
-                                game_metric_rows, hierarchical_bootstrap, interquartile_mean, load_trained_run,
-                                seed_statistic)
+from ipomdp.experiments import (ITIGER_GAPS, ITIGER_METRICS, TIGER_GAPS, TIGER_METRICS, WUMPUS_GAME_METRICS, WUMPUS_GAPS,
+                                WUMPUS_METRICS, aggregate_games, aggregate_reports, build_run_config, build_training_run,
+                                crossed_bootstrap, game_metric_rows, hierarchical_bootstrap, interquartile_mean,
+                                load_trained_run, seed_statistic)
+from ipomdp.experiments.interactive_analysis import InteractiveAnalysisSettings, InteractiveBenchmark
 from ipomdp.training import save_checkpoint
 
 CPU = torch.device("cpu")
@@ -109,6 +111,33 @@ class TestSeedAggregation:
         statistics = aggregate_reports([report(100.0), report(200.0), report(300.0)], "wumpus")
         assert set(WUMPUS_GAPS) <= statistics.keys()
         assert statistics["gap/learned_planner - reference_risk0.4"].mean == pytest.approx(-373.0)
+
+    def test_itiger_gaps_are_to_the_reference_agent_and_gains_to_the_untrained_filter(self):
+        """
+        aggregate.py, section 8: the report's "optimal" row is the reference agent of the benchmark file; a gain is the
+        trained probe's divergence minus the untrained filter's on the same histories, paired within the seed.
+        """
+        def report(planner: float, trained_kl: float, untrained_kl: float) -> dict:
+            out: dict = {}
+            for path in ITIGER_METRICS.values():
+                node = out
+                for key in path[:-1]:
+                    node = node.setdefault(key, {})
+                node[path[-1]] = 0.0
+            out["reference"]["returns"]["optimal"]["mean"] = 16.3
+            out["reference"]["returns"]["learned_planner"]["mean"] = planner
+            out["marginals"]["mlp/agent"]["other_node"]["kl_mean"] = trained_kl
+            out["untrained"]["marginals"]["mlp/agent"]["other_node"]["kl_mean"] = untrained_kl
+            return out
+        statistics = aggregate_reports([report(15.3, 0.1, 0.6), report(14.3, 0.2, 0.7), report(16.3, 0.3, 0.8)], "itiger")
+        assert set(ITIGER_GAPS) <= statistics.keys() and set(ITIGER_METRICS) <= statistics.keys()
+        assert statistics["return/reference"].std == pytest.approx(0.0)
+        gap = statistics["gap/learned_planner - reference"]
+        assert gap.mean == pytest.approx(-1.0) and gap.values == pytest.approx([-1.0, -2.0, 0.0])
+        gain = statistics["gain/other_node_kl/mlp_agent"]
+        assert gain.mean == pytest.approx(-0.5) and gain.std == pytest.approx(0.0, abs=1e-12)
+        # The control has no interactive-state probe on the agent's histories, so no such gain is defined.
+        assert "gain/probe_kl/mlp_random" in statistics and "gain/probe_kl/mlp_agent" not in statistics
 
 
 class TestRobustStatistics:
@@ -257,3 +286,29 @@ class TestSweepCondition:
         with pytest.raises(ValueError):
             sweep.record_condition(tmp_path / "s", ["env=wumpus", "seed_x=1"], WumpusAnalysisSettings())
         assert sweep.domain_of([]) == "tiger" and sweep.domain_of(["env=wumpus"]) == "wumpus"
+
+    def test_itiger_condition_holds_the_benchmark_and_a_report_of_another_benchmark_is_refused(self, tmp_path):
+        """sweep.py, section 7: the benchmark's bounds and fold digest are part of the condition and of every report."""
+        sweep = self._sweep()
+        vectors, actions = torch.zeros(1, 3, dtype=torch.float64), torch.zeros(1, dtype=torch.int64)
+        benchmark = InteractiveBenchmark(1.0, 2.0, vectors, actions, "digest-a", "test")
+        settings = InteractiveAnalysisSettings(episodes=4, mlp_probe_steps=10, seed=1)
+        assert sweep.domain_of(["env=itiger", "env.level=2"]) == "itiger"
+        sweep.record_condition(tmp_path / "s", ["env=itiger"], settings, benchmark)
+        sweep.record_condition(tmp_path / "s", ["env=itiger"], settings, benchmark)             # continuing: no error
+        recorded = json.loads((tmp_path / "s" / "sweep.json").read_text())
+        assert recorded["benchmark"] == {"lower": 1.0, "upper": 2.0, "digest": "digest-a"}
+        for other in (InteractiveBenchmark(1.5, 2.0, vectors, actions, "digest-a", "test"),
+                      InteractiveBenchmark(1.0, 2.0, vectors, actions, "digest-b", "test")):
+            with pytest.raises(ValueError):
+                sweep.record_condition(tmp_path / "s", ["env=itiger"], settings, other)
+            with pytest.raises(ValueError):
+                sweep.check_report_benchmark({"bracket": sweep.benchmark_identity(other)}, benchmark, tmp_path / "r.json")
+        report = {"bracket": {"lower": 1.0, "upper": 2.0, "width": 1.0, "source": "copied file", "digest": "digest-a"},
+                  "settings": {"episodes": 4, "mlp_probe_steps": 10, "seed": 1}}
+        sweep.check_report_benchmark(report, benchmark, tmp_path / "r.json")
+        sweep.check_report_settings(report, settings, tmp_path / "r.json")
+        # A Tiger or Wumpus condition records no benchmark: their sweep.json is what it always was.
+        from ipomdp.experiments import AnalysisSettings
+        sweep.record_condition(tmp_path / "t", [], AnalysisSettings())
+        assert set(json.loads((tmp_path / "t" / "sweep.json").read_text())) == {"overrides", "analysis"}

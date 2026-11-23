@@ -98,6 +98,22 @@
 #    - hierarchical_bootstrap itself is unchanged: registered readouts (PROTOCOL.md) cite it and
 #      must reproduce bit for bit. game_metric_rows exposes the merged (seeds, games) tables, so a
 #      readout can apply any of the three intervals to the same rows.
+#
+# 8. Interactive Tiger (2026-11-23):
+#    - Reports come from experiments/interactive_analysis.py. The fold has no exact optimum: the
+#      report's "optimal" row is the REFERENCE agent of the fold's benchmark file (exact filter,
+#      action of the best lower-bound vector), whose value is at least the certified lower bound L.
+#      The table names it "reference", and every gap is a gap to the reference agent, never to V*.
+#      What the reference agent itself may lose to the optimum is bounded by the bracket's width,
+#      which sweep.py writes into the aggregate beside these statistics.
+#    - Paired within seed as in section 3: every seed is analysed on the same episodes, so the
+#      reference agent's return is identical across seeds.
+#    - The probe control (interactive_analysis.py, section 5) is the run's own untrained filter read
+#      by the same probes on the same histories. "gain/..." is trained minus untrained per seed, a
+#      paired difference of two divergences: negative means that training brought the decoded belief
+#      closer to the exact one. The control has no interactive-state probe on the agent's histories
+#      (they cannot be replayed), so that gain exists on random histories only; the marginal probes
+#      have it on both.
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -153,10 +169,46 @@ WUMPUS_GAPS: dict[str, tuple[str, str]] = {
     "gap/learned_planner - random": ("return/learned_planner", "return/random"),
 }
 
-# conf/env/<name>.yaml -> (metrics, paired gaps) (section 5).
+# Metric name -> path into an Interactive Tiger report.json (experiments/interactive_analysis.py; section 8).
+_PROBES = [(kind, source) for kind in ("mlp", "linear") for source in ("random", "agent")]
+_MARGINALS = ("physical", "other_node")
+ITIGER_METRICS: dict[str, tuple[str, ...]] = {
+    "return/reference": ("reference", "returns", "optimal", "mean"),
+    "return/learned_planner": ("reference", "returns", "learned_planner", "mean"),
+    "return/decoded_mlp": ("reference", "returns", "decoded_mlp", "mean"),
+    "return/decoded_linear": ("reference", "returns", "decoded_linear", "mean"),
+    **{f"probe_kl/{kind}_{source}": ("reference", "probes", f"{kind}/{source}", "mean_kl") for kind, source in _PROBES},
+    **{f"probe_l1/{kind}_{source}": ("reference", "probes", f"{kind}/{source}", "mean_l1") for kind, source in _PROBES},
+    **{f"{marginal}_kl/{kind}_{source}": ("marginals", f"{kind}/{source}", marginal, "kl_mean")
+       for marginal in _MARGINALS for kind, source in _PROBES},
+    **{f"{marginal}_l1/{kind}_{source}": ("marginals", f"{kind}/{source}", marginal, "l1_mean")
+       for marginal in _MARGINALS for kind, source in _PROBES},
+    **{f"untrained/probe_kl/{kind}_random": ("untrained", "probes", f"{kind}/random", "mean_kl") for kind in ("mlp", "linear")},
+    **{f"untrained/{marginal}_kl/{kind}_{source}": ("untrained", "marginals", f"{kind}/{source}", marginal, "kl_mean")
+       for marginal in _MARGINALS for kind, source in _PROBES},
+    **{f"{quantity}/{kind}_agent": ("reference", "bounds", f"{kind}/agent", quantity)
+       for kind in ("mlp", "linear")
+       for quantity in ("value_error_mean", "value_error_bound_mean", "regret_mean", "regret_bound_mean",
+                        "suboptimal_decision_rate", "policy_loss_bound_mean")},
+    "selection_score (biased)": ("checkpoint_eval_return",),
+}
+
+ITIGER_GAPS: dict[str, tuple[str, str]] = {
+    "gap/learned_planner - reference": ("return/learned_planner", "return/reference"),
+    "gap/decoded_mlp - reference": ("return/decoded_mlp", "return/reference"),
+    "gap/decoded_linear - reference": ("return/decoded_linear", "return/reference"),
+    "gap/learned_planner - decoded_mlp": ("return/learned_planner", "return/decoded_mlp"),
+    **{f"gain/probe_kl/{kind}_random": (f"probe_kl/{kind}_random", f"untrained/probe_kl/{kind}_random")
+       for kind in ("mlp", "linear")},
+    **{f"gain/{marginal}_kl/{kind}_{source}": (f"{marginal}_kl/{kind}_{source}", f"untrained/{marginal}_kl/{kind}_{source}")
+       for marginal in _MARGINALS for kind, source in _PROBES},
+}
+
+# conf/env/<name>.yaml -> (metrics, paired gaps) (sections 5 and 8).
 DOMAIN_METRICS: dict[str, tuple[dict[str, tuple[str, ...]], dict[str, tuple[str, str]]]] = {
     "tiger": (TIGER_METRICS, TIGER_GAPS),
     "wumpus": (WUMPUS_METRICS, WUMPUS_GAPS),
+    "itiger": (ITIGER_METRICS, ITIGER_GAPS),
 }
 
 

@@ -36,11 +36,11 @@
 #      marker. Resuming is bit-exact only from the state at which latest.pt was written, so
 #      that choice is left to the user.
 #
-# 4. Both Domains (2026-10-10):
+# 4. One Analysis per Domain (2026-10-10; Interactive Tiger in section 7):
 #    - The domain is the last `env=<name>` override, else conf/config.yaml's default (tiger).
 #      Tiger seeds are analysed by analyze_run (exact solver), Wumpus seeds by analyze_wumpus_run,
 #      and aggregate_reports uses that domain's metric table (experiments/aggregate.py, section 5).
-#      --solver-tolerance is Tiger-only and raises for Wumpus.
+#      --solver-tolerance is Tiger-only and raises for the other domains.
 #    - Runs trained elsewhere join a sweep by symlinking their directory as seed<k> with the
 #      trained marker: a seed whose analysis/report.json exists is aggregated as is. The recorded
 #      overrides must then be the ones those runs were trained with.
@@ -74,6 +74,20 @@
 #      written before 2026-10-19 record no output; the analysis then always wrote to "analysis". Reports written before
 #      2026-10-27 record no checkpoint; the analysis then read only best.pt. A missing output or checkpoint is checked
 #      as that value; any other missing field raises.
+#
+# 7. Interactive Tiger (2026-11-23):
+#    - `env=itiger` seeds are analysed by analyze_interactive_run against --benchmark, the certified bracket of the
+#      fold (experiments/interactive_analysis.py; one file per fold, e.g. runs/benchmarks/itiger_level1.pt). The
+#      option is required for this domain and refused for the others. An unknown domain raises: before this section
+#      every domain but Wumpus World took the Tiger path, which would have trained an itiger seed and then failed in
+#      its analysis.
+#    - The benchmark is part of the condition. sweep.json records its lower bound, upper bound and fold digest (not
+#      its path: a copy of the file is the same benchmark), and a stored report whose bracket differs from the file's
+#      raises, as a report with other analysis settings does (section 6). The analysis itself refuses a file computed
+#      on another fold.
+#    - The aggregate carries the bracket beside the statistics: every gap of this domain is a gap to the reference
+#      agent, and the bracket's width bounds what that agent may lose to the optimum (experiments/aggregate.py,
+#      section 8).
 # ==============================================================================
 
 import argparse
@@ -92,9 +106,12 @@ import numpy as np
 
 from ipomdp.experiments import (AnalysisSettings, WumpusAnalysisSettings, aggregate_games, aggregate_reports, analyze_run,
                                 analyze_wumpus_run)
+from ipomdp.experiments.interactive_analysis import (InteractiveAnalysisSettings, InteractiveBenchmark,
+                                                     analyze_interactive_run)
 
 REPO = Path(__file__).resolve().parent
 TRAINED_MARKER = "TRAINED"
+Settings = AnalysisSettings | WumpusAnalysisSettings | InteractiveAnalysisSettings
 
 
 def train(seed_dir: Path, seed: int, overrides: list[str]) -> None:
@@ -115,10 +132,20 @@ def domain_of(overrides: list[str]) -> str:
     return default
 
 
-def record_condition(sweep_dir: Path, overrides: list[str], settings: AnalysisSettings | WumpusAnalysisSettings) -> None:
-    """Section 3: one sweep directory is one experimental condition."""
+def benchmark_identity(benchmark: InteractiveBenchmark) -> dict:
+    """Section 7: what identifies a benchmark in a condition and in a stored report's bracket."""
+    return {"lower": benchmark.lower, "upper": benchmark.upper, "digest": benchmark.digest}
+
+
+def record_condition(sweep_dir: Path, overrides: list[str], settings: Settings,
+                     benchmark: InteractiveBenchmark | None = None) -> None:
+    """
+    Section 3: one sweep directory is one experimental condition. `benchmark` (Interactive Tiger, section 7) adds
+    its identity; without it the recorded condition is the one Tiger and Wumpus sweeps have always written.
+    """
     # Normalised through JSON: tuples in the settings (Wumpus reference thresholds) come back as lists.
-    condition = json.loads(json.dumps({"overrides": overrides, "analysis": asdict(settings)}))
+    condition = json.loads(json.dumps({"overrides": overrides, "analysis": asdict(settings)}
+                                      | ({} if benchmark is None else {"benchmark": benchmark_identity(benchmark)})))
     path = sweep_dir / "sweep.json"
     if path.exists():
         recorded = json.loads(path.read_text())
@@ -129,7 +156,16 @@ def record_condition(sweep_dir: Path, overrides: list[str], settings: AnalysisSe
         path.write_text(json.dumps(condition, indent=2))
 
 
-def check_report_settings(report: dict, settings: AnalysisSettings | WumpusAnalysisSettings, path: Path) -> None:
+def check_report_benchmark(report: dict, benchmark: InteractiveBenchmark, path: Path) -> None:
+    """Section 7: the stored report was analysed against this benchmark (same bounds, same fold)."""
+    recorded, wanted = report["bracket"], benchmark_identity(benchmark)
+    differ = sorted(k for k in wanted if recorded[k] != wanted[k])
+    if differ:
+        raise ValueError(f"{path} was analysed against another benchmark: "
+                         + ", ".join(f"{k} {recorded[k]!r} != {wanted[k]!r}" for k in differ) + " (section 7).")
+
+
+def check_report_settings(report: dict, settings: Settings, path: Path) -> None:
     """Section 6: the stored report's analysis settings equal the sweep's (missing output / checkpoint: their only old value)."""
     recorded, wanted = dict(report.get("settings", {})), json.loads(json.dumps(asdict(settings)))
     for field, only_value in (("output", "analysis"), ("checkpoint", "best.pt")):       # section 6: younger fields
@@ -161,6 +197,8 @@ def main() -> None:
                         help="Wumpus only: the exact planner's games.npz of the same analysis seed (section 6).")
     parser.add_argument("--baseline-runs", type=Path, default=None,
                         help="Wumpus only: runs/baselines/<name>, read seed<k>/<analysis output>/games.npz (section 5).")
+    parser.add_argument("--benchmark", type=Path, default=None,
+                        help="Interactive Tiger only, required there: the fold's benchmark file (section 7).")
     parser.add_argument("overrides", nargs="*", help="Hydra overrides passed to every main.py run.")
     args = parser.parse_intermixed_args()
     for override in args.overrides:
@@ -170,9 +208,16 @@ def main() -> None:
         raise ValueError(f"Duplicate seeds in {args.seeds}.")
 
     domain = domain_of(args.overrides)
+    wumpus_only = (args.analysis_output is not None or args.checkpoint is not None or args.exact_planner_games is not None
+                   or args.baseline_runs is not None)
+    if domain != "wumpus" and wumpus_only:
+        raise ValueError("--analysis-output, --checkpoint, --exact-planner-games and --baseline-runs apply to Wumpus World only.")
+    if domain != "tiger" and args.solver_tolerance is not None:
+        raise ValueError("--solver-tolerance applies to Tiger only: the other domains have no exact solver.")
+    if (domain == "itiger") != (args.benchmark is not None):
+        raise ValueError("--benchmark is required for env=itiger and applies to env=itiger only (section 7).")
+    benchmark = None
     if domain == "wumpus":
-        if args.solver_tolerance is not None:
-            raise ValueError("--solver-tolerance applies to Tiger only: Wumpus World has no exact solver.")
         settings = WumpusAnalysisSettings(args.episodes, args.mlp_probe_steps, args.analysis_seed)
         if args.analysis_output is not None:
             settings = replace(settings, output=args.analysis_output)
@@ -180,16 +225,22 @@ def main() -> None:
             settings = replace(settings, checkpoint=args.checkpoint)
         output = settings.output
         analyze = analyze_wumpus_run
-    else:
-        if (args.analysis_output is not None or args.checkpoint is not None or args.exact_planner_games is not None
-                or args.baseline_runs is not None):
-            raise ValueError("--analysis-output, --checkpoint, --exact-planner-games and --baseline-runs apply to Wumpus World only.")
+    elif domain == "itiger":
+        output = "analysis"
+        settings = InteractiveAnalysisSettings(args.episodes, args.mlp_probe_steps, args.analysis_seed)
+        benchmark = InteractiveBenchmark.load(args.benchmark)
+
+        def analyze(run_dir, run_settings, run_device):
+            return analyze_interactive_run(run_dir, run_settings, args.benchmark, run_device)
+    elif domain == "tiger":
         output = "analysis"
         tolerance = defaults.solver_tolerance if args.solver_tolerance is None else args.solver_tolerance
         settings = AnalysisSettings(args.episodes, tolerance, args.mlp_probe_steps, args.analysis_seed)
         analyze = analyze_run
+    else:
+        raise ValueError(f"sweep.py has no analysis for env={domain} (sections 4 and 7).")
     sweep_dir = REPO / "runs" / "sweeps" / args.name
-    record_condition(sweep_dir, args.overrides, settings)
+    record_condition(sweep_dir, args.overrides, settings, benchmark)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     reports = []
@@ -207,10 +258,14 @@ def main() -> None:
                 torch.cuda.empty_cache()     # section 2: the analysis runs in this process; free its cache
         report = json.loads(report_path.read_text())
         check_report_settings(report, settings, report_path)                       # section 6
+        if benchmark is not None:
+            check_report_benchmark(report, benchmark, report_path)                 # section 7
         reports.append(report)
 
     statistics = aggregate_reports(reports, domain)
-    reference = ({"optimal_value_b0": reports[0]["optimal_value_b0"]} if domain == "tiger" else {})
+    reference = {"tiger": lambda: {"optimal_value_b0": reports[0]["optimal_value_b0"]},
+                 "itiger": lambda: {"bracket": reports[0]["bracket"]},
+                 "wumpus": lambda: {}}[domain]()
     hierarchical = {}
     if domain == "wumpus":
         games = []
@@ -239,8 +294,11 @@ def main() -> None:
     # One aggregate per analysis directory, so a held-out aggregate never replaces the development one.
     aggregate_path = sweep_dir / f"aggregate{'' if output == 'analysis' else '_' + output}.json"
     aggregate_path.write_text(json.dumps(aggregate, indent=2))
-    print(f"\n{args.name} ({domain}): {len(args.seeds)} seeds {args.seeds}"
-          + (f", V*(b0) = {reference['optimal_value_b0']:.3f}" if reference else ""))
+    headline = {"tiger": lambda: f", V*(b0) = {reference['optimal_value_b0']:.3f}",
+                "itiger": lambda: (f", certified bracket of V*(b0) [{reference['bracket']['lower']:.4f}, "
+                                   f"{reference['bracket']['upper']:.4f}] (gaps are to the reference agent)"),
+                "wumpus": lambda: ""}[domain]()
+    print(f"\n{args.name} ({domain}): {len(args.seeds)} seeds {args.seeds}{headline}")
     print(f"  {'metric':<40} {'mean':>10} {'t 95% CI':>10} {'std':>10} {'IQM':>10} {'IQM 95% bootstrap':>22}")
     for name, stat in statistics.items():
         print(f"  {name:<40} {stat.mean:10.4f} {stat.ci95:>10.4f} {stat.std:10.4f} {stat.iqm:10.4f} "
