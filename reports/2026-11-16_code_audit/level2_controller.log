@@ -1,0 +1,35 @@
+[00:39:25] commit 720c12d
+[00:40:45] (a) level-1 fold digests: i 957782ffdac6d103, j 957782ffdac6d103, equal True; 26 states
+[00:40:45] checkpoint: 1000 trials, 49909 lower-bound vectors, L(b0) = 16.5510
+[00:40:46] (b) stationary_graph, first 828 vectors (lower bound 15.7583), prune epsilon 0.5: 26 nodes, exact value -5.0624
+[00:40:47] (b) stationary_graph, first 828 vectors (lower bound 15.7583), prune epsilon 0.2: 32 nodes, exact value 5.0986
+[00:40:49] (b) stationary_graph, first 828 vectors (lower bound 15.7583), prune epsilon 0.05: 47 nodes, exact value -14.3200
+[00:40:51] (b) stationary_graph, first 2157 vectors (lower bound 16.2082), prune epsilon 0.5: 36 nodes, exact value -7.8384
+[00:40:53] (b) stationary_graph, first 2157 vectors (lower bound 16.2082), prune epsilon 0.2: 46 nodes, exact value 4.8844
+[00:40:57] (b) stationary_graph, first 2157 vectors (lower bound 16.2082), prune epsilon 0.05: 71 nodes, exact value -0.6495
+[00:41:09] (c) pointer controller: 49909 nodes, 32637 reachable from its initial node, 32637 after merging equivalent nodes; every successor is an older node: True; steps from the initial node to a blind policy: 65 at least, 17064 at most; its fold would have up to 195822 states
+[00:41:09] (d) t1.ignore: 3 nodes, exact value -73.5897; i's level-2 fold 10 states
+[00:41:09] (d) t1.restart: 3 nodes, exact value -63.4674; i's level-2 fold 10 states
+[00:41:09] (d) t1.restart_from_growl: 3 nodes, exact value -73.5897; i's level-2 fold 10 states
+[00:41:09] (d) t1.one_step_back: 3 nodes, exact value -73.5897; i's level-2 fold 10 states
+[00:41:09] (d) t2.ignore: 5 nodes, exact value 12.1617; i's level-2 fold 14 states
+[00:41:09] (d) t2.restart: 5 nodes, exact value 9.2264; i's level-2 fold 14 states
+[00:41:09] (d) t2.restart_from_growl: 5 nodes, exact value 15.3567; i's level-2 fold 14 states
+[00:41:09] (d) t2.one_step_back: 5 nodes, exact value 15.3567; i's level-2 fold 14 states
+[00:41:09] (d) t3.ignore: 7 nodes, exact value -6.8873; i's level-2 fold 18 states
+[00:41:09] (d) t3.restart: 7 nodes, exact value -11.3287; i's level-2 fold 18 states
+[00:41:09] (d) t3.restart_from_growl: 7 nodes, exact value 2.2996; i's level-2 fold 18 states
+[00:41:09] (d) t3.one_step_back: 7 nodes, exact value 1.1728; i's level-2 fold 18 states
+[00:41:09] (d) t4.ignore: 9 nodes, exact value -8.6371; i's level-2 fold 22 states
+[00:41:09] (d) t4.restart: 9 nodes, exact value -14.0611; i's level-2 fold 22 states
+[00:41:09] (d) t4.restart_from_growl: 9 nodes, exact value -12.5586; i's level-2 fold 22 states
+[00:41:09] (d) t4.one_step_back: 9 nodes, exact value -7.7914; i's level-2 fold 22 states
+[00:41:09] (d) best of 16 (thresholds (1, 2, 3, 4), rules ('ignore', 'restart', 'restart_from_growl', 'one_step_back')): t2.restart_from_growl, exact value 15.3567
+[00:41:09] (e) local search from the best counter with 0 spare nodes (5 nodes): 15.4023 after 3 sweeps
+[00:41:09] (e) local search from the best counter with 2 spare nodes (7 nodes): 15.4482 after 7 sweeps
+[00:41:16] (e) local search from the best counter with 4 spare nodes (9 nodes): 15.4516 after 10 sweeps
+[00:41:39] (e) local search from the best counter with 8 spare nodes (13 nodes): 15.4516 after 10 sweeps
+[00:43:04] (e) local search from the best counter with 12 spare nodes (17 nodes): 15.4516 after 10 sweeps
+[00:43:11] (e) local search from 8 random controllers of 7 nodes: -20.00, -20.00, -20.00, -20.00, -20.00, -20.00, -20.00, -20.00
+[00:43:38] (e) local search from 8 random controllers of 9 nodes: -20.00, -20.00, -20.00, -20.00, -20.00, -20.00, -20.00, -20.00
+[00:49:46] (e) local search from 8 random controllers of 12 nodes: -20.00, -20.00, -20.00, -20.00, -20.00, 15.40, 15.40, 15.42
