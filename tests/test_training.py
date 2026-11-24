@@ -28,14 +28,15 @@ def _episodes(batch: int, seed: int, device: torch.device = CPU) -> EpisodeBatch
     return EpisodeBatch(torch.stack(actions, 1), torch.stack(observations, 1), torch.stack(rewards, 1), None)
 
 
-def _trainer(device: torch.device = CPU, representation: Representation = Representation.JEPA) -> WorldModelTrainer:
+def _trainer(device: torch.device = CPU, representation: Representation = Representation.JEPA,
+             config: TrainerConfig = CONFIG) -> WorldModelTrainer:
     torch.manual_seed(0)
     belief_filter = BeliefFilter(A, O, D, H, 1).to(device)
     jepa = (RecurrentJEPA(belief_filter, LatentPredictor(D, A, H, 1), 0.99).to(device)
             if representation is Representation.JEPA else None)
     return WorldModelTrainer(belief_filter, jepa, ValueHead(D, H, 1, 255).to(device),
                              RewardHead(D, A, H, 1, 255).to(device), ObservationHead(D, A, O, H, 1).to(device),
-                             TwoHotSymlog(255, 2000.0).to(device), A, O, discount=0.95, config=CONFIG, device=device)
+                             TwoHotSymlog(255, 2000.0).to(device), A, O, discount=0.95, config=config, device=device)
 
 
 class TestEpisodeBuffer:
@@ -172,6 +173,37 @@ class TestWorldModelTrainer:
         logits = trainer.observation_head(latents.detach(), actions.reshape(-1, A))
         torch.nn.functional.cross_entropy(logits, batch.observations.reshape(-1)).backward()
         assert all(p.grad is None for p in trainer.belief_filter.parameters())
+
+    def test_train_step_keeps_the_planning_heads_off_the_filter(self):
+        # trainer.py, section 2: in JEPA mode the value and observation heads read detached latents. The test above
+        # builds its own detached loss, so it would pass if train_step lost its detach. This one goes through
+        # train_step: with the gradient clip out of reach (the clip is one norm over all parameters, so it would
+        # couple them), re-drawing the weights of those two heads must leave the gradient that train_step puts on
+        # the filter and the predictor bit-identical. In the decoder representation the observation term is meant
+        # to reach the filter, so the same re-draw must change the filter's gradient there: the contrast shows that
+        # the re-draw matters wherever a path exists.
+        config = TrainerConfig(learning_rate=3e-4, weight_decay=1e-4, grad_clip_norm=1e9, value_target_momentum=0.99,
+                               separate_value_clip=False)
+
+        def gradients(representation: Representation, redraw: bool) -> list[torch.Tensor]:
+            trainer = _trainer(representation=representation, config=config)
+            if redraw:
+                torch.manual_seed(1)
+                with torch.no_grad():
+                    for head in (trainer.value_head, trainer.observation_head):
+                        for p in head.parameters():
+                            p.normal_(0.0, 0.5)
+            trainer.optimizer.step = lambda: None  # inspect the gradients, keep the weights
+            trainer.train_step(_episodes(8, 0))
+            shaped = [trainer.belief_filter] + ([trainer.jepa.predictor] if trainer.jepa is not None else [])
+            grads = [p.grad for net in shaped for p in net.parameters()]
+            assert all(g is not None for g in grads) and any(bool(g.any()) for g in grads)
+            return [g.clone() for g in grads]
+
+        plain, redrawn = gradients(Representation.JEPA, False), gradients(Representation.JEPA, True)
+        assert all(torch.equal(a, b) for a, b in zip(plain, redrawn, strict=True))
+        plain, redrawn = gradients(Representation.DECODER, False), gradients(Representation.DECODER, True)
+        assert any(not torch.equal(a, b) for a, b in zip(plain, redrawn, strict=True))
 
     def test_jepa_must_wrap_the_trained_filter(self):
         belief_filter = BeliefFilter(A, O, D, H, 1)

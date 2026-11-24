@@ -93,6 +93,26 @@ class TestTrainingRun:
         assert resumed.evaluate() == reference_eval
         assert all(torch.equal(a, b) for a, b in zip(_parameters(resumed), _parameters(uninterrupted)))
 
+    @pytest.mark.parametrize("store", [False, True])
+    def test_resume_after_an_evaluation(self, tmp_path: Path, store: bool):
+        # The test above saves before any evaluation, so it would pass if the best score, the evaluation simulator's
+        # position or (with stored evaluation games, the Wumpus recipe) the greedy episodes in the buffer were not
+        # restored. Here the checkpoint follows an evaluation.
+        setup = tiger_setup(CPU)
+        reference = TrainingRun(setup, _config(store_eval_episodes=store), CPU)
+        reference.collect_and_train()
+        reference.collect_and_train()
+        first = reference.evaluate()
+        save_checkpoint(tmp_path / "latest.pt", reference.state_dict())
+        expected = [reference.collect_and_train(), reference.evaluate()]
+
+        resumed = TrainingRun(setup, _config(seed=123, store_eval_episodes=store), CPU)
+        resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
+        assert resumed.best_eval_return == first["eval_discounted_return"]
+        assert resumed.buffer.size == 8 + (4 if store else 0)
+        assert [resumed.collect_and_train(), resumed.evaluate()] == expected
+        assert resumed.best_eval_return == reference.best_eval_return
+        assert all(torch.equal(a, b) for a, b in zip(_parameters(resumed), _parameters(reference)))
 
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
     def test_resume_on_cuda(self, tmp_path: Path):
@@ -145,8 +165,8 @@ class TestDetachedPlanningHead:
             TrainingRun(tiger_setup(CPU), _config(detached_planning_head=True), CPU)
 
     def test_planning_loss_does_not_reach_the_filter(self):
-        # Only the planning term trains here (the other heads' losses are scaled to zero), so any
-        # filter gradient would have to come through it.
+        # The planning term is rebuilt here by hand on detached latents: it gives the filter no gradient and the
+        # planning head one. This checks the construction; the path through train_step is the next test.
         run = self._run(detached_planning_head=True)
         run.collect_and_train()
         trainer, batch = run.trainer, run.buffer.sample(4)
@@ -161,6 +181,34 @@ class TestDetachedPlanningHead:
         assert all(p.grad is None for p in trainer.belief_filter.parameters())
         assert all(p.grad is not None for p in run.planning_observation_head.parameters())
         assert all(torch.equal(p, q) for p, q in zip(before, run.planning_observation_head.parameters()))
+
+    def test_train_step_keeps_the_planning_head_off_the_filter(self):
+        # Through train_step itself: with the gradient clip out of reach (one norm over all parameters, which would
+        # couple them), re-drawing the planning head's weights changes the planning loss and the value targets, and
+        # must leave the gradient on the filter bit-identical. The main observation head is the contrast: its
+        # cross-entropy is what shapes the filter in the decoder representation, so re-drawing it must change it.
+        trainer_config = TrainerConfig(learning_rate=3e-4, weight_decay=1e-4, grad_clip_norm=1e9,
+                                       value_target_momentum=0.99, separate_value_clip=False)
+        run = self._run(detached_planning_head=True, trainer=trainer_config)
+        run.collect_and_train()
+        trainer, batch = run.trainer, run.buffer.sample(4)
+        trainer.optimizer.step = lambda: None  # inspect the gradients, keep the weights
+
+        def filter_gradient() -> list[torch.Tensor]:
+            trainer.train_step(batch)
+            return [p.grad.clone() for p in trainer.belief_filter.parameters()]
+
+        def redraw(head: torch.nn.Module) -> None:
+            with torch.no_grad():
+                for p in head.parameters():
+                    p.normal_(0.0, 0.5)
+
+        plain = filter_gradient()
+        assert any(bool(g.any()) for g in plain)
+        redraw(run.planning_observation_head)
+        assert all(torch.equal(a, b) for a, b in zip(plain, filter_gradient(), strict=True))
+        redraw(run.observation_head)
+        assert any(not torch.equal(a, b) for a, b in zip(plain, filter_gradient(), strict=True))
 
     def test_resume_continues_bit_for_bit(self, tmp_path: Path):
         reference = self._run(detached_planning_head=True)
