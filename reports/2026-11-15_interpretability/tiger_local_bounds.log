@@ -1,0 +1,46 @@
+C-q.4 (post hoc): the local form of the span bounds on the canonical Tiger; ten JEPA runs of runs/sweeps/polyak, CPU, analysis seed 12345, 512 episodes; analysed at commits ['440adad']
+mean [Student-t 95% over the ten seeds]; the stored reports (GPU, other episodes of the same seed) hold the global form only
+
+  probe mlp/agent
+    mean L1 decoding error                             0.0078 [0.0022, 0.0135]  per seed [0.0041, 0.0176, 0.0053, 0.0039, 0.005, 0.0267, 0.0042, 0.0036, 0.0039, 0.004]
+      the same in the stored reports                   0.0044 [0.0040, 0.0048]  per seed [0.004, 0.0049, 0.0054, 0.0046, 0.0041, 0.0051, 0.0043, 0.0036, 0.0039, 0.004]
+    L_V (largest half-span of V*)                      55.00 [55.00, 55.00]  per seed [55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0]
+    half-span of the active vector (mean)              18.72 [18.70, 18.73]  per seed [18.7, 18.74, 18.76, 18.7, 18.71, 18.72, 18.72, 18.7, 18.71, 18.7]
+    value error: measured                              0.0559 [0.0372, 0.0745]  per seed [0.0437, 0.0902, 0.0521, 0.0374, 0.0461, 0.1162, 0.0446, 0.0363, 0.0449, 0.0474]
+    value error: local bound                           0.0572 [0.0382, 0.0761]  per seed [0.0447, 0.0922, 0.0546, 0.038, 0.0471, 0.1182, 0.0456, 0.0369, 0.0461, 0.0482]
+    value error: global bound                          0.4305 [0.1210, 0.7401]  per seed [0.2254, 0.9688, 0.2932, 0.2128, 0.2727, 1.4686, 0.2337, 0.1967, 0.2135, 0.2201]
+    value error:   global bound, stored reports        0.2417 [0.2194, 0.2640]  per seed [0.2224, 0.2683, 0.2959, 0.2517, 0.2235, 0.2795, 0.2383, 0.1991, 0.2165, 0.2219]
+    value error: local / global                        0.173 [0.139, 0.207]  per seed [0.198, 0.095, 0.186, 0.179, 0.173, 0.081, 0.195, 0.188, 0.216, 0.219]
+    value error: local bound / measured                1.02 [1.02, 1.03]  per seed [1.02, 1.02, 1.05, 1.02, 1.02, 1.02, 1.02, 1.02, 1.02, 1.02]
+    one-step regret: measured                          0.0012 [0.0008, 0.0015]  per seed [0.001, 0.0024, 0.0011, 0.0008, 0.0013, 0.0018, 0.0008, 0.0009, 0.0009, 0.0008]
+    one-step regret: local bound                       0.1113 [0.0741, 0.1484]  per seed [0.087, 0.1788, 0.1045, 0.0743, 0.0914, 0.2317, 0.0888, 0.0721, 0.0897, 0.0944]
+    one-step regret: global bound                      0.8611 [0.2420, 1.4802]  per seed [0.4509, 1.9376, 0.5864, 0.4255, 0.5453, 2.9372, 0.4674, 0.3934, 0.427, 0.4403]
+    one-step regret:   global bound, stored reports    0.4834 [0.4388, 0.5280]  per seed [0.4448, 0.5366, 0.5918, 0.5033, 0.4469, 0.5591, 0.4766, 0.3981, 0.433, 0.4439]
+    one-step regret: local / global                    0.168 [0.135, 0.201]  per seed [0.193, 0.092, 0.178, 0.175, 0.168, 0.079, 0.19, 0.183, 0.21, 0.214]
+    one-step regret: local bound / measured            96.27 [82.85, 109.69]  per seed [90.1, 74.3, 96.11, 88.13, 72.32, 130.11, 114.61, 84.2, 97.03, 115.73]
+    policy form, local (estimate)                      2.23 [1.48, 2.97]  per seed [1.74, 3.58, 2.09, 1.49, 1.83, 4.63, 1.78, 1.44, 1.79, 1.89]
+    policy form, global (estimate)                     17.22 [4.84, 29.60]  per seed [9.02, 38.75, 11.73, 8.51, 10.91, 58.74, 9.35, 7.87, 8.54, 8.81]
+    the largest measured value error and regret are under the largest local bounds on 10 of 10 seeds (pair by pair it is a theorem; tests/test_interpretability.py)
+
+  probe linear/agent
+    mean L1 decoding error                             0.0160 [0.0147, 0.0172]  per seed [0.018, 0.0166, 0.0155, 0.0157, 0.0163, 0.0178, 0.017, 0.0168, 0.0132, 0.0128]
+      the same in the stored reports                   0.0161 [0.0148, 0.0174]  per seed [0.018, 0.017, 0.0157, 0.0158, 0.0165, 0.0181, 0.0171, 0.0169, 0.0133, 0.0128]
+    L_V (largest half-span of V*)                      55.00 [55.00, 55.00]  per seed [55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0]
+    half-span of the active vector (mean)              18.72 [18.70, 18.73]  per seed [18.7, 18.74, 18.76, 18.7, 18.71, 18.72, 18.72, 18.7, 18.71, 18.7]
+    value error: measured                              0.1422 [0.1293, 0.1551]  per seed [0.1543, 0.1405, 0.1426, 0.1638, 0.1516, 0.1369, 0.1537, 0.1546, 0.1046, 0.1195]
+    value error: local bound                           0.1504 [0.1370, 0.1638]  per seed [0.1655, 0.1467, 0.1504, 0.1703, 0.161, 0.1432, 0.1593, 0.1682, 0.1131, 0.1264]
+    value error: global bound                          0.8782 [0.8097, 0.9466]  per seed [0.9903, 0.9123, 0.8525, 0.8646, 0.8965, 0.9769, 0.9346, 0.9217, 0.7267, 0.7058]
+    value error:   global bound, stored reports        0.8872 [0.8163, 0.9581]  per seed [0.9898, 0.9332, 0.8652, 0.8671, 0.9091, 0.9975, 0.9425, 0.931, 0.7313, 0.7055]
+    value error: local / global                        0.172 [0.161, 0.182]  per seed [0.167, 0.161, 0.176, 0.197, 0.18, 0.147, 0.17, 0.183, 0.156, 0.179]
+    value error: local bound / measured                1.06 [1.05, 1.07]  per seed [1.07, 1.04, 1.05, 1.04, 1.06, 1.05, 1.04, 1.09, 1.08, 1.06]
+    one-step regret: measured                          0.0085 [0.0070, 0.0099]  per seed [0.0125, 0.0056, 0.008, 0.008, 0.0105, 0.0068, 0.0076, 0.0103, 0.0081, 0.0073]
+    one-step regret: local bound                       0.2805 [0.2550, 0.3059]  per seed [0.3029, 0.2788, 0.282, 0.3228, 0.2974, 0.2697, 0.3015, 0.3076, 0.2066, 0.2355]
+    one-step regret: global bound                      1.7564 [1.6195, 1.8933]  per seed [1.9805, 1.8246, 1.7049, 1.7291, 1.793, 1.9538, 1.8692, 1.8435, 1.4533, 1.4116]
+    one-step regret:   global bound, stored reports    1.7744 [1.6326, 1.9163]  per seed [1.9796, 1.8663, 1.7303, 1.7343, 1.8181, 1.9951, 1.885, 1.862, 1.4627, 1.4111]
+    one-step regret: local / global                    0.160 [0.150, 0.170]  per seed [0.153, 0.153, 0.165, 0.187, 0.166, 0.138, 0.161, 0.167, 0.142, 0.167]
+    one-step regret: local bound / measured            34.46 [28.76, 40.15]  per seed [24.33, 49.9, 35.22, 40.19, 28.27, 39.45, 39.47, 29.93, 25.35, 32.45]
+    policy form, local (estimate)                      5.61 [5.10, 6.12]  per seed [6.06, 5.58, 5.64, 6.46, 5.95, 5.39, 6.03, 6.15, 4.13, 4.71]
+    policy form, global (estimate)                     35.13 [32.39, 37.87]  per seed [39.61, 36.49, 34.1, 34.58, 35.86, 39.08, 37.38, 36.87, 29.07, 28.23]
+    the largest measured value error and regret are under the largest local bounds on 10 of 10 seeds (pair by pair it is a theorem; tests/test_interpretability.py)
+
+cost: 41.9 min per seed on one CPU thread
