@@ -46,6 +46,10 @@
 #          > reports/2026-11-15_interpretability/mlp_probe_fit_selection.log
 #    `--steps` and `--out` exist for a rehearsal of the chain at a small size; the faithfulness check runs only at the
 #    registered size, and `readout` reads only the registered directory.
+#    - An interrupted run continues at its next fit (added 2026-11-24 after the registration, when the machine's
+#      memory guard had stopped the play twice within a run): every finished fit is written to seed<k>.partial.json,
+#      and a later call skips it. A fit depends on its fit seed and the data alone, so what is computed is unchanged;
+#      the recorded seconds are the sum over the fits and no longer hold the loading time.
 # ==============================================================================
 
 import argparse
@@ -120,26 +124,39 @@ def play(seeds: list[int], steps: int, out: Path) -> None:
         if (out / f"seed{seed}.json").exists():
             print(f"seed {seed}: done before", flush=True)
             continue
-        start = time.time()
         stored = torch.load(DATA / f"seed{seed}_data.pt", weights_only=True)
         fit_set = ProbeDataset(stored["fit_latents"], stored["fit_posteriors"])
         eval_set = ProbeDataset(stored["eval_latents"], stored["eval_posteriors"])
-        fits = {str(KNOWN_FIT_SEED): _fit(fit_set, eval_set, KNOWN_FIT_SEED, steps, tail)}
-        if registered:                                           # section 2, faithfulness
-            cq5 = json.loads((DATA / f"seed{seed}.json").read_text())["fits"]["constant"][str(KNOWN_FIT_SEED)]["mean_l1"]
-            if fits[str(KNOWN_FIT_SEED)]["last_l1"] != cq5:
-                raise RuntimeError(f"seed {seed}: the last iterate at fit seed {KNOWN_FIT_SEED} reads "
-                                   f"{fits[str(KNOWN_FIT_SEED)]['last_l1']!r}, C-q.5 stored {cq5!r}: the loop is not "
-                                   "fit_mlp_probe's.")
-        for fit_seed in FRESH_FIT_SEEDS:
-            fits[str(fit_seed)] = _fit(fit_set, eval_set, fit_seed, steps, tail)
-        row = {"seed": seed, "commit": commit, "steps": steps, "tail": tail, "seconds": time.time() - start, "fits": fits}
+        # Section 4: the finished fits of an interrupted call. Values are never printed here (one read, by `readout`).
+        partial_path = out / f"seed{seed}.partial.json"
+        partial = json.loads(partial_path.read_text()) if partial_path.exists() else {"steps": steps, "seconds": 0.0, "fits": {}}
+        if partial["steps"] != steps:
+            raise ValueError(f"{partial_path} was written at {partial['steps']} steps, not {steps}.")
+        fits, kept = partial["fits"], len(partial["fits"])
+        for fit_seed in (KNOWN_FIT_SEED, *FRESH_FIT_SEEDS):
+            if str(fit_seed) in fits:
+                continue
+            start = time.time()
+            fit = _fit(fit_set, eval_set, fit_seed, steps, tail)
+            if registered and fit_seed == KNOWN_FIT_SEED:        # section 2, faithfulness, before anything is stored
+                cq5 = json.loads((DATA / f"seed{seed}.json").read_text())["fits"]["constant"][str(KNOWN_FIT_SEED)]["mean_l1"]
+                if fit["last_l1"] != cq5:
+                    raise RuntimeError(f"seed {seed}: the last iterate at fit seed {KNOWN_FIT_SEED} reads "
+                                       f"{fit['last_l1']!r}, C-q.5 stored {cq5!r}: the loop is not fit_mlp_probe's.")
+            fits[str(fit_seed)] = fit
+            partial["seconds"] += time.time() - start
+            tmp = out / f"seed{seed}.partial.json.tmp"
+            tmp.write_text(json.dumps(partial))
+            os.replace(tmp, partial_path)
+        row = {"seed": seed, "commit": commit, "steps": steps, "tail": tail, "seconds": partial["seconds"], "fits": fits}
         tmp = out / f"seed{seed}.json.tmp"
         tmp.write_text(json.dumps(row))
         os.replace(tmp, out / f"seed{seed}.json")
+        partial_path.unlink()
         # Timing only: the values are read once, by `readout`.
         checked = "faithful to C-q.5" if registered else "rehearsal size, not checked against C-q.5"
-        print(f"seed {seed}: {checked}; {time.time() - start:.0f} s", flush=True)
+        print(f"seed {seed}: {checked}; {kept} fits kept from an earlier call; {partial['seconds']:.0f} s for the six fits",
+              flush=True)
 
 
 def _interval(values: list[float]) -> str:
@@ -192,7 +209,7 @@ def readout() -> None:
     print(f"    selected minus last: {_interval((selected - last).mean(axis=1).tolist())}")
     print(f"    standard deviation over the five fit seeds, mean over runs: last {last.std(axis=1, ddof=1).mean():.4f}, "
           f"selected {selected.std(axis=1, ddof=1).mean():.4f}")
-    print(f"\ncost: {np.mean([row['seconds'] for row in rows]) / 60:.1f} min per run on one CPU thread (six fits)")
+    print(f"\ncost: {np.mean([row['seconds'] for row in rows]) / 60:.1f} min per run on one CPU thread for the six fits")
 
 
 def main() -> None:

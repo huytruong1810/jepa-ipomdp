@@ -167,6 +167,12 @@
 - **Not covered by C-q.5:** the probe fitted on random histories (the decoded-belief agent's), the Wumpus probe, the Interactive Tiger probes.
 - **Machine:** the level-2 development run started at 05:26 behind C-q.5 (about 2.5 h); the decoder run and the analyses follow as queued. The GPU hold stands.
 
+**Addendum 2026-11-24 07:25: the CPU development run on Interactive Tiger level 2 has ended (seed 100, not an E1 seed; default configuration, arm 3's; exit 0 after 1 h 55 min on four CPU threads beside other jobs).**
+- Greedy evaluations during training (128 episodes each, the run's own simulator): -19.88, -19.88, 11.62 +- 1.48, 14.18 +- 2.55, 12.31 +- 2.33, 10.74 +- 2.85, 11.33 +- 2.53, 12.98 +- 2.50. `best.pt` is collection 20 (14.18).
+- What this says and does not say: the default configuration learns the level-2 problem (always listening returns -19.88). The six evaluations after learning average 12.2 with about +- 2.5 each; the reference agent of the benchmark file scored 12.05 +- 1.67 on other episodes and the certified bracket is [13.26, 14.26]. Whether the learned planner reaches the reference agent is not settled by these numbers, and the checkpoint is the highest of eight noisy evaluations. The paired analysis on fresh episodes decides; it is queued behind the decoder run and starts when 9.4 GB are available.
+- The level-1 development run with the decoder representation (arm 2's configuration) started at 07:21.
+- C-q.6 (the probe-fit selection test) has 2 of 10 runs played. The memory guard stopped its process twice, each time losing the run in progress, because the other project's memory use swings by about 4 GB within an hour. The play now keeps every finished fit, so a stop costs at most one fit of six minutes; what is computed is unchanged.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
