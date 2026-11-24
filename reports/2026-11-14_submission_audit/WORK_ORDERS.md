@@ -95,7 +95,7 @@
 **Addendum 2026-11-23 21:07: the CPU development run on Interactive Tiger level 1 has ended (seed 100, not an E1 seed; default configuration; exit 0 after 2 h 41 min on four CPU threads beside other jobs).**
 - Greedy evaluations during training (128 episodes each, the run's own simulator): -19.88, -18.37, 12.00 +- 2.83, 11.51 +- 2.70, 14.19 +- 2.52, 12.47 +- 2.66, 12.98 +- 2.82 and, at the last collection, 16.55 +- 2.36. `best.pt` is that last collection.
 - What this says and does not say: the default configuration learns the level-1 problem (the always-listen return is -19.88). Whether it reaches the reference agent (16.3 on C-r's episodes; bracket [16.55, 19.67]) is NOT settled by these numbers: each carries about +- 2.6, the five before the last average 12.6, and the checkpoint was chosen by the highest of them. The paired analysis on fresh episodes against the benchmark file decides; it is queued on the CPU behind C-q.5 for memory and should end at about 23:30.
-- The same run at level 2 (seed 100, default configuration) starts now; about 2.5 h.
+- The same run at level 2 (seed 100, default configuration) was started at 21:08 and stopped at 21:12: with it the machine sat at the 6 GB of available memory the other project asks jepa to leave. It now follows the level-1 analysis, which itself waits for C-q.5's three units (about 00:15); the analysis should end at about 01:00 and the level-2 run at about 03:40.
 
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
