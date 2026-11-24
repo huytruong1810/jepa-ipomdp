@@ -114,6 +114,11 @@
 #      closer to the exact one. The control has no interactive-state probe on the agent's histories
 #      (they cannot be replayed), so that gain exists on random histories only; the marginal probes
 #      have it on both.
+#    - "history_free/..." is the second control (interactive_analysis.py, section 6): the divergence
+#      of the best constant, which reads no latent. It is the scale of the divergences above: a
+#      probe's KL divided by it is the share of the history's information about that variable which
+#      the decoded belief does not recover. The table holds the control itself; a readout forms the
+#      ratio per seed.
 # ==============================================================================
 
 from dataclasses import dataclass
@@ -186,6 +191,8 @@ ITIGER_METRICS: dict[str, tuple[str, ...]] = {
     **{f"untrained/probe_kl/{kind}_random": ("untrained", "probes", f"{kind}/random", "mean_kl") for kind in ("mlp", "linear")},
     **{f"untrained/{marginal}_kl/{kind}_{source}": ("untrained", "marginals", f"{kind}/{source}", marginal, "kl_mean")
        for marginal in _MARGINALS for kind, source in _PROBES},
+    **{f"history_free/{variable}_{divergence}/{source}": ("history_free", source, variable, f"{divergence}_mean")
+       for variable in ("state", *_MARGINALS) for divergence in ("kl", "l1") for source in ("random", "agent")},
     **{f"{quantity}/{kind}_agent": ("reference", "bounds", f"{kind}/agent", quantity)
        for kind in ("mlp", "linear")
        for quantity in ("value_error_mean", "value_error_bound_mean", "regret_mean", "regret_bound_mean",

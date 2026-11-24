@@ -138,6 +138,10 @@ class TestSeedAggregation:
         assert gain.mean == pytest.approx(-0.5) and gain.std == pytest.approx(0.0, abs=1e-12)
         # The control has no interactive-state probe on the agent's histories, so no such gain is defined.
         assert "gain/probe_kl/mlp_random" in statistics and "gain/probe_kl/mlp_agent" not in statistics
+        # The history-free control (section 8): KL and L1 of the state and of both marginals, per history source.
+        assert {name for name in statistics if name.startswith("history_free/")} == {
+            f"history_free/{variable}_{divergence}/{source}" for variable in ("state", "physical", "other_node")
+            for divergence in ("kl", "l1") for source in ("random", "agent")}
 
 
 class TestRobustStatistics:

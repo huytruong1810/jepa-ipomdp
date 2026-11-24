@@ -13,6 +13,9 @@ every value from above. What is verified:
     4. The whole analysis runs on an untrained agent and reports the bracket, the reference agent and both marginals.
     5. The probe control (module section 5) reads the trained probes' histories: with the trained filter in its place
        it reproduces the trained MLP reports exactly; through a run directory its filter is the run's initial one.
+    6. The history-free control (module section 6): it equals a hand computation, vanishes when every history has one
+       posterior, is the best constant on its fit histories, keeps 0 log 0 = 0 and reports a state the fit histories
+       never reach as an infinite divergence; in the whole analysis it is reported per history source.
 """
 
 import json
@@ -32,8 +35,8 @@ from ipomdp.domain.policy_graph import PolicyGraph
 from ipomdp.experiments import AnalysisSettings, analyze_run, build_training_run
 from ipomdp.experiments.interactive_analysis import (InteractiveAnalysisSettings, InteractiveBenchmark,
                                                      analyze_interactive, analyze_interactive_run, fold_digest,
-                                                     initial_acting_filter, interactive_problem, marginal_reports,
-                                                     reference_sets)
+                                                     history_free_reports, initial_acting_filter, interactive_problem,
+                                                     marginal_reports, reference_sets)
 from ipomdp.experiments.runs import load_trained_run
 from ipomdp.interpretability.belief_probe import ProbeDataset
 from ipomdp.models import BeliefFilter, ObservationHead, RewardHead, TwoHotSymlog, ValueHead
@@ -140,6 +143,66 @@ def test_marginal_divergences_vanish_for_the_exact_beliefs(problem):
     assert all(report.kl_mean > 0.0 for report in uniform.values())
 
 
+def _dataset(posteriors: torch.Tensor) -> ProbeDataset:
+    """Exact posteriors with stand-in latents: the history-free control must not read them."""
+    return ProbeDataset(latents=torch.full((posteriors.shape[0], 2), float("nan")), posteriors=posteriors)
+
+
+class TestHistoryFreeControl:
+    """Module section 6: the fit histories' mean exact posterior as a constant decoder."""
+
+    def test_it_equals_the_hand_computation_on_the_state_and_on_both_marginals(self, problem):
+        num_states = problem.pomdp.num_states
+        dirichlet = torch.distributions.Dirichlet(torch.ones(num_states, dtype=torch.float64))
+        torch.manual_seed(0)
+        fit, held_out = dirichlet.sample((300,)), dirichlet.sample((200,))
+        reports = history_free_reports(_dataset(fit), _dataset(held_out), problem)
+        assert set(reports) == {"state", "physical", "other_node"}
+        constant = fit.mean(dim=0)
+        kl = (held_out * (held_out.log() - constant.log())).sum(-1)
+        assert reports["state"].kl_mean == pytest.approx(float(kl.mean()), rel=1e-12)
+        assert reports["state"].kl_max == pytest.approx(float(kl.max()), rel=1e-12)
+        assert reports["state"].l1_mean == pytest.approx(float((held_out - constant).abs().sum(-1).mean()), rel=1e-12)
+        for name, groups, count in (("physical", problem.physical_state, problem.num_physical_states),
+                                    ("other_node", problem.other_node, problem.other.num_nodes)):
+            p = torch.stack([held_out[:, groups == g].sum(-1) for g in range(count)], dim=-1)
+            q = torch.stack([constant[groups == g].sum() for g in range(count)])
+            assert reports[name].kl_mean == pytest.approx(float((p * (p.log() - q.log())).sum(-1).mean()), rel=1e-12)
+            assert reports[name].l1_mean == pytest.approx(float((p - q).abs().sum(-1).mean()), rel=1e-12)
+            # Summing states into groups cannot raise a divergence (the log-sum inequality; the triangle inequality).
+            assert reports[name].kl_mean <= reports["state"].kl_mean and reports[name].l1_mean <= reports["state"].l1_mean
+
+    def test_it_vanishes_when_every_history_has_the_same_posterior(self, problem):
+        row = torch.distributions.Dirichlet(torch.ones(problem.pomdp.num_states, dtype=torch.float64)).sample()
+        same = row.expand(50, -1).clone()
+        for report in history_free_reports(_dataset(same), _dataset(same), problem).values():
+            assert report.kl_mean == pytest.approx(0.0, abs=1e-12) and report.l1_mean == pytest.approx(0.0, abs=1e-12)
+
+    def test_no_other_constant_has_a_lower_mean_kl_on_the_fit_histories(self, problem):
+        """The mean posterior minimises the mean KL(b_h || q) over constants q, the objective the probes are fitted with."""
+        dirichlet = torch.distributions.Dirichlet(torch.ones(problem.pomdp.num_states, dtype=torch.float64))
+        torch.manual_seed(1)
+        fit = dirichlet.sample((400,))
+        best = history_free_reports(_dataset(fit), _dataset(fit), problem)["state"].kl_mean
+        for other in dirichlet.sample((20,)) * 0.5 + fit.mean(dim=0) * 0.5:
+            assert float((fit * (fit.log() - other.log())).sum(-1).mean()) >= best
+
+    def test_zero_mass_adds_nothing_and_an_unseen_state_is_infinite(self, problem):
+        num_states = problem.pomdp.num_states
+        torch.manual_seed(2)
+        fit = torch.distributions.Dirichlet(torch.ones(num_states, dtype=torch.float64)).sample((100,))
+        fit[:, 0] = 0.0                                              # no fit history gives state 0 any mass
+        fit = fit / fit.sum(-1, keepdim=True)
+        # Held-out histories that give state 0 no mass either: 0 log (0 / 0) counts as 0, every number is finite.
+        finite = history_free_reports(_dataset(fit), _dataset(fit[:40]), problem)
+        assert all(math.isfinite(r.kl_mean) and math.isfinite(r.kl_max) and r.kl_mean >= -1e-12 for r in finite.values())
+        # One held-out history reaches state 0: its KL from the constant is infinite and is reported as such.
+        reached = fit[:40].clone()
+        reached[0] = torch.full((num_states,), 1.0 / num_states, dtype=torch.float64)
+        report = history_free_reports(_dataset(fit), _dataset(reached), problem)["state"]
+        assert report.kl_max == math.inf and report.kl_mean == math.inf and math.isfinite(report.l1_mean)
+
+
 EPISODES, DIM, HIDDEN = 8, 8, 16
 
 
@@ -178,6 +241,12 @@ def test_the_analysis_reports_the_bracket_the_reference_and_both_marginals(probl
         assert set(reports) == {"physical", "other_node"}
         assert all(math.isfinite(r.kl_mean) and r.kl_mean >= -1e-12 for r in reports.values())
     assert all(math.isfinite(r.mean_kl) and r.mean_kl >= -1e-12 for r in analysis.untrained.probes.values())
+    # Section 6: one history-free report per history source, on the state and on both marginals. The KL may be
+    # infinite at this size (48 fit histories can miss a state that a held-out history reaches); L1 is always finite.
+    assert set(analysis.history_free) == {"random", "agent"}
+    for reports in analysis.history_free.values():
+        assert set(reports) == {"state", "physical", "other_node"}
+        assert all(r.kl_mean >= -1e-12 and 0.0 <= r.l1_mean <= 2.0 for r in reports.values())
 
 
 def test_the_control_reads_the_histories_of_the_trained_probes(problem):
@@ -224,6 +293,8 @@ def test_a_trained_itiger_run_is_analysed_against_its_benchmark_file(tmp_path):
     assert set(report["marginals"]["mlp/agent"]) == {"physical", "other_node"}
     assert set(report["untrained"]["probes"]) == {"linear/random", "mlp/random"}
     assert set(report["untrained"]["marginals"]["mlp/agent"]) == {"physical", "other_node"}
+    assert set(report["history_free"]) == {"random", "agent"}
+    assert set(report["history_free"]["agent"]) == {"state", "physical", "other_node"}
     trained = load_trained_run(tmp_path, CPU)                 # the control's filter is the run's initial one, not best.pt
     control = initial_acting_filter(trained, CPU).state_dict()
     assert all(torch.equal(control[name], value) for name, value in initial.items())

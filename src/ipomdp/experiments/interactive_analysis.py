@@ -62,6 +62,26 @@
 #      the control reproduces the trained MLP reports exactly (tests/test_interactive_analysis.py). The linear probes
 #      start from the global generator's state and are compared, not reproduced.
 #    - Readout: descriptive, no threshold. What the trained probes gain over this control is what training adds.
+#
+# 6. Probe Control: the History-Free Constant (the scale of a divergence):
+#    - Section 5 compares a trained probe with the same probe on an untrained filter. Neither number says how far a
+#      decoded belief is from one that knows nothing of the history. That scale is the best constant: the mean exact
+#      posterior q of the fit histories. Among all constants it minimises the fit histories' mean KL(b_h || q), the
+#      cross-entropy objective every probe is fitted with (interpretability/belief_probe.py). It reads no latent, so
+#      it is the same for every filter, trained or not.
+#    - Its divergence on the held-out histories is reported for the interactive state and for the two marginals of
+#      section 3, on section 3's episodes (random histories and the agent's own). Each marginal number therefore sits
+#      beside the marginal probes' numbers on the same histories. The interactive-state probes of analyze_beliefs
+#      read other episodes of the same two history laws (streams 1-4, not 11-14), so beside them the "state" number
+#      is a second estimate on equally distributed histories, not a paired one.
+#    - Reading: with h drawn from the history law (the step included), E_h KL(b_h || E_h b_h) is the mutual
+#      information between the history and the state, in nats: everything the history says about the state beyond the
+#      state's marginal law. A probe's mean KL is the part of it that the decoded belief misses. So
+#      probe KL / history-free KL is the share of the history's information that is NOT recovered from the latent: 0
+#      for the exact belief, 1 for a latent that says nothing, above 1 for a decoder worse than the constant. The same
+#      holds marginal by marginal.
+#    - 0 log 0 = 0: a state that no history gives mass to adds nothing. A state that a held-out history reaches and no
+#      fit history does makes that history's KL infinite, and it is reported as infinite: nothing is clamped.
 # ==============================================================================
 
 import hashlib
@@ -177,25 +197,57 @@ class MarginalReport:
     l1_mean: float
 
 
+def _marginal_groups(problem: InteractiveModel, device: torch.device) -> list[tuple[str, Tensor, list[int]]]:
+    """
+    The two marginals of section 3 as (name, group index of every interactive state, groups to report). A group with no
+    reachable interactive state (a controller node the fold never visits) holds no mass in any belief and is left out,
+    so it adds exactly 0 to every divergence.
+    """
+    out = []
+    for name, groups, num_groups in (("physical", problem.physical_state, problem.num_physical_states),
+                                     ("other_node", problem.other_node, problem.other.num_nodes)):
+        groups = groups.to(device)
+        out.append((name, groups, [g for g in range(num_groups) if bool((groups == g).any())]))
+    return out
+
+
 @torch.no_grad()
 def marginal_reports(probe, dataset: ProbeDataset, problem: InteractiveModel) -> dict[str, MarginalReport]:
-    """
-    KL(exact marginal || decoded marginal) and L1 on the physical and the other agent's node marginals. A group with no
-    reachable interactive state (a controller node the fold never visits) holds no mass in either belief and is left
-    out, so it adds exactly 0 to both divergences.
-    """
+    """KL(exact marginal || decoded marginal) and L1 on the physical and the other agent's node marginals."""
     log_decoded = probe.log_probs(dataset.latents).double()
     exact = dataset.posteriors.double()
     reports = {}
-    for name, groups, num_groups in (("physical", problem.physical_state, problem.num_physical_states),
-                                     ("other_node", problem.other_node, problem.other.num_nodes)):
-        groups = groups.to(exact.device)
-        members = [g for g in range(num_groups) if bool((groups == g).any())]
+    for name, groups, members in _marginal_groups(problem, exact.device):
         log_q = _log_marginal(log_decoded, groups, members)
         p = torch.stack([exact[:, groups == g].sum(-1) for g in members], dim=-1)
         kl = (p * (p.clamp(min=1e-12).log() - log_q)).sum(-1)
         l1 = (p - log_q.exp()).abs().sum(-1)
         reports[name] = MarginalReport(float(kl.mean()), float(kl.max()), float(l1.mean()))
+    return reports
+
+
+def _constant_report(p: Tensor, q: Tensor) -> MarginalReport:
+    """Divergence of every row of p (N, K) from the one distribution q (K,), with 0 log 0 = 0 (section 6)."""
+    kl = (torch.xlogy(p, p) - torch.xlogy(p, q)).sum(-1)       # +inf where a row has mass on a state q gives none
+    l1 = (p - q).abs().sum(-1)
+    return MarginalReport(float(kl.mean()), float(kl.max()), float(l1.mean()))
+
+
+@torch.no_grad()
+def history_free_reports(fit_set: ProbeDataset, eval_set: ProbeDataset,
+                         problem: InteractiveModel) -> dict[str, MarginalReport]:
+    """
+    Section 6: the fit histories' mean exact posterior as a constant decoder, scored on the held-out histories.
+    KL(exact || constant) and L1 on the interactive state ("state") and on the two marginals of section 3. No latent
+    is read: the two data sets enter through their exact posteriors alone.
+    """
+    constant = fit_set.posteriors.double().mean(dim=0)
+    exact = eval_set.posteriors.double()
+    reports = {"state": _constant_report(exact, constant)}
+    for name, groups, members in _marginal_groups(problem, exact.device):
+        p = torch.stack([exact[:, groups == g].sum(-1) for g in members], dim=-1)
+        q = torch.stack([constant[groups == g].sum() for g in members])
+        reports[name] = _constant_report(p, q)
     return reports
 
 
@@ -224,12 +276,15 @@ class InteractiveAnalysis:
             agent, its optimal_value_b0 is L(b0) and its solver_error_bound is the bracket width U - L.
         marginals: per probe ("<linear|mlp>/<random|agent>") the physical and other-node marginal reports (section 3).
         untrained: the same probes on the run's untrained filter (section 5).
+        history_free: per history source ("random", "agent") the constant decoder's report on the interactive state
+            ("state") and on the two marginals, on the episodes of `marginals` (section 6).
     """
 
     bracket: dict
     reference: BeliefAnalysis
     marginals: dict[str, dict[str, MarginalReport]]
     untrained: ProbeControl
+    history_free: dict[str, dict[str, MarginalReport]]
 
 
 def _fitters(mlp_probe_steps: int):
@@ -237,13 +292,17 @@ def _fitters(mlp_probe_steps: int):
     return (("linear", fit_linear_probe), ("mlp", lambda d: fit_mlp_probe(d, steps=mlp_probe_steps)))
 
 
-def _marginal_probes(problem: InteractiveModel, belief_filter: BeliefFilter,
-                     episodes: dict[str, tuple[EpisodeBatch, EpisodeBatch]],
-                     mlp_probe_steps: int) -> dict[str, dict[str, MarginalReport]]:
-    """Section 3: per probe family and history source, a probe fitted on the first set and scored on the second."""
-    data = {source: (build_probe_dataset(problem.pomdp, belief_filter, fit_episodes),
+def _marginal_data(problem: InteractiveModel, belief_filter: BeliefFilter,
+                   episodes: dict[str, tuple[EpisodeBatch, EpisodeBatch]]) -> dict[str, tuple[ProbeDataset, ProbeDataset]]:
+    """Section 3: per history source the fit and the held-out data set of one filter on the given episodes."""
+    return {source: (build_probe_dataset(problem.pomdp, belief_filter, fit_episodes),
                      build_probe_dataset(problem.pomdp, belief_filter, eval_episodes))
             for source, (fit_episodes, eval_episodes) in episodes.items()}
+
+
+def _marginal_probes(problem: InteractiveModel, data: dict[str, tuple[ProbeDataset, ProbeDataset]],
+                     mlp_probe_steps: int) -> dict[str, dict[str, MarginalReport]]:
+    """Section 3: per probe family and history source, a probe fitted on the first set and scored on the second."""
     return {f"{kind}/{source}": marginal_reports(fit(fit_set), eval_set, problem)
             for kind, fit in _fitters(mlp_probe_steps) for source, (fit_set, eval_set) in data.items()}
 
@@ -265,7 +324,7 @@ def analyze_interactive(problem: InteractiveModel, belief_filter: BeliefFilter, 
                         planner_agent: PlanningAgent, benchmark: InteractiveBenchmark, episode_length: int,
                         num_episodes: int, mlp_probe_steps: int, seed: int, device: torch.device) -> InteractiveAnalysis:
     """
-    Sections 2, 3 and 5 on one trained agent.
+    Sections 2, 3, 5 and 6 on one trained agent.
 
     Args:
         problem: The fold the agent was trained on (its pomdp must match the benchmark's digest).
@@ -284,13 +343,16 @@ def analyze_interactive(problem: InteractiveModel, belief_filter: BeliefFilter, 
     uniform = UniformRandomAgent(pomdp.num_actions, num_episodes, stream_seed(seed, 16), device)
     episodes = {"random": (play_episodes(env(11), uniform)[0], play_episodes(env(12), uniform)[0]),
                 "agent": (play_episodes(env(13), planner_agent)[0], play_episodes(env(14), planner_agent)[0])}
-    marginals = _marginal_probes(problem, belief_filter, episodes, mlp_probe_steps)
+    data = _marginal_data(problem, belief_filter, episodes)
+    marginals = _marginal_probes(problem, data, mlp_probe_steps)
+    # Section 6: the exact posteriors of these episodes do not depend on the filter that replayed them.
+    history_free = {source: history_free_reports(fit_set, eval_set, problem) for source, (fit_set, eval_set) in data.items()}
     untrained = ProbeControl(_random_state_probes(pomdp, initial_filter, episode_length, num_episodes, mlp_probe_steps,
                                                   seed, device),
-                             _marginal_probes(problem, initial_filter, episodes, mlp_probe_steps))
+                             _marginal_probes(problem, _marginal_data(problem, initial_filter, episodes), mlp_probe_steps))
     bracket = {"lower": benchmark.lower, "upper": benchmark.upper, "width": benchmark.upper - benchmark.lower,
                "source": benchmark.source, "digest": benchmark.digest}
-    return InteractiveAnalysis(bracket, reference, marginals, untrained)
+    return InteractiveAnalysis(bracket, reference, marginals, untrained, history_free)
 
 
 def print_interactive_summary(analysis: InteractiveAnalysis) -> None:
@@ -318,6 +380,10 @@ def print_interactive_summary(analysis: InteractiveAnalysis) -> None:
     for name, reports in analysis.untrained.marginals.items():
         print(f"  untrained marginal probe {name:<12} " + "  ".join(f"{m}: KL {r.kl_mean:.5f} L1 {r.l1_mean:.4f}"
                                                                    for m, r in reports.items()))
+    print("  control: the fit histories' mean exact posterior, a constant that reads no latent (section 6)")
+    for source, reports in analysis.history_free.items():
+        print(f"  history-free {source:<7} " + "  ".join(f"{m}: KL {r.kl_mean:.5f} L1 {r.l1_mean:.4f}"
+                                                         for m, r in reports.items()))
 
 
 @dataclass(frozen=True)
