@@ -699,6 +699,36 @@ class TestLearningStack:
         resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
         assert repr([resumed.collect_and_train()]) == repr(expected[1:])
 
+    def test_the_retrain_recipe_trains_and_resumes_bit_for_bit(self, tmp_path):
+        # The combination the Wumpus results are trained with (decoder representation, a 5-step observation term, the
+        # double value, stored evaluation games, epsilon exploration, the whole-buffer retrain). Each option has its own
+        # test; the combination had none. The checkpoint is written after a retrain and an evaluation, the kind of
+        # point an interrupted sweep seed continues from: the continuation must equal the uninterrupted run in every
+        # metric, every parameter and the buffer's greedy flags, across a second retrain.
+        from ipomdp.experiments import wumpus_setup
+        from ipomdp.models import ValueEstimator, ValuePair
+        from ipomdp.training import Representation, TrainingRun, load_checkpoint, save_checkpoint
+        setup = wumpus_setup(CPU, DISCOUNT)
+        config = lambda **kw: self._config(representation=Representation.DECODER, observation_horizon=5,  # noqa: E731
+                                           value_estimator=ValueEstimator.DOUBLE, store_eval_episodes=True, epsilon=0.25,
+                                           epsilon_min=0.1, retrain_every=2, retrain_updates=3, **kw)
+        play = lambda run: [run.collect_and_train(), run.collect_and_train(), run.evaluate()]  # noqa: E731
+        reference = TrainingRun(setup, config(), CPU)
+        start = play(reference)
+        assert [metrics["retrained"] for metrics in start[:2]] == [0.0, 1.0]
+        assert isinstance(reference.value_head, ValuePair) and "multistep_observation" in reference.networks
+        assert {int(state["step"]) for state in reference.trainer.optimizer.state.values()} == {3}   # Adam restarted
+        assert int(reference.buffer._greedy.sum()) == 4                                              # the stored evaluation
+        save_checkpoint(tmp_path / "latest.pt", reference.state_dict())
+        expected = play(reference)
+        assert expected[1]["retrained"] == 1.0
+        resumed = TrainingRun(setup, config(seed=99), CPU)
+        resumed.load_state_dict(load_checkpoint(tmp_path / "latest.pt"))
+        assert repr(play(resumed)) == repr(expected)
+        parameters = lambda run: [p for net in run.networks.values() for p in net.state_dict().values()]  # noqa: E731
+        assert all(torch.equal(a, b) for a, b in zip(parameters(resumed), parameters(reference), strict=True))
+        assert torch.equal(resumed.buffer._greedy, reference.buffer._greedy) and resumed.buffer.size == 24
+
     def test_multistep_predictor_aligns_targets_and_reaches_the_filter(self):
         from ipomdp.models import BeliefFilter, MultiStepObservationPredictor
         torch.manual_seed(0)
