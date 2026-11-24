@@ -252,7 +252,7 @@ Read in full: `analysis.py`, `belief_probe.py`, `error_bounds.py`, `wumpus_laten
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `conf/config.yaml` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `conf/env/tiger.yaml` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `conf/env/wumpus.yaml` | | | |
-| 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `main.py` | | | |
+| 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `main.py` | Read for E1 on 2026-11-23, correct as read: the loop, both checkpoints, the exit codes (0 only after every collection, 130 on SIGINT, 1 on a guardrail abort). The periodic visualisation plays on the evaluation simulator, so it advances the evaluation's streams (deterministic; Phase 5 section, finding 4). Phase 7 review still open. | None. | CPU runs of both Interactive Tiger levels with `viz_every=2 save_every=2` exit 0. |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `pyproject.toml` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `recreate_venv.sh` | | | |
 | 7 experiments, entry points, telemetry, reports, runs, queue, packaging | `reports/2026-09-30_reviewer_page/README.md` | | | |
