@@ -173,6 +173,38 @@
 - The level-1 development run with the decoder representation (arm 2's configuration) started at 07:21.
 - C-q.6 (the probe-fit selection test) has 2 of 10 runs played. The memory guard stopped its process twice, each time losing the run in progress, because the other project's memory use swings by about 4 GB within an hour. The play now keeps every finished fit, so a stop costs at most one fit of six minutes; what is computed is unchanged.
 
+**Addendum 2026-11-24 12:05: the decoder level-1 run and the level-2 run are analysed (development seed 100 each, CPU, 512 episodes of analysis seed 12345; not E1 results). The two representations differ sharply on the other agent's node. This bears on E1's arms.**
+- **Return** (mean +- standard error over the 512 episodes; each fold's agents play the same simulator seeds; no per-episode returns are stored, so no paired error):
+
+  | development run | reference agent | learned planner | decoded-belief agent, MLP probe | decoded-belief agent, linear probe |
+  |---|---|---|---|---|
+  | level 1, JEPA (arm 1's configuration) | 15.85 +- 1.27 | 14.24 +- 1.31 | 13.14 +- 1.22 | 10.55 +- 0.87 |
+  | level 1, decoder (arm 2's) | 15.85 +- 1.27 | 14.78 +- 1.28 | 14.85 +- 1.29 | 10.20 +- 0.93 |
+  | level 2, JEPA (arm 3's) | 14.08 +- 1.10 | 12.73 +- 1.17 | 10.54 +- 1.15 | -12.00 +- 0.52 |
+
+  - On all three the learned planner is 1.1 to 1.6 under the reference agent, which one seed at 512 episodes cannot resolve (unpaired standard error 1.6 to 1.8). Level 2's bracket is [13.26, 14.26].
+  - At level 2 the linear probe's decoded-belief agent returns -12.0, close to always listening (-19.9): the linearly decoded belief is not good enough to act on there.
+- **Representation, on the scale of the history-free control** (share of the history's information about a variable that the probe recovers from the latent, 1 minus probe KL / history-free KL; trained filter / the run's untrained filter):
+
+  | variable, probe, histories | level 1, JEPA | level 1, decoder | level 2, JEPA |
+  |---|---|---|---|
+  | tiger's side, linear, random | 97% / 78% | 98% / 78% | 96% / 82% |
+  | tiger's side, MLP, random | 99% / 96% | 100% / 96% | 99% / 96% |
+  | j's node, linear, random | 46% / 35% | **89% / 35%** | 78% / 66% |
+  | j's node, MLP, random | 69% / 64% | **95% / 64%** | 93% / 91% |
+  | j's node, linear, agent's own | (control pending) | **93% / 58%** | 66% / 60% |
+  | j's node, MLP, agent's own | (control pending) | **97% / 86%** | 89% / 88% |
+
+  - **The decoder latent holds the belief about j's controller node; the JEPA latent holds little more of it than an untrained recurrent network.** At level 1 the decoder recovers 89 to 97% of what the history says about j's node, where JEPA recovers 46 to 69% and the untrained network 35 to 86%. At level 2 (j's controller has 5 nodes) the untrained network already recovers 60 to 91%, and JEPA training adds 1 to 12 points.
+  - A reading that fits the design (not tested): j's node reaches agent i only through its observations (the creaks of j's doors and the resets they cause). In decoder mode the observation loss shapes the filter; in JEPA mode the observation head reads a detached latent, so no gradient asks the filter to keep what predicts j's next action.
+  - The level-1 JEPA run's control on the agent's own histories comes with its re-analysis (queued; its first analysis predates the control).
+- **Bounds on L, MLP probe, agent's histories:** level 1 decoder: mean L1 0.125; value error 0.217 <= 2.19 (local) <= 7.23 (global); policy form 83 (local) and 289. Level 2 JEPA: mean L1 0.235; value error 0.353 <= 4.05 <= 13.3; policy form 155 and 533. The local form stays near a third of the global one, and both stay about ten times the measured value error.
+- **What this means for E1** (one development seed per configuration; the draft's arms are level 1 JEPA, level 1 decoder, level 2 JEPA):
+  - If the ten seeds look like these, contribution (3) on the interactive problem is carried by the decoder arm, and the JEPA arms report a latent that is no better than the untrained control on j's node.
+  - The draft has no decoder arm at level 2. **Proposal for the user: add it as a fourth arm** (ten seeds; the smoke measures its cost, the plan's figure is 15 to 30 GPU-hours), or run level 2 with the decoder instead of JEPA at no extra cost. To inform that choice a level-2 decoder development run is queued on the CPU (seed 100, about 2 h and its analysis); it is not one of the draft's arms and commits nothing.
+  - The CPU screen I had offered (a 5-step observation horizon, a 64-dimensional latent) is no longer the obvious next step: its first element, the decoder at the default configuration, already recovers 89% or more. I am not running it.
+- **Machine:** C-q.6 has 7 of 10 runs played; the level-1 re-analysis waits for 9.4 GB. The GPU hold stands.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
