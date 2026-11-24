@@ -142,6 +142,31 @@
 - **Reading, replacing the cruder one of the 23:35 addendum:** the latent recovers 97 to 99% of what the history says about the tiger's side and 46 to 69% of what it says about j's controller node. An untrained recurrent network already gives 35 to 64% of the latter, so training adds 5 to 11 points on j's node, against 3 to 19 points on the tiger's side where little was left to add. The share on the agent's own histories is not known yet: its control needs the planner's episodes, which come with the next analyses (level 2, the decoder arm) and with a re-analysis of this seed.
 - One development seed; the MLP probe's fit is under test (C-q.5). Nothing here is an E1 result.
 
+**Addendum 2026-11-24 05:30: C-q.5 is read (`da33608`; log `reports/2026-11-15_interpretability/mlp_probe_fit_stability.log`; PROTOCOL, "C-q results"). The MLP probe's fit is unstable at its last iterate. The paper's Tiger bound numbers are typical fits and stand, with a caveat. A decision about the instrument is needed before E1 is registered.**
+- **What was run:** on the ten canonical JEPA Tiger runs, the MLP probe of the analysis (3,000 full-batch Adam steps at a constant rate of 3e-3, last iterate) refitted on the agent's own histories with fit seeds 0 to 4, and the same with a cosine rate; 100 fits. Every run first reproduced C-q.4's number with `fit_mlp_probe` itself.
+- **Evidence** (mean L1 of the decoded from the exact belief on held-out histories):
+
+  | | constant rate (the code) | cosine rate |
+  |---|---|---|
+  | median of the 50 fits | 0.0045 | 0.0054 |
+  | largest of the 50 | 0.0267 | 0.0069 |
+  | fits above twice the median | 2 of 50 | 0 of 50 |
+  | spread over the five fit seeds (standard deviation, mean over runs) | 0.0022 | 0.0004 |
+  | fit seed 0 over the ten runs, Student-t 95% | 0.0078 [0.0022, 0.0135] | 0.0053 [0.0048, 0.0059] |
+  | mean of five fit seeds over the ten runs | 0.0053 [0.0041, 0.0064] | 0.0053 [0.0050, 0.0056] |
+
+  - The two outlying fits are runs 1 and 5 at fit seed 0, the analysis's own seed: exactly the two values that C-q.4 could not replicate. Both are late rises: the last iterate is 3.6 and 5.2 times the median of its own last 1,000 steps. Every run's tail has such rises (its maximum is 1.6 to 5.3 times its median); the reported number is whatever step 3,000 lands on.
+  - The cosine rate removes the rises and costs a fifth in typical error, because it trains less in the same steps.
+- **For the paper's ids `tiger.bounds.*`** (0.24, 0.05, 0.48, 0.001, 24, 48, 43, 86, 9.7; they cite the stored GPU reports with a mean L1 of 0.0044 [0.0040, 0.0048]): the stored fits sit at the constant rate's typical value (median 0.0045); none of the ten landed on a rise. **The numbers stand as typical fits.** The caveat a reader is owed: a refit lands four to six times higher about once in 25 fits, as two of the ten did in the CPU replication (C-q.4), where the same statistic read 0.0078 [0.0022, 0.0135].
+- **A candidate fix, from a post hoc look at the stored traces (no new fit, not registered):** within a fit's tail the training loss and the evaluation error rise together (Spearman 0.93 at the median fit). The traced point with the lowest TRAINING loss of the last 1,000 steps gives a median of 0.0042, a largest value of 0.0053, and at fit seed 0 over the ten runs 0.0042 [0.0039, 0.0046]: stable, and no worse than the typical constant-rate fit. It uses no evaluation data. It was read off these traces, so it needs a test on other fits before anyone relies on it; that test is registered next (CPU, the stored data sets, fresh fit seeds) and changes nothing in `src/`.
+- **The decision (the user and the audit session):**
+  1. **Keep the fit, disclose the tail.** No stored number changes. New analyses inherit the tail: E1 has about nine MLP fits per run, 270 in all, so on the order of ten of its numbers would sit on a rise if the rate carries over to that problem (untested there), widening its intervals as in C-q.4.
+  2. **Change the fit before E1 is registered** (E1 has no stored analysis to protect). Cosine is tested and costs a fifth in typical error; the lowest-training-loss iterate looks better and is being tested. Tiger then either is re-analysed with the new fit on the CPU (twenty runs at about 42 min; `tiger.bounds.*` and the decoded-belief rows move by a few percent and the ledger follows), or keeps its stored reports and the paper says that two fits were used.
+  3. **Wumpus is separate either way.** Its MLP probe is another function with the same recipe (`fit_mlp_wumpus_probe`) and was not tested. Seeds 10-14 of W11 must be analysed by the code that analysed seeds 5-9, so it does not change before W11 is read; a check like this one on a stored Wumpus run would say whether C-o.4's probe numbers carry the same tail.
+  - My recommendation: option 2 with the lowest-training-loss iterate if its test holds, and Tiger re-analysed on the CPU so that one instrument serves the whole of contribution (3). It costs CPU hours and no GPU time.
+- **Not covered by C-q.5:** the probe fitted on random histories (the decoded-belief agent's), the Wumpus probe, the Interactive Tiger probes.
+- **Machine:** the level-2 development run started at 05:26 behind C-q.5 (about 2.5 h); the decoder run and the analyses follow as queued. The GPU hold stands.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
