@@ -40,6 +40,49 @@ class TestRunConstruction:
         assert run_config.num_simulations == cfg.mcts.num_simulations
         assert run_config.trainer.value_target_momentum == cfg.trainer.value_target_momentum
 
+    def test_every_option_of_the_config_reaches_the_run(self):
+        """
+        A key of conf/config.yaml that nothing reads would turn an override into a silent no-op. build_run_config reads
+        every leaf of the model, agent, mcts and trainer groups; the leaves it leaves to others are exactly the ones
+        named here: the training loop's schedule, the guardrail limits and `resume` (all read in main.py) and the
+        domain's name (build_training_run). A new option that is not wired fails this test.
+        """
+        plain, read = OmegaConf.to_container(_compose([]), resolve=True), set()
+
+        class Recorder:
+            """Attribute, item and ** access on a nested dict that records every leaf it hands out."""
+
+            def __init__(self, node: dict, path: tuple[str, ...]):
+                self._node, self._path = node, path
+
+            def __getattr__(self, key: str):
+                return self[key]
+
+            def __getitem__(self, key: str):
+                value = self._node[key]
+                if isinstance(value, dict):
+                    return Recorder(value, self._path + (key,))
+                read.add(self._path + (key,))
+                return value
+
+            def keys(self):
+                return self._node.keys()
+
+        def leaves(node: dict, path: tuple[str, ...] = ()):
+            for key, value in node.items():
+                yield from leaves(value, path + (key,)) if isinstance(value, dict) else [path + (key,)]
+
+        build_run_config(Recorder(plain, ()))
+        assert set(leaves(plain)) - read == {
+            ("resume",), ("env", "name"),
+            *{("training", key) for key in ("total_episodes", "eval_every", "save_every", "viz_every", "checkpoint_selection")},
+            *{("guardrail", key) for key in ("thermal_trip_c", "thermal_recovery_c", "vram_trip_mb", "rss_trip_mb")}}
+        main = (Path(__file__).resolve().parents[1] / "main.py").read_text()
+        for reader in ("cfg.resume", "t.total_episodes", "t.eval_every", "t.save_every", "t.viz_every",
+                       "t.checkpoint_selection", "cfg.guardrail.thermal_trip_c", "cfg.guardrail.thermal_recovery_c",
+                       "cfg.guardrail.vram_trip_mb", "cfg.guardrail.rss_trip_mb"):
+            assert reader in main, reader
+
     def test_run_directory_reloads_best_networks(self, tmp_path: Path):
         cfg = _compose(TINY)
         _, run = build_training_run(cfg, CPU)
