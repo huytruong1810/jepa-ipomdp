@@ -15,7 +15,8 @@ from ipomdp.domain.solver import EXACT_PRUNE_EPSILON
 from ipomdp.interpretability import (ExactBeliefAgent, analyze_beliefs, build_probe_dataset, error_bounds,
                                      evaluate_probe, fit_linear_probe, half_spans, lipschitz_constant, local_bounds,
                                      q_values)
-from ipomdp.interpretability.belief_probe import ProbeDataset
+from ipomdp.interpretability import belief_probe
+from ipomdp.interpretability.belief_probe import BeliefProbe, ProbeDataset, fit_mlp_probe
 from ipomdp.models import BeliefFilter, ObservationHead, RewardHead, TwoHotSymlog, ValueHead
 from ipomdp.planning import BeliefTreeSearch, LearnedSearchModel
 from ipomdp.training import play_episodes
@@ -236,6 +237,65 @@ class TestProbes:
             probe.network.weight[0, 0] = float("nan")
         with pytest.raises(FloatingPointError):
             evaluate_probe(probe, data)
+
+    @staticmethod
+    def _every_iterate(data: ProbeDataset, steps: int, rate: float, seed: int, adam):
+        """The MLP fit's update sequence with nothing selected: the parameters and the training loss of theta_0 .. theta_steps."""
+        torch.manual_seed(seed)
+        mean, std = belief_probe._standardisation(data.latents)
+        network = torch.nn.Sequential(torch.nn.Linear(data.latents.shape[1], 64), torch.nn.ELU(),
+                                      torch.nn.Linear(64, data.posteriors.shape[1]))
+        probe = BeliefProbe(network, mean, std)
+        optimizer = adam(probe.parameters(), lr=rate)
+        states, losses = [], []
+        for step in range(steps + 1):
+            optimizer.zero_grad()
+            loss = belief_probe._cross_entropy(probe, data)
+            states.append({name: value.detach().clone() for name, value in probe.state_dict().items()})
+            losses.append(float(loss.detach()))
+            if step < steps:
+                loss.backward()
+                optimizer.step()
+        return states, losses
+
+    @staticmethod
+    def _probe_data() -> ProbeDataset:
+        generator = torch.Generator().manual_seed(0)
+        latents = torch.randn(400, 6, generator=generator)
+        logits = torch.stack([latents[:, 0] * 2 + latents[:, 1] ** 2, -latents[:, 0], latents[:, 2]], dim=-1)
+        return ProbeDataset(latents, torch.softmax(logits.double(), dim=-1))
+
+    @pytest.mark.parametrize("rate, steps, window", [(3e-3, 300, 100), (0.2, 300, 100), (0.2, 60, 1000)])
+    def test_mlp_probe_returns_the_lowest_training_loss_iterate_of_its_tail(self, monkeypatch, rate, steps, window):
+        """
+        belief_probe.py, section 5: among the iterates of the last `window` steps and the final one (all of them in a
+        shorter fit), the returned probe is the earliest with the lowest training loss, and the final one only if its
+        loss is strictly lower. At the fit's own rate, and at a rate large enough for the loss to oscillate, so that
+        the returned iterate is not always the last.
+        """
+        data, adam = self._probe_data(), torch.optim.Adam
+        monkeypatch.setattr(belief_probe, "MLP_SELECTION_STEPS", window)
+        monkeypatch.setattr(belief_probe.torch.optim, "Adam", lambda parameters, lr: adam(parameters, lr=rate))
+        chosen = []
+        for seed in range(6):
+            states, losses = self._every_iterate(data, steps, rate, seed, adam)
+            first = max(0, steps - window)
+            expected = min(range(first, steps), key=lambda index: (losses[index], index))
+            if losses[steps] < losses[expected]:
+                expected = steps
+            fitted = fit_mlp_probe(data, steps=steps, seed=seed).state_dict()
+            assert fitted.keys() == states[expected].keys()
+            for name, value in states[expected].items():
+                assert torch.equal(fitted[name], value), f"seed {seed}: {name} is not the iterate {expected}"
+            chosen.append(expected)
+        if rate == 0.2 and window < steps:
+            assert any(index != steps for index in chosen)        # the selection is exercised, not only the last iterate
+
+    def test_mlp_probe_raises_on_a_non_finite_training_loss(self):
+        data = self._probe_data()
+        broken = ProbeDataset(data.latents, torch.full_like(data.posteriors, float("nan")))
+        with pytest.raises(FloatingPointError):
+            fit_mlp_probe(broken, steps=5)
 
 
 class TestBeliefAnalysis:

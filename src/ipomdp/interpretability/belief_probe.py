@@ -39,8 +39,31 @@
 #      marginal reports of experiments/interactive_analysis.py are the per-factor readout of those problems.
 #    - A non-finite divergence raises FloatingPointError. A diverged probe would otherwise reach the report as NaN
 #      (torch.quantile returns NaN on a NaN input), and the aggregate over seeds would carry it silently.
+#
+# 5. The MLP Probe Returns the Lowest-Training-Loss Iterate of Its Tail (2026-11-24):
+#    - The fit is 3,000 full-batch Adam steps at a constant rate. Adam at a constant rate is not a descent method:
+#      late in the fit the loss makes short excursions upwards, and the iterate inside one decodes four to six times
+#      worse on held-out histories. Until 2026-11-24 the LAST iterate was returned, so about one fit in 25 to 50
+#      landed on such a rise (two of 50 refits of the ten canonical Tiger runs, one of 50 further ones; PROTOCOL.md
+#      C-q.5 and C-q.6, reports/2026-11-15_interpretability/mlp_probe_fit_stability.py and
+#      mlp_probe_fit_selection.py). Reports written before that date hold last-iterate fits.
+#    - Now the iterate with the lowest TRAINING loss among the last MLP_SELECTION_STEPS + 1 iterates is returned
+#      (theta_{steps - 1000} .. theta_steps; all of them when the fit is shorter). On 50 fits not looked at before,
+#      no selected iterate was on a rise, the typical held-out error was unchanged (median 0.0042 for both) and its
+#      spread over fit seeds fell from 0.0016 to 0.0003; the two known rises read 0.0046 and 0.0048 where the last
+#      iterate read 0.0176 and 0.0267.
+#    - Why this rule and not a decaying rate: a cosine rate also removes the rises, but it trains less in the same
+#      steps and its typical error was a fifth higher (C-q.5).
+#    - The choice uses the fit data alone. No held-out history enters it, so the probe's held-out error stays a
+#      held-out error, and the fit/evaluation split of section 2 is untouched.
+#    - The update sequence is the old one, statement for statement: reading a loss and copying parameters touch
+#      neither the generator nor the optimizer. The last iterate's own loss costs one more forward pass. Ties keep
+#      the earliest iterate of the tail; the last iterate wins only with a strictly lower loss (as tested in C-q.6).
+#    - The Wumpus probe (wumpus_latents.py, fit_mlp_wumpus_probe) has the same recipe and still returns its last
+#      iterate: it was not part of those tests.
 # ==============================================================================
 
+import math
 from dataclasses import dataclass
 
 import torch
@@ -143,18 +166,37 @@ def fit_linear_probe(dataset: ProbeDataset) -> BeliefProbe:
     return probe
 
 
+# Section 5: the returned iterate is chosen among the iterates of this many last steps and the final one.
+MLP_SELECTION_STEPS = 1000
+
+
 def fit_mlp_probe(dataset: ProbeDataset, steps: int = 3000, hidden: int = 64, seed: int = 0) -> BeliefProbe:
-    """Two-layer MLP probe (upper bound on the posterior information present in the latent)."""
+    """
+    Two-layer MLP probe (upper bound on the posterior information present in the latent): full-batch Adam at a
+    constant rate, returning the iterate with the lowest training loss of the fit's tail (section 5).
+    """
     torch.manual_seed(seed)
     mean, std = _standardisation(dataset.latents)
     network = nn.Sequential(nn.Linear(dataset.latents.shape[1], hidden), nn.ELU(),
                             nn.Linear(hidden, dataset.posteriors.shape[1]))
     probe = BeliefProbe(network, mean, std).to(dataset.latents.device)
     optimizer = torch.optim.Adam(probe.parameters(), lr=3e-3)
-    for _ in range(steps):
+    first_candidate = max(0, steps - MLP_SELECTION_STEPS)
+    best_loss, best_state = math.inf, None
+    for step in range(steps):
         optimizer.zero_grad()
-        _cross_entropy(probe, dataset).backward()
+        loss = _cross_entropy(probe, dataset)                    # the loss of theta_step, the iterate before this update
+        if step >= first_candidate and float(loss.detach()) < best_loss:
+            best_loss = float(loss.detach())
+            best_state = {name: value.detach().clone() for name, value in probe.state_dict().items()}
+        loss.backward()
         optimizer.step()
+    with torch.no_grad():
+        last_loss = float(_cross_entropy(probe, dataset))         # the loss of theta_steps, the last iterate
+    if not math.isfinite(last_loss):
+        raise FloatingPointError(f"the MLP probe's training loss is {last_loss} after {steps} steps (section 5).")
+    if best_state is not None and not last_loss < best_loss:
+        probe.load_state_dict(best_state)
     return probe
 
 
