@@ -126,6 +126,22 @@
 - **The question this puts to the user** (nothing is registered; the C-s draft says "nothing was tuned on these problems"): register E1 at the canonical default and report what comes, or develop on seeds of 100 and above first (latent size, training length), which costs GPU days that the schedule to 2026-12-05 does not hold in reserve. Until there is an answer I keep to the draft and run only development seeds of E1's own three arms on the CPU.
 - **Queued on the CPU, one job at a time behind memory gates** (`runs/itiger/presmoke_followup.sh`, a serial chain since 23:32): after C-q.5 ends (about 05:00), the level-2 development run (arm 3's configuration, about 2.5 h), then a level-1 development run with the decoder representation (arm 2's configuration, about 2.7 h), then their two analyses, each when 9.4 GB are available. The level-2 run had been started at 23:25 beside the probe-fit process and was stopped after two minutes: the machine sat at 6.2 GB available with the other project at 14.0 GB.
 
+**Addendum 2026-11-23 23:55: the history-free control is in the analysis (`9b6bb2e`), and it gives the level-1 numbers a scale on random histories.**
+- **What it is** (`src/ipomdp/experiments/interactive_analysis.py`, section 6): the best constant decoder, the mean exact posterior of the fit histories, which reads no latent. Its mean KL on held-out histories estimates the mutual information between the history and the variable, so **a probe's KL divided by it is the share of the history's information that the decoded belief does not recover**: 0 for the exact belief, 1 for a latent that says nothing. It is reported per history source on the interactive state and on both marginals, aggregated per seed, and the C-s readout draft prints each probe's share beside the untrained filter's. Analysis code only; 55 tests of the three affected files pass, golden 51.
+- **The scale on random histories** (it depends on the problem and the analysis episodes only, not on any agent; analysis seed 12345, 51,712 held-out histories; one-off call of the committed function):
+
+  | fold | interactive state: KL, L1 | tiger's side: KL, L1 | j's node: KL, L1 |
+  |---|---|---|---|
+  | level 1 (26 states) | 0.652, 0.850 | 0.102, 0.235 | 0.482, 0.762 |
+  | level 2 (14 states) | 0.678, 0.868 | 0.099, 0.236 | 0.469, 0.752 |
+
+- **The level-1 development seed on that scale** (random histories; share of the history's information NOT recovered, trained filter / the run's untrained filter):
+  - tiger's side: linear probe 0.03 / 0.22, MLP probe 0.01 / 0.04;
+  - j's node: linear probe 0.54 / 0.65, MLP probe 0.31 / 0.36;
+  - whole interactive state: linear 0.42 / 0.53, MLP 0.23 / 0.28.
+- **Reading, replacing the cruder one of the 23:35 addendum:** the latent recovers 97 to 99% of what the history says about the tiger's side and 46 to 69% of what it says about j's controller node. An untrained recurrent network already gives 35 to 64% of the latter, so training adds 5 to 11 points on j's node, against 3 to 19 points on the tiger's side where little was left to add. The share on the agent's own histories is not known yet: its control needs the planner's episodes, which come with the next analyses (level 2, the decoder arm) and with a re-analysis of this seed.
+- One development seed; the MLP probe's fit is under test (C-q.5). Nothing here is an E1 result.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
