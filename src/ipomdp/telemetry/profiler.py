@@ -4,24 +4,25 @@
 # ==============================================================================
 #
 # DESIGN DECISIONS & THEORETICAL FOUNDATIONS:
-# 1. Asynchronous CUDA Event Timing:
-#    - Measures GPU kernels using torch.cuda.Event(enable_timing=True) to eliminate
-#      false latency inflation caused by asynchronous PCIe kernel queueing.
-#    - Captures pure hardware SM execution time without forcing synchronization bubbles.
+# 1. Wall-Clock Timing, Synchronised on Request:
+#    - A stage is timed with time.perf_counter around its block. CUDA calls return before their
+#      kernels finish, so a stage that ends on the device would be timed short: sync_cuda=True
+#      calls torch.cuda.synchronize() before and after the block.
+#    - The training loop times whole collections and evaluations (main.py). Both end with reads
+#      on the CPU, which synchronise by themselves, so it leaves the flag off.
+#    - Nothing here uses torch.cuda.Event. An earlier header said so; the code never did.
 #
 # 2. Rolling Percentile Distribution Tracking:
 #    - Maintains fixed-size rolling deques (default 100 steps) for each pipeline stage.
-#    - Computes robust non-parametric latency statistics (p50, p90, p99, mean, std),
-#      detecting tail-latency latency spikes that mean values mask.
+#    - Computes latency statistics over the window (mean, std, p50, p90, p99, min, max).
 #
-# 3. High-Throughput Context Manager Interface:
-#    - Implements lightweight Python context manager:
-#         with profiler.profile("mcts_search"): ...
-#      with nanosecond precision (time.perf_counter_ns) and zero memory allocations.
+# 3. Context Manager Interface:
+#    - with profiler.profile("collect_and_train"): ...
+#      One duration in milliseconds is appended to the stage's deque per call.
 #
-# 4. End-to-End Throughput Metric Derivation:
-#    - Computes real-time environment Transitions Per Second (TPS) and gradient
-#      optimization Steps Per Second (SPS).
+# 4. End-to-End Throughput:
+#    - Transitions per second (TPS) and optimizer steps per second (SPS) since construction,
+#      from the counts the caller reports with record_step.
 # ==============================================================================
 
 from collections import deque

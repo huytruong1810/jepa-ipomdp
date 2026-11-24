@@ -88,6 +88,21 @@ class TestExecutionGuardrail:
         assert guardrail.check_system_health(step_idx=1)
         assert not saved
 
+    def test_thermal_trip_waits_for_the_recovery_temperature(self, monkeypatch):
+        # Heat pauses a run and does not end it: the cooldown polls until the temperature is at or below the recovery
+        # threshold, and the check then reports a healthy system. The sleeps are recorded instead of slept.
+        readings = iter([90.0, 85.0, 71.0])
+        monitor = SystemTelemetryMonitor()
+        monitor.get_metrics = lambda force_refresh=False: {"gpu/temp_celsius": next(readings)}
+        slept, saved = [], []
+        monkeypatch.setattr("ipomdp.telemetry.guardrails.time.sleep", slept.append)
+        guardrail = ExecutionGuardrail(logging.getLogger("TestGuardrail"), monitor, thermal_trip_c=82.0,
+                                       thermal_recovery_c=72.0, vram_trip_mb=1e5, rss_trip_mb=1e5,
+                                       emergency_save_fn=lambda: saved.append(True))
+        assert guardrail.check_system_health(step_idx=7)
+        assert slept == [2.0, 2.0] and not saved
+        assert guardrail.incident_counts["thermal_throttle_events"] == 1
+
     def test_emergency_save_on_persistent_vram_pressure(self):
         saved = []
         guardrail = self._guardrail({"gpu/vram_reserved_mb": 20000.0, "gpu/physical_vram_used_mb": 20000.0},
