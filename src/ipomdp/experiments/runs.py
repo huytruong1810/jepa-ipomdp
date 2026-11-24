@@ -21,6 +21,13 @@
 #      (domain/wumpus.py, section 1); a saved config without the key fails loudly. analyze_run is the
 #      Tiger analysis (it needs the exact solver); Wumpus runs are analysed by
 #      experiments/wumpus.py.
+#    - Interactive Tiger (conf/env/itiger.yaml) is agent i's fold of agent j's controller
+#      (domain/interactive.py): an exact FinitePOMDP over (tiger side, j's node, j's last action),
+#      sampled by the same BatchedPOMDPEnv, so it trains exactly as the canonical Tiger does. The
+#      builder reads env.level, env.discount and the two bracket widths, and takes 25 to 50 s (it
+#      solves and certifies the levels below). Its analysis is experiments/interactive_analysis.py,
+#      against the fold's benchmark file: the exact solve of analyze_run is out of reach there, and
+#      analyze_run refuses such a run before loading it.
 #
 # 3. Analysis Uses Fresh Seeds, Not the Training Evaluation:
 #    - best.pt is the checkpoint with the highest greedy evaluation during training (the default
