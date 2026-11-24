@@ -4,14 +4,22 @@
 
 Research code for an agent that plans in partially observable domains over a belief state it learns. A recurrent latent filter takes the place of the Bayes filter, learned reward, observation and value heads take the place of the model, and a belief-tree search that branches exactly over observations plans over them. The code also holds the exact counterparts (Bayes filter, solver, exact-belief planner), which are used to measure where the learned planner goes wrong.
 
-Two domains:
+Three domains:
 
 - **Tiger** (Cassandra's `tiger.95.POMDP`, γ = 0.95), where the exact optimum is known.
 - **4×4 Wumpus World** (one hunter, 16,380 layouts, 33 observations, 50-step games, γ = 0.99), where the exact belief can be computed by enumerating layouts but no exact solution is available.
+- **Interactive Tiger** (the two-agent tiger problem of Gmytrasiewicz & Doshi, 2005, as a finitely nested I-POMDP, γ = 0.95), where the agent must also track what the other agent is about to do. The exact belief is computed; the optimum is bracketed by certified bounds.
 
 ## Method
 
 **Exact reference layer (`src/ipomdp/domain/`).** `FinitePOMDP` holds float64 tensors `T[a,s,s']`, `O[a,s',o]`, `R[a,s]`, `b0`, `γ` and is the single source of truth for the batched simulator (`env.py`), the exact Bayes filter (`belief.py`) and exact value iteration by incremental pruning with a certified error bound (`solver.py`). `wumpus.py` holds the Wumpus rules, simulator and the layout-enumeration belief tracker.
+
+**Nested I-POMDPs (`multiagent_tiger.py`, `interactive.py`, `policy_graph.py`, `bounds.py`).** The joint tables are Table 1 of Gmytrasiewicz & Doshi (2005). Agent i at strategy level l models agent j at level l − 1 as a finite controller, and folding that controller into the transition and observation tensors gives a `FinitePOMDP` over (tiger side, j's controller node, j's last action). The same simulator, Bayes filter and training code then apply without change, and the learned agent gets no input about the other agent beyond its own observations.
+
+- Level 1 folds j's level-0 controller, extracted from a certified solution of j's single-agent problem: 26 states, 3 actions, 6 observations.
+- Level 2 folds a 5-node controller for j at level 1 (the best of a declared family of growl counters by exact evaluation): 14 states.
+- Neither fold is within reach of the exact solver. Each is bracketed by a point-based lower bound (HSVI), whose vector set its own controller provably attains, and an information-relaxation upper bound. A benchmark file holds the bracket and the lower-bound vectors; the reference agent acts on the exact belief with the best vector's action, so its value is at least the lower end.
+- Of the paper's own numbers, Table 1 is reproduced exactly and the level-0 value function (its Fig. 4) within 0.003. Its level-1 examples (Fig. 11 and Section 7.3) are not reproduced (`reports/2026-11-16_code_audit/gd2005_level1_examples.log`).
 
 **Filter and one-step model (`src/ipomdp/models/`, `src/ipomdp/training/trainer.py`).**
 
@@ -33,7 +41,7 @@ The two-hot codec places bins at symlog-spaced values but encodes and decodes li
 
 **Planning (`src/ipomdp/planning/`, `src/ipomdp/agents/`).** `BeliefTreeSearch` is PUCT at decision nodes, exact branching over observations at chance nodes, and expectimax backups. It runs over a `SearchModel`: `ExactSearchModel` (exact beliefs), `LearnedSearchModel` (filter latents and heads; a child is the filter's own update `filter.step(z, a, o')`), or `ExactWumpusSearchModel` (the exact-belief reference planner). The agent acts with Polyak-averaged copies of its networks.
 
-**Diagnostics (`src/ipomdp/interpretability/`, `reports/`).** Probes map latents to exact beliefs; span bounds turn the decoding error into bounds on value and regret. Exact-component localisation substitutes the exact reward or observation probabilities into the learned backup at the planner's own decision points and measures what changes.
+**Diagnostics (`src/ipomdp/interpretability/`, `reports/`).** Probes map latents to exact beliefs; span bounds turn the decoding error into bounds on value and regret, in a global form (the largest span of the value function's vectors) and a local form (the spans of the vectors active at the exact and at the decoded belief). Exact-component localisation substitutes the exact reward or observation probabilities into the learned backup at the planner's own decision points and measures what changes.
 
 ## Results
 
@@ -64,6 +72,8 @@ With next-observation prediction as the representation term instead of latent se
 - Leave-one-out ablations on the held-out seeds (maximum backup instead of the double value, no whole-buffer retraining, latent self-prediction as the one-step representation term) change the return by 34 to 53 per game, none distinguishable from zero over five seeds. Whole-buffer retraining improves how well position and heading are decoded from the latent on every seed.
 - Decision-aware objectives for the observation model and several ways of adding data did not repair the observation-model error reliably; the scripts and their registered tests are in `reports/2026-10-02_wumpus_diagnostics/`.
 
+**Interactive Tiger.** The certified brackets of the optimal value at the initial belief are [16.55, 19.67] for the level-1 fold and [13.26, 14.26] for the level-2 fold (`reports/2026-11-16_code_audit/itiger_benchmark_artifact_rerun.log`, `itiger_level2_artifact.log`). No result of the learned agent on these problems is reported here yet.
+
 ## Usage
 
 The project uses [uv](https://docs.astral.sh/uv/) with Python 3.12 and CUDA 12.8 torch. `./recreate_venv.sh` rebuilds `.venv` from `uv.lock`.
@@ -74,8 +84,12 @@ uv run main.py env=wumpus                        # train on Wumpus World
 uv run main.py seed=1 training.total_episodes=1280 mcts.num_simulations=20   # any config key can be overridden
 uv run main.py resume=runs/tiger/<run>/checkpoints/latest.pt                 # continue a run bit-for-bit
 
+uv run main.py env=itiger [env.level=2]          # train on Interactive Tiger (agent i at level 1 or 2)
+
 uv run analyze.py runs/tiger/<run>               # probes, bounds, returns, geometry -> <run>/analysis/
 uv run sweep.py <name> --seeds 0,1,2,3,4 [overrides ...]   # train and analyse each seed -> runs/sweeps/<name>/
+uv run analyze.py runs/itiger/<run> --benchmark runs/benchmarks/itiger_level1.pt          # against the fold's bracket
+uv run sweep.py <name> --seeds 0,1,2 --benchmark runs/benchmarks/itiger_level1.pt env=itiger
 
 uv run pytest                                    # fast suite
 uv run pytest -m slow                            # certified solve, exact planner vs optimal, world-model acceptance (GPU)
@@ -91,19 +105,33 @@ uv run sweep.py wumpus_retrain_heldout --seeds 5,6,7,8,9 --analysis-seed 2026101
   model.value_estimator=double training.retrain_every=50 training.retrain_updates=6400
 ```
 
+The benchmark file of an Interactive Tiger fold is computed once, on the CPU (most of a day; the search is checkpointed, and running the command again continues it):
+
+```bash
+uv run reports/2026-11-16_code_audit/itiger_benchmark.py --lower-only --trials 1000 \
+  --upper 19.6692 --upper-source "information relaxation, delay 2 (itiger_benchmark.log)" \
+  --artifact runs/benchmarks/itiger_level1.pt --checkpoint runs/benchmarks/itiger_level1.search.npz
+uv run reports/2026-11-16_code_audit/itiger_benchmark.py --level 2 --lower-only --trials 1000 \
+  --upper 14.2574 --upper-source "information relaxation, delay 2 (itiger_level2_benchmark.log)" \
+  --artifact runs/benchmarks/itiger_level2.pt --checkpoint runs/benchmarks/itiger_level2.search.npz
+```
+
+`--upper` is the certified upper end from the information relaxation, which the same script computes without `--lower-only`; the two logs named above, beside the script, hold the values, and the script's header has the settings.
+
 One training run takes about an hour on Tiger and two and a half to three hours on Wumpus World on one GPU (RTX 5080).
 
 ## Layout
 
 ```
 main.py  analyze.py  sweep.py       thin entry points (train / analyse a run / multi-seed experiment)
-conf/                               Hydra config (config.yaml, env/tiger.yaml, env/wumpus.yaml)
+conf/                               Hydra config (config.yaml, env/tiger.yaml, env/wumpus.yaml, env/itiger.yaml)
 src/ipomdp/
-  domain/            FinitePOMDP, Tiger, Wumpus World, simulators, exact Bayes filters, exact solver
+  domain/            FinitePOMDP, Tiger, Wumpus World, simulators, exact Bayes filters, exact solver;
+                     two-agent Tiger, nested I-POMDP folds, finite controllers, value bounds
   models/            latent filter, predictor, value/reward/observation heads, two-hot codec
   planning/          belief-tree search; exact, learned and exact-Wumpus search models
   agents/            planning agent, uniform random agent, exact-belief Wumpus heuristic
-  baselines/         recurrent model-free baseline (R2D2 style)
+  baselines/         recurrent model-free baseline (R2D2 style), BA-POMCP
   training/          episode buffer, trainer, rollouts, checkpointable TrainingRun
   interpretability/  belief probes, error bounds, belief analysis
   experiments/       config -> run, run-directory reload and analysis, seed aggregation and intervals
@@ -113,6 +141,8 @@ reports/
   2026-10-02_wumpus_diagnostics/   localisation and remedy screens (each script's header states its registered test)
   2026-11-03_paper_figures/        figure scripts
   2026-11-14_submission_audit/     number ledger, per-seed statistics, audit log, artifact manifest
+  2026-11-15_interpretability/     write-in intervention on the latent, local span bounds, probe-fit stability
+  2026-11-16_code_audit/           file-by-file review, Interactive Tiger benchmarks and their logs
 tests/
 ```
 
