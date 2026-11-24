@@ -19,6 +19,15 @@
 #   60 failed on this, 2026-11-02 22:11). That one error is accepted, and only when the prefix is one seed and the seed
 #   dir has TRAINED and <analysis output>/report.json; the next call (two seeds) writes the aggregate. Any other error
 #   still fails.
+# failure_excerpt <file>: the wrapper's last stderr WITHOUT the lines that carry results, for diagnosing a failed stage
+# whose numbers are read once. sweep.py passes main.py's stderr through, and main.py's progress bar prints the seed's
+# training evaluations in its postfix (eval=, best=); runs/week/sweep_retry_last.err therefore holds them and must not
+# be read for such a stage (found 2026-11-23). The excerpt drops progress bars and evaluation lines, keeps 200 lines.
+failure_excerpt() {
+  tr '\r' '\n' < runs/week/sweep_retry_last.err \
+    | grep -v -e '^Collections:' -e '[0-9]%|' -e 'greedy eval' -e 'discounted return' -e 'eval=' | tail -n 200 > "$1"
+}
+
 sweep_retry() {
   local name=$1; shift
   [ "$1" = "--seeds" ] || { echo "sweep_retry: --seeds must follow the name" >&2; return 2; }

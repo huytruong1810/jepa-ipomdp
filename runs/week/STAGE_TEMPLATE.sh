@@ -16,6 +16,11 @@
 # - Resumable: skip a step when its `.done` marker exists, and touch the marker only after the step succeeded
 #   (never skip on the output file itself: a reboot mid-write leaves a truncated file).
 # - A smoke goes first. Print `commit $(git log -1 --format=%H)` into the stage's own log.
+# - A stage whose numbers are read once sends a sweep's output to a file that is not read, and on a failure calls
+#   `failure_excerpt <file>` (sweep_retry.sh) and names that file: runs/week/sweep_retry_last.err holds main.py's
+#   progress bar, whose postfix prints the seed's training evaluations.
+# - The queue starts a later stage even when an earlier one failed: a stage that depends on another one checks
+#   runs/week/done/<that stage> itself.
 cd /home/andyj1810/projects/jepa_ipomdp || exit 1
 set -o pipefail
 O=runs/wumpus/<name>
