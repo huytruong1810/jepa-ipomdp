@@ -105,6 +105,29 @@ The solver's witness LP becomes public; nothing numeric changes.
 
 **Reference agent at the paper's threshold (risk 0.4; `tests/test_wumpus_agents.py`, slow).** Against an independent exact filter, every gamble had an exact danger <= 0.4. Over 64 games, only 6 of its steps were gambles; the largest danger taken was 1/3, and no game ended in a death. It won 68.8% of the games against 59.4% at risk 0.
 
+## The deferred code changes in one list (kept current; the rows under "Files" have the reasons)
+
+**A. Behind the GPU gate** (code on the path of a stored run: the option fingerprints on CUDA, `wumpus_gpu`, golden, G-load and the seed-5 guard must print identical before any of it is committed).
+- `domain/env.py`: the simulator clones the state it restores; a test restores twice from one dictionary.
+- `domain/wumpus.py`: one module-level owner of the heading table and of the cell ahead; clone on restore; `step` raises before the first `reset`; the shape check moves to the top.
+- One seeded-generator helper for the seven copies (`env.py:81`, `wumpus.py:356`, `episode_buffer.py:94`, `planning_agent.py:92`, `uniform_agent.py:27`, `wumpus_exact_model.py:178`, `recurrent_dqn.py:268`).
+- `models/history_filter.py`: `encode` raises on a length under 1 and the `nan_to_num` goes.
+- `models/layers.py`: the unused default of `build_residual_stack` goes (after a check of the report scripts); `list[...]`.
+- `agents/planning_agent.py`: required keyword arguments; the trials become an action-override wrapper that keeps the `state_dict` keys.
+- `planning/mcts.py`: `observation_prune` required; `__dict__` out of the slots. `planning/search_model.py`: required arguments.
+- `training/episode_buffer.py`: `add` raises on more episodes than the capacity; restore clones and checks shapes.
+- `training/checkpointing.py`: flush the file and its directory before the rename.
+- `conf/config.yaml`: two stale comments (`seed`, `ema_momentum`); keys and nesting stay byte-stable.
+- The seam of the plan's Phase 5 (`training/objective.py`, one module per screened option under `training/remedies/`, one checkpoint-payload class, the ego map's own readout class with the same parameter paths).
+
+**B. After the held-out extension (W11) is read** (its seeds must be trained and analysed by the code that produced seeds 5-9).
+- `interpretability/wumpus_latents.py`: raise instead of NaN for the 99th percentile above 2^24 elements; one probe-fitting core with `belief_probe.py`, keeping the order of the random draws; one PCA.
+- `baselines/recurrent_dqn.py`: enumerations for `exploration` and `value_scale`; one n-step helper shared with the trainer.
+
+**C. No gate needed, open.**
+- `experiments/runs.py`, `latent_figure`: on a fold, colour the training-time geometry figure by the tiger's side marginal, not by the first fold state.
+- Geometry per marginal on the interactive state (Phase 6), computable from stored runs.
+
 ## Phase 5 (training loop, remedies, baseline): review started 2026-11-23, in progress
 
 **Scope so far.** Only the review, and first the path a default-configuration run takes, because E1 trains through it. The seam refactor of the plan (remedies into their own modules) changes the recipe path and waits for the GPU gate, like every code change below.
