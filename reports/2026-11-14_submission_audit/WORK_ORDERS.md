@@ -218,6 +218,24 @@
 - So the reading of 12:05 holds on the agent's own histories as well: with the MLP probe the JEPA latent tells nothing more about j's node than the same network before training; the decoder latent does.
 - **Machine at 14:29:** 5.8 GB available with nothing of jepa running (ipomcp holds 15.6 GB); jepa's waiters start nothing under 7.3 GB. Waiting: the last two runs of C-q.6 and the analysis of the level-2 decoder development run (9.4 GB).
 
+**Addendum 2026-11-24 16:05: C-q.6 is read (log `reports/2026-11-15_interpretability/mlp_probe_fit_selection.log`; PROTOCOL, "C-q results"). The candidate fix for the MLP probe's fit holds on fresh fits. The instrument decision of the 05:30 addendum can now be taken on evidence.**
+- **The rule:** keep the constant rate and the 3,000 steps; return the iterate with the lowest training loss of the last 1,000 steps instead of the last one. It uses the fit data alone.
+- **On 50 fits not run before** (ten runs, fit seeds 5-9; mean L1 of the decoded from the exact belief):
+
+  | | last iterate (the code) | lowest-training-loss iterate | cosine rate (C-q.5, fit seeds 0-4) |
+  |---|---|---|---|
+  | median of 50 fits | 0.0042 | 0.0042 | 0.0054 |
+  | largest of 50 | 0.0289 | 0.0055 | 0.0069 |
+  | above twice the median | 1 of 50 | 0 of 50 | 0 of 50 |
+  | per-run mean over five fit seeds, Student-t 95% | 0.0049 [0.0039, 0.0059] | **0.0042 [0.0040, 0.0045]** | 0.0053 [0.0050, 0.0056] |
+  | spread over fit seeds (standard deviation) | 0.0016 | 0.0003 | 0.0004 |
+
+  - Where the two iterates differ, the selected one is never higher by more than 0.00001, and it always lies in the last 100 steps. The two known rises of C-q.5 (0.0176 and 0.0267) read 0.0046 and 0.0048 under the rule.
+  - Limit: the fresh fits held one clear rise and two smaller ones, so the removal on unseen fits rests on those; the two known cases agree. The scope is the Tiger probe on the agent's own histories.
+- **Recommendation for the decision (the user and the audit session; nothing in `src/` is changed until it is taken):** adopt the rule in `fit_mlp_probe` before E1 is registered, and re-analyse the twenty canonical Tiger runs with it on the CPU (about 42 min each, no GPU), so that one instrument serves the whole of contribution (3).
+  - Consequences: `tiger.bounds.*` and the decoded-belief rows move by a few percent (the typical error falls from about 0.0045 to 0.0042) and the ledger follows; the E1 development analyses of seed 100 would be redone with it (CPU). The Wumpus probe (`fit_mlp_wumpus_probe`) does not change before W11 is read.
+  - The alternative stays what it was: keep the fit, state in the paper that a refit lands four to six times higher about once in 25 to 50 fits, and accept that some of E1's 280 probe fits (four arms, seven per run) will sit on a rise.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).

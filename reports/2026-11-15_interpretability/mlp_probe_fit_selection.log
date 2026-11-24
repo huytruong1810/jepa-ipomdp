@@ -1,0 +1,38 @@
+C-q.6 (post hoc): the lowest-training-loss iterate of the last 1000 steps against the last iterate; the MLP probe of the Tiger analysis (3000 full-batch Adam steps at 0.003) on C-q.5's data sets of the ten JEPA runs; run at commits ['280cd8b', '584a06f', '6114f3d', 'd65c67a']
+at fit seed 0 every run reproduced the mean L1 that C-q.5 stored for its last iterate
+
+  fit seed 0 (the analysis's; C-q.5's known cases, an illustration)
+    run seed 0: last 0.0041; selected 0.0041 at step 3000
+    run seed 1: last 0.0176; selected 0.0046 at step 2979
+    run seed 2: last 0.0053; selected 0.0053 at step 2999
+    run seed 3: last 0.0039; selected 0.0039 at step 2993
+    run seed 4: last 0.0050; selected 0.0040 at step 2945
+    run seed 5: last 0.0267; selected 0.0048 at step 2982
+    run seed 6: last 0.0042; selected 0.0043 at step 2998
+    run seed 7: last 0.0036; selected 0.0036 at step 2999
+    run seed 8: last 0.0039; selected 0.0039 at step 2996
+    run seed 9: last 0.0040; selected 0.0040 at step 2999
+    over the ten runs: last 0.0078 [0.0022, 0.0135]; selected 0.0042 [0.0039, 0.0046]
+
+  fresh fit seeds [5, 6, 7, 8, 9] (the test): mean L1 on the evaluation set
+    run seed 0: last [0.0038, 0.0037, 0.007, 0.0047, 0.0034]; selected [0.0038, 0.0037, 0.0046, 0.0047, 0.0034] at steps [2997, 2999, 2993, 3000, 3000]
+    run seed 1: last [0.0045, 0.0042, 0.0043, 0.0047, 0.0041]; selected [0.0045, 0.0042, 0.0043, 0.0047, 0.0041] at steps [2996, 2998, 2996, 3000, 2998]
+    run seed 2: last [0.0046, 0.004, 0.0055, 0.0072, 0.0042]; selected [0.0046, 0.004, 0.0055, 0.0044, 0.0042] at steps [3000, 2998, 3000, 2980, 2998]
+    run seed 3: last [0.0038, 0.004, 0.0039, 0.0041, 0.0048]; selected [0.0038, 0.004, 0.0039, 0.0041, 0.0044] at steps [3000, 3000, 3000, 2997, 2998]
+    run seed 4: last [0.0039, 0.004, 0.0046, 0.0043, 0.0033]; selected [0.0039, 0.004, 0.0046, 0.0042, 0.0033] at steps [2999, 2996, 2996, 2997, 3000]
+    run seed 5: last [0.0047, 0.0046, 0.0048, 0.005, 0.0048]; selected [0.0047, 0.0046, 0.0047, 0.005, 0.0044] at steps [3000, 2998, 2976, 3000, 2998]
+    run seed 6: last [0.0044, 0.0044, 0.0047, 0.0044, 0.0047]; selected [0.0044, 0.0044, 0.0047, 0.0044, 0.0047] at steps [2995, 3000, 2997, 2999, 2999]
+    run seed 7: last [0.0039, 0.0035, 0.0289, 0.0037, 0.0037]; selected [0.0039, 0.0035, 0.0038, 0.0037, 0.0037] at steps [2999, 2997, 2981, 2997, 2998]
+    run seed 8: last [0.004, 0.004, 0.004, 0.0039, 0.0036]; selected [0.0037, 0.004, 0.0039, 0.0039, 0.0036] at steps [2941, 2999, 2916, 3000, 2994]
+    run seed 9: last [0.0042, 0.0046, 0.0047, 0.0046, 0.0042]; selected [0.0042, 0.0046, 0.0047, 0.0046, 0.0042] at steps [2999, 2999, 3000, 2998, 3000]
+    the 50 last iterates:     median 0.0042; above twice that median: 1 of 50; largest 0.0289
+    the 50 selected iterates: median 0.0042; above twice the last iterates' median: 0 of 50; largest 0.0055
+    the selected iterate is the last one on 15 of 50 fits; selected above last on 21 fits, by at most 0.0000
+
+  over the ten runs, the per-run mean of the five fresh fit seeds, mean [Student-t 95%]
+    last iterate:        0.0049 [0.0039, 0.0059]
+    selected iterate:    0.0042 [0.0040, 0.0045]
+    selected minus last: -0.0006 [-0.0017, 0.0005]
+    standard deviation over the five fit seeds, mean over runs: last 0.0016, selected 0.0003
+
+cost: 31.5 min per run on one CPU thread for the six fits
