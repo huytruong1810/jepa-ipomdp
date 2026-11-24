@@ -362,6 +362,30 @@ Networks: best.pt of the three stored oracle + double runs (exact-belief targets
     - V3 leaves: optimal at N <= 2, -4.13 at N = 4, -0.01 at N = 64, -0.23 at N = 128;
     - V8 leaves: optimal at every N except N = 8 (-0.75 +- 1.10).
     - So with biased leaves the return oscillates with the budget (the horizon effect) instead of improving monotonically. The learned leaves behave like accurate leaves, not like zero leaves.
+- **C-q.4 (the local form of the span bounds on the canonical Tiger, read once 2026-11-23 20:22; POST HOC; log `reports/2026-11-15_interpretability/tiger_local_bounds.log`, analysed at 440adad; ten JEPA seeds of `runs/sweeps/polyak`, CPU, 512 episodes, probes fitted and scored on the agent's own histories).** Mean over the ten seeds, Student-t 95%; L_V = L_Q = 55.00, the active vector's half-span is 18.72 on average:
+
+  | quantity | MLP probe | linear probe |
+  |---|---|---|
+  | mean L1 decoding error | 0.0078 [0.0022, 0.0135] | 0.0160 [0.0147, 0.0172] |
+  | value error, measured | 0.0559 [0.0372, 0.0745] | 0.1422 [0.1293, 0.1551] |
+  | value error, local bound | 0.0572 [0.0382, 0.0761] | 0.1504 [0.1370, 0.1638] |
+  | value error, global bound | 0.4305 [0.1210, 0.7401] | 0.8782 [0.8097, 0.9466] |
+  | value error, local / global | 0.173 [0.139, 0.207] | 0.172 [0.161, 0.182] |
+  | value error, local bound / measured | 1.02 [1.02, 1.03] | 1.06 [1.05, 1.07] |
+  | one-step regret, measured | 0.0012 [0.0008, 0.0015] | 0.0085 [0.0070, 0.0099] |
+  | one-step regret, local bound | 0.1113 [0.0741, 0.1484] | 0.2805 [0.2550, 0.3059] |
+  | one-step regret, global bound | 0.8611 [0.2420, 1.4802] | 1.7564 [1.6195, 1.8933] |
+  | one-step regret, local / global | 0.168 [0.135, 0.201] | 0.160 [0.150, 0.170] |
+  | one-step regret, local bound / measured | 96 [83, 110] | 34 [29, 40] |
+  | policy form, local (estimate) | 2.23 [1.48, 2.97] | 5.61 [5.10, 6.12] |
+  | policy form, global (estimate) | 17.22 [4.84, 29.60] | 35.13 [32.39, 37.87] |
+
+  - The size of the gain: the local form is about a sixth of the global one, for both probes and both quantities (per seed between 0.08 and 0.22). The policy form falls from 17.2 to 2.2 with the MLP probe and from 35.1 to 5.6 with the linear probe, against V*(b0) = 19.37: the global form with the linear probe is above the value itself.
+  - The local value bound is within 2% (MLP) and 6% (linear) of the measured error. **This is a property of a two-state problem and is not evidence that the form is tight in general:** with two states |alpha.(b - b')| equals span(alpha)/2 x ||b - b'||_1 exactly whenever one vector is active at both beliefs, so the bound is slack only where the active vector changes. Nothing of the kind holds on the 14- and 26-state folds.
+  - The one-step regret bound stays loose: 96 times (MLP) and 34 times (linear) the measured regret. The regret is zero wherever the decoded belief does not change the action (the decoded belief asks for a suboptimal action on 0.11 to 0.34% of the steps with the MLP probe and on 0.8 to 1.8% with the linear one), and a norm bound cannot see that.
+  - The largest measured value error and regret are under the largest local bounds on 10 of 10 seeds for both probes (largest value error 1.6 to 3.8, largest local bound 3.4 to 12.3, largest global bound 11.6 to 33.3).
+  - **Replication of the stored global form (the registered side comparison).** The linear probe replicates: mean L1 0.0160 against a stored 0.0161, global value bound 0.878 against 0.887. The MLP probe replicates on eight seeds (mean L1 within 0.001) and not on seeds 1 and 5: 0.0176 and 0.0267 against stored 0.0049 and 0.0051. Over the ten seeds the MLP probe's mean L1 is therefore 0.0078 [0.0022, 0.0135] here against a stored 0.0044 [0.0040, 0.0048], and its global value bound 0.43 [0.12, 0.74] against a stored 0.24 [0.22, 0.26]. On both seeds the largest L1 error is below the stored one, so the excess is spread over many histories. Whether the cause is the fit (a last iterate of full-batch Adam at a constant rate) is C-q.5's question; until it is read, the MLP rows of this table carry that caveat and the linear rows do not.
+  - Cost: 41.9 min per seed on one CPU thread, beside other jobs.
 
 ## C-r result, Tiger (read once 2026-11-21 10:01; `reports/2026-10-19_eval_protocol/ba_pomcp_tiger_readout.log`; campaign at 5609947, log beside it): OURS AHEAD OF EVERY BA-POMCP ARM
 
