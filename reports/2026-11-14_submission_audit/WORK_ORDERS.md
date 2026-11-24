@@ -92,6 +92,11 @@
   - Fast suite: 339 passed / 2 skipped on the CPU before the last two additions, and the two files they went into pass (`tests/test_wumpus.py` 54, `tests/test_system_monitoring.py` 9).
 - Phase 7 (entry points, telemetry, queue, reports): the telemetry package, the configuration files, the queue, the sweep wrapper and the packaging files are read; 122 rows remain, almost all report and stage scripts.
 
+**Addendum 2026-11-23 21:07: the CPU development run on Interactive Tiger level 1 has ended (seed 100, not an E1 seed; default configuration; exit 0 after 2 h 41 min on four CPU threads beside other jobs).**
+- Greedy evaluations during training (128 episodes each, the run's own simulator): -19.88, -18.37, 12.00 +- 2.83, 11.51 +- 2.70, 14.19 +- 2.52, 12.47 +- 2.66, 12.98 +- 2.82 and, at the last collection, 16.55 +- 2.36. `best.pt` is that last collection.
+- What this says and does not say: the default configuration learns the level-1 problem (the always-listen return is -19.88). Whether it reaches the reference agent (16.3 on C-r's episodes; bracket [16.55, 19.67]) is NOT settled by these numbers: each carries about +- 2.6, the five before the last average 12.6, and the checkpoint was chosen by the highest of them. The paired analysis on fresh episodes against the benchmark file decides; it is queued on the CPU behind C-q.5 for memory and should end at about 23:30.
+- The same run at level 2 (seed 100, default configuration) starts now; about 2.5 h.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
