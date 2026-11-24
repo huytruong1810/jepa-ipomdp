@@ -212,6 +212,12 @@
 - **The level-2 decoder development run has trained** (seed 100, CPU, exit 0 after 40 min): greedy evaluations -19.88, -19.88, 7.00 +- 2.42, 13.05 +- 2.42, 13.90 +- 2.04 (`best.pt`), 11.54 +- 2.74, 12.70 +- 2.47, 13.00 +- 2.49. It learns the level-2 problem as the JEPA run did. Its analysis is queued behind the level-1 re-analysis; both wait for 9.4 GB.
 - C-q.6: 8 of 10 runs played.
 
+**Addendum 2026-11-24 14:30: the level-1 JEPA development run is re-analysed with the history-free control; the two cells that were pending are filled, and the analysis reproduced itself.**
+- **Reproducibility:** the re-analysis (same run, same analysis seed, CPU, two threads) gives all 151 numbers of the first report again, field for field; the 18 new fields are the control's.
+- **The pending cells of the 12:05 table** (level 1, JEPA, the agent's own histories; share of the history's information about j's node recovered, trained / untrained): linear probe **64% / 58%**, MLP probe **86% / 86%**. Beside them the decoder's 93% / 58% and 97% / 86%. On the tiger's side JEPA recovers 96% (linear) and 99% (MLP) against the untrained 92% and 98%.
+- So the reading of 12:05 holds on the agent's own histories as well: with the MLP probe the JEPA latent tells nothing more about j's node than the same network before training; the decoder latent does.
+- **Machine at 14:29:** 5.8 GB available with nothing of jepa running (ipomcp holds 15.6 GB); jepa's waiters start nothing under 7.3 GB. Waiting: the last two runs of C-q.6 and the analysis of the level-2 decoder development run (9.4 GB).
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
