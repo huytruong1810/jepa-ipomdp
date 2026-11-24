@@ -205,6 +205,13 @@
   - The CPU screen I had offered (a 5-step observation horizon, a 64-dimensional latent) is no longer the obvious next step: its first element, the decoder at the default configuration, already recovers 89% or more. I am not running it.
 - **Machine:** C-q.6 has 7 of 10 runs played; the level-1 re-analysis waits for 9.4 GB. The GPU hold stands.
 
+**Addendum 2026-11-24 13:30: user ruling on E1's arms, and the schedule that follows.**
+- **The ruling (13:25): E1 gets a fourth arm, level 2 with the decoder.** The arms are level 1 JEPA, level 1 decoder, level 2 JEPA, level 2 decoder, ten training seeds each. C-s.5 (decoder minus JEPA, the learned planner's return per training seed, with its smallest equivalence margin) is read at each level. It was added before any E1 seed has run; nothing is registered yet.
+- Done for it, all outside the tracked tree until the registration (`runs/week/drafts/`): the registration draft holds the four arms; the fourth arm's stage draft (`h4_e1_l2_decoder.sh.draft`) exists; the smoke has a fourth seed (103). The readout and the arm script needed no change.
+- **Schedule (my estimate, not a decision).** By the plan's figure of 1.5 to 3 GPU-hours per seed the four arms take 60 to 120 GPU-hours, the smoke 7 to 12, W11 40 to 50: 107 to 182 GPU-hours, 4.5 to 7.6 days of an uninterrupted queue. For E1 to read out by 2026-12-05 the hold then has to lift by about **2026-11-26** (it was about 11-27 with three arms). The CPU development runs suggest the lower half of that range (a seed trained in 0.7 to 2.7 h on four CPU threads and was analysed in about 1 h); the GPU smoke replaces the estimate by a measurement.
+- **The level-2 decoder development run has trained** (seed 100, CPU, exit 0 after 40 min): greedy evaluations -19.88, -19.88, 7.00 +- 2.42, 13.05 +- 2.42, 13.90 +- 2.04 (`best.pt`), 11.54 +- 2.74, 12.70 +- 2.47, 13.00 +- 2.49. It learns the level-2 problem as the JEPA run did. Its analysis is queued behind the level-1 re-analysis; both wait for 9.4 GB.
+- C-q.6: 8 of 10 runs played.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
