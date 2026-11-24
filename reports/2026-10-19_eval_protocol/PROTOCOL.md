@@ -386,6 +386,26 @@ Networks: best.pt of the three stored oracle + double runs (exact-belief targets
   - The largest measured value error and regret are under the largest local bounds on 10 of 10 seeds for both probes (largest value error 1.6 to 3.8, largest local bound 3.4 to 12.3, largest global bound 11.6 to 33.3).
   - **Replication of the stored global form (the registered side comparison).** The linear probe replicates: mean L1 0.0160 against a stored 0.0161, global value bound 0.878 against 0.887. The MLP probe replicates on eight seeds (mean L1 within 0.001) and not on seeds 1 and 5: 0.0176 and 0.0267 against stored 0.0049 and 0.0051. Over the ten seeds the MLP probe's mean L1 is therefore 0.0078 [0.0022, 0.0135] here against a stored 0.0044 [0.0040, 0.0048], and its global value bound 0.43 [0.12, 0.74] against a stored 0.24 [0.22, 0.26]. On both seeds the largest L1 error is below the stored one, so the excess is spread over many histories. Whether the cause is the fit (a last iterate of full-batch Adam at a constant rate) is C-q.5's question; until it is read, the MLP rows of this table carry that caveat and the linear rows do not.
   - Cost: 41.9 min per seed on one CPU thread, beside other jobs.
+- **C-q.5 (the stability of the MLP probe's fit, read once 2026-11-24 05:25; POST HOC; log `reports/2026-11-15_interpretability/mlp_probe_fit_stability.log`, played at 28c1df1 to 030d617; the ten JEPA runs of `runs/sweeps/polyak`, the agent's own histories of C-q.4, fit seeds 0-4 under two schedules, 100 fits; no pass rule).** THE CONSTANT-RATE LAST ITERATE IS UNSTABLE; THE READING STATED IN ADVANCE HOLDS, AND THE DECAYED RATE HAS A COST THAT WAS NOT ANTICIPATED.
+  - Faithfulness: on every run `fit_mlp_probe` itself reproduced C-q.4's mean L1, and the traced loop ended at its parameters.
+  - **Constant rate (the code as it is).** The median of the 50 fits is 0.0045. Two of the 50 are above twice the median: 0.0176 (run 1) and 0.0267 (run 5), both at fit seed 0, the analysis's own. These are the two values that C-q.4 did not replicate. The next largest are 0.0077, 0.0072 and 0.0068.
+  - **They are late rises.** At fit seed 0 the last iterate is 3.55 (run 1) and 5.19 (run 5) times the median of its own last 1,000 steps and equals that tail's maximum; on the other eight runs it is 0.89 to 1.13 times the median. Every run's tail holds such rises: its maximum is 1.6 to 5.3 times its median. The training loss varies by 0.0001 to 0.0007 within a tail (of 0.445).
+  - **Cosine rate.** Median 0.0054, none of the 50 above twice the median, largest 0.0069. The standard deviation over the five fit seeds, averaged over the runs, falls from 0.0022 to 0.0004.
+  - Over the ten runs, mean [Student-t 95%]:
+
+  | mean L1 of the last iterate | constant | cosine | cosine minus constant (paired per run) |
+  |---|---|---|---|
+  | fit seed 0 (the analysis's) | 0.0078 [0.0022, 0.0135] | 0.0053 [0.0048, 0.0059] | -0.0025 [-0.0080, 0.0030] |
+  | mean of the five fit seeds | 0.0053 [0.0041, 0.0064] | 0.0053 [0.0050, 0.0056] | 0.0000 [-0.0011, 0.0011] |
+
+  - **Reading.**
+    - The instability is the constant-rate last iterate, as stated in advance: both outlying fits are late rises, and the decayed rate removes them at every fit seed.
+    - Not anticipated: the decayed rate is not free. Its typical error is a fifth higher (median 0.0054 against 0.0045), because it trains less in the same 3,000 steps. The two schedules have the same mean; the cosine has the narrower interval and the worse typical fit.
+    - The stored reports (mean L1 0.0044 [0.0040, 0.0048], behind the ledger's `tiger.bounds.*`) sit at the constant rate's typical value: none of their ten fits landed on a rise. They are typical fits of an instrument with a heavy right tail, about one fit in 25 here.
+  - **Post hoc exploration of the stored traces (2026-11-24; no new fit; not registered).** Within a fit's last 1,000 steps the training loss and the evaluation error rise together: Spearman 0.93 at the median of the 50 constant-rate fits, at least 0.79. Of the 2,000 traced points 84 (4.2%) are above twice their fit's tail median. The traced point with the lowest TRAINING loss of the last 1,000 steps has a median of 0.0042 over the 50 fits and a largest value of 0.0053; at fit seed 0 over the ten runs it gives 0.0042 [0.0039, 0.0046]. So an iterate chosen by the training loss alone, without evaluation data, would remove the rises without the cosine's cost. The rule was read off these traces (points every 25 steps, the loss one step before the evaluated parameters), so it is a candidate to test on other fits, not a result.
+  - **Not covered:** the probe fitted on random histories (the decoded-belief agent's), the Wumpus MLP probe (`fit_mlp_wumpus_probe`, the same recipe), and the probes of the Interactive Tiger analysis (26 and 14 states).
+  - Nothing in `src/` is changed by this item. Whether the fit changes is a decision about the instrument.
+  - Cost: 65.9 min per run on one CPU thread, of which 15.9 min for the two data sets, beside other jobs.
 
 ## C-r result, Tiger (read once 2026-11-21 10:01; `reports/2026-10-19_eval_protocol/ba_pomcp_tiger_readout.log`; campaign at 5609947, log beside it): OURS AHEAD OF EVERY BA-POMCP ARM
 

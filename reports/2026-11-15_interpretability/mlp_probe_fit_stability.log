@@ -1,0 +1,48 @@
+C-q.5 (post hoc): the stability of the MLP probe's fit; ten JEPA runs of runs/sweeps/polyak, the agent's own histories of C-q.4 (CPU, analysis seed 12345, 512 episodes), 3000 full-batch Adam steps at 0.003; run at commits ['030d617', '28c1df1', '49beeaf']
+every run reproduced C-q.4's mean L1 with fit_mlp_probe itself, and the traced loop ended at its parameters
+
+  schedule constant: the last iterate's mean L1 on the evaluation set, fit seeds [0, 1, 2, 3, 4]
+    run seed 0: [0.0041, 0.0043, 0.0041, 0.0058, 0.0041]
+    run seed 1: [0.0176, 0.0045, 0.0049, 0.0048, 0.0046]
+    run seed 2: [0.0053, 0.0051, 0.0046, 0.0046, 0.0044]
+    run seed 3: [0.0039, 0.0038, 0.0041, 0.0068, 0.0072]
+    run seed 4: [0.005, 0.0044, 0.0037, 0.0037, 0.004]
+    run seed 5: [0.0267, 0.005, 0.0047, 0.0047, 0.0046]
+    run seed 6: [0.0042, 0.0042, 0.0046, 0.0046, 0.0043]
+    run seed 7: [0.0036, 0.0077, 0.0043, 0.0046, 0.0034]
+    run seed 8: [0.0039, 0.0037, 0.0037, 0.0039, 0.0039]
+    run seed 9: [0.004, 0.0045, 0.0056, 0.0048, 0.0046]
+    median of the 50 fits 0.0045; fits above twice the median: 2 of 50; largest 0.0267
+
+  schedule cosine: the last iterate's mean L1 on the evaluation set, fit seeds [0, 1, 2, 3, 4]
+    run seed 0: [0.0059, 0.0051, 0.0048, 0.0057, 0.0054]
+    run seed 1: [0.0054, 0.0051, 0.0056, 0.006, 0.0054]
+    run seed 2: [0.0069, 0.0066, 0.0057, 0.0055, 0.0054]
+    run seed 3: [0.0046, 0.0047, 0.005, 0.0055, 0.0051]
+    run seed 4: [0.0052, 0.0048, 0.0046, 0.0044, 0.0047]
+    run seed 5: [0.0058, 0.0059, 0.0055, 0.0055, 0.0056]
+    run seed 6: [0.0049, 0.0048, 0.0055, 0.0058, 0.0053]
+    run seed 7: [0.0042, 0.004, 0.006, 0.0057, 0.0046]
+    run seed 8: [0.0046, 0.0044, 0.0043, 0.0052, 0.0047]
+    run seed 9: [0.0055, 0.0059, 0.0057, 0.0059, 0.006]
+    median of the 50 fits 0.0054; fits above twice the median: 0 of 50; largest 0.0069
+
+  constant rate, fit seed 0 (the analysis's fit): the last iterate against the trace of the last 1000 steps (every 25 steps)
+    run seed 0: last 0.0041; tail min 0.0041, median 0.0045, max 0.0143; last / median 0.92; training loss last 0.445542, tail min 0.445542, max 0.445790
+    run seed 1: last 0.0176; tail min 0.0046, median 0.0050, max 0.0176; last / median 3.55; training loss last 0.445160, tail min 0.444952, max 0.445160
+    run seed 2: last 0.0053; tail min 0.0053, median 0.0059, max 0.0130; last / median 0.90; training loss last 0.444800, tail min 0.444800, max 0.444919
+    run seed 3: last 0.0039; tail min 0.0039, median 0.0042, max 0.0224; last / median 0.92; training loss last 0.445555, tail min 0.445555, max 0.445943
+    run seed 4: last 0.0050; tail min 0.0040, median 0.0044, max 0.0142; last / median 1.13; training loss last 0.445478, tail min 0.445478, max 0.445634
+    run seed 5: last 0.0267; tail min 0.0048, median 0.0051, max 0.0267; last / median 5.19; training loss last 0.446099, tail min 0.445384, max 0.446099
+    run seed 6: last 0.0042; tail min 0.0042, median 0.0045, max 0.0122; last / median 0.94; training loss last 0.445218, tail min 0.445218, max 0.445476
+    run seed 7: last 0.0036; tail min 0.0036, median 0.0039, max 0.0195; last / median 0.92; training loss last 0.445541, tail min 0.445541, max 0.446289
+    run seed 8: last 0.0039; tail min 0.0039, median 0.0042, max 0.0069; last / median 0.93; training loss last 0.445471, tail min 0.445471, max 0.445557
+    run seed 9: last 0.0040; tail min 0.0040, median 0.0045, max 0.0098; last / median 0.89; training loss last 0.445511, tail min 0.445511, max 0.445564
+
+  over the ten runs, mean [Student-t 95%]
+    constant  fit seed 0: 0.0078 [0.0022, 0.0135];  mean of the five fit seeds: 0.0053 [0.0041, 0.0064]
+    cosine    fit seed 0: 0.0053 [0.0048, 0.0059];  mean of the five fit seeds: 0.0053 [0.0050, 0.0056]
+    cosine minus constant, paired per run: fit seed 0 -0.0025 [-0.0080, 0.0030];  mean of the five fit seeds 0.0000 [-0.0011, 0.0011]
+    standard deviation over the five fit seeds, mean over runs: constant 0.0022, cosine 0.0004
+
+cost: 65.9 min per run on one CPU thread, of which 15.9 min for the two data sets
