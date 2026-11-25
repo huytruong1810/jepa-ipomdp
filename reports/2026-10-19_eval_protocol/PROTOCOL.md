@@ -416,6 +416,35 @@ Networks: best.pt of the three stored oracle + double runs (exact-belief targets
   - **Reading, as stated in advance:** no selected iterate is above twice the median and the paired difference is not above zero, so the rule is supported. The fresh last iterates held one clear rise (the chance of none was about 0.12), so the removal on fits not looked at before rests on that one case and two smaller ones; the two known cases agree. Against C-q.5's cosine rate (0.0053 [0.0050, 0.0056] on fit seeds 0-4) the selected iterate is as stable and a fifth lower.
   - Scope as registered: the Tiger probe on the agent's own histories. Nothing in `src/` is changed; adopting the rule is a decision about the instrument.
   - Cost: 31.5 min per run on one CPU thread for the six fits.
+- **C-q.7 (the canonical Tiger re-analysed with the selected-iterate MLP probe, read once 2026-11-25 13:30; POST HOC; log `reports/2026-11-15_interpretability/tiger_reanalysis.log`; ten JEPA and ten decoder runs, CPU, one thread, analysis seed 12345; no pass rule).** THE PROBE NUMBERS COME OUT AS EXPECTED AND TIGHTER; THE DECODED-BELIEF AGENT LOSES MORE ON THESE EPISODES THAN IN THE STORED REPORTS, WHICH THIS ITEM CANNOT ATTRIBUTE.
+  - Faithfulness: on all ten JEPA runs the linear probe's bound report equals C-q.4's field for field.
+  - **The MLP probe on the agent's histories, JEPA runs** (mean [Student-t 95%]; "old fit" is C-q.4, the same CPU episodes; "stored" is the GPU report, other episodes):
+
+  | quantity | new fit (this item) | old fit, same episodes | stored |
+  |---|---|---|---|
+  | mean L1 | 0.0042 [0.0039, 0.0046] | 0.0078 [0.0022, 0.0135] | 0.0044 [0.0040, 0.0048] |
+  | value error, measured | 0.0455 [0.0413, 0.0498] | 0.0559 [0.0372, 0.0745] | 0.0461 [0.0415, 0.0507] |
+  | value error, global bound | 0.2329 [0.2122, 0.2536] | 0.4305 [0.1210, 0.7401] | 0.2417 [0.2194, 0.2640] |
+  | value error, local bound | 0.0467 [0.0421, 0.0512] | 0.0572 [0.0382, 0.0761] | (not stored) |
+  | one-step regret, measured | 0.0009 [0.0008, 0.0010] | 0.0012 [0.0008, 0.0015] | 0.0010 [0.0009, 0.0012] |
+  | one-step regret, global bound | 0.4658 [0.4245, 0.5072] | 0.8611 [0.2420, 1.4802] | 0.4834 [0.4388, 0.5280] |
+  | one-step regret, local bound | 0.0907 [0.0821, 0.0992] | 0.1113 [0.0741, 0.1484] | (not stored) |
+  | policy form, global (estimate) | 9.32 [8.49, 10.14] | 17.22 [4.84, 29.60] | 9.67 [8.78, 10.56] |
+  | policy form, local (estimate) | 1.81 [1.64, 1.98] | 2.23 [1.48, 2.97] | (not stored) |
+  | suboptimal decisions | 0.13% [0.12, 0.15] | 0.17% [0.11, 0.22] | 0.15% [0.12, 0.17] |
+
+  - As expected in advance: the mean L1 is 0.0042 and its interval is 16 times narrower than the old fit's on the same episodes; the linear rows are unchanged; the learned planner's paired gap to the optimal agent is 0.03 [-0.08, 0.14] (JEPA) and -0.05 [-0.17, 0.07] (decoder), as in the stored reports (0.02 [-0.04, 0.07] and -0.00 [-0.08, 0.07]).
+  - **Decoder runs:** mean L1 on the agent's histories 0.0038 [0.0036, 0.0040] (stored 0.0042 [0.0034, 0.0049]); global value bound 0.2092 [0.1959, 0.2225] (stored 0.2290 [0.1872, 0.2709]); local forms 0.0410, 0.0805 and 1.61. On random histories the MLP probe's mean L1 is 0.0034 [0.0032, 0.0037] where the stored reports have 0.0050 [0.0024, 0.0076]: two stored fits read 0.0141 and 0.0087 (seeds 6 and 7) and one agent-history fit 0.0070 (seed 4), so **the stored decoder reports hold late rises**, which the stored JEPA reports did not.
+  - **The decoded-belief agent, not anticipated in size.** The optimal agent returns 21.77 on these 512 episodes and 18.48 on the stored reports' (V*(b0) = 19.37; one run's standard error is 1.2 to 1.4). Paired gaps to the optimal agent:
+
+  | agent | JEPA, this item | JEPA, stored | decoder, this item | decoder, stored |
+  |---|---|---|---|---|
+  | decoded belief, MLP probe | **-0.96 [-1.24, -0.69]** | -0.20 [-0.44, 0.03] | **-0.80 [-1.54, -0.05]** | -0.09 [-0.41, 0.22] |
+  | decoded belief, linear probe | -7.46 [-9.30, -5.62] | -4.70 [-6.63, -2.78] | -8.63 [-11.56, -5.70] | -5.44 [-8.63, -2.26] |
+
+    - With the MLP probe the gap is negative on all ten JEPA seeds here (-0.45 to -1.71); in the stored reports it ranges from -0.79 to +0.19.
+    - This item cannot say why: against the stored reports both the fit and the episodes differ, and C-q.4 kept no returns. Every seed is analysed on the same episodes, so a Student-t interval over seeds holds no contribution of the episode set; a shift shared by all seeds is what an episode-set effect would look like, and it is also what a worse probe would look like. C-q.8 separates the two (the old fit on these episodes, returns kept).
+  - Cost: 33.6 min (JEPA) and 25.4 min (decoder) per run on one CPU thread.
 
 ## C-r result, Tiger (read once 2026-11-21 10:01; `reports/2026-10-19_eval_protocol/ba_pomcp_tiger_readout.log`; campaign at 5609947, log beside it): OURS AHEAD OF EVERY BA-POMCP ARM
 
