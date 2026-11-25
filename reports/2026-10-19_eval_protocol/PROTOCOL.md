@@ -446,6 +446,20 @@ Networks: best.pt of the three stored oracle + double runs (exact-belief targets
     - With the MLP probe the gap is negative on all ten JEPA seeds here (-0.45 to -1.71); in the stored reports it ranges from -0.79 to +0.19.
     - This item cannot say why: against the stored reports both the fit and the episodes differ, and C-q.4 kept no returns. Every seed is analysed on the same episodes, so a Student-t interval over seeds holds no contribution of the episode set; a shift shared by all seeds is what an episode-set effect would look like, and it is also what a worse probe would look like. C-q.8 separates the two (the old fit on these episodes, returns kept).
   - Cost: 33.6 min (JEPA) and 25.4 min (decoder) per run on one CPU thread.
+- **C-q.8 (the decoded-belief agent's gap in C-q.7: the fit or the episodes?, read once 2026-11-25 15:49; POST HOC; log `reports/2026-11-15_interpretability/tiger_reanalysis_fit_control.log`; the ten JEPA runs with the old fit on C-q.7's CPU episodes; no pass rule).** THE EPISODES CARRY THE SHIFT, NOT THE FIT.
+  - Faithfulness: with the old fit every run reproduced both of C-q.4's bound reports field for field, and the optimal agent's and the learned planner's returns are equal under the two fits.
+  - The decoded-belief agent with the MLP probe, paired gap to the optimal agent, mean [Student-t 95% over the ten seeds]:
+
+  | | these CPU episodes | the stored reports' GPU episodes |
+  |---|---|---|
+  | old fit (last iterate) | -1.20 [-1.83, -0.58] | -0.20 [-0.44, 0.03] |
+  | new fit (selected iterate) | -0.96 [-1.24, -0.69] | (not analysed) |
+
+  - Selected minus last on the same episodes: +0.24 [-0.31, 0.79]. Six of the ten seeds are equal to three decimals, three differ by under 0.1, and on seed 2 the old fit's probe sat on a rise (mean L1 on random histories 0.0208) and its agent lost 3.44 where the new fit's loses 1.01. So the new fit did not make the decoded-belief agent worse, and where the two differ it is the old fit that was on a rise: its random-history probe reads 0.0122, 0.0208 and 0.0145 on seeds 0, 2 and 3 (0.0074 [0.0029, 0.0118] over the seeds, against 0.0036 [0.0034, 0.0039]).
+  - With the linear probe the gap is the same under both fits, as it must be: -7.46 [-9.30, -5.62] here, -4.70 [-6.63, -2.78] in the stored reports.
+  - **Reading, as stated in advance:** the old fit's gap on these episodes is also near -1, and the difference between the fits is small against it. The shift from -0.2 to about -1 comes with the episode set. Every seed is analysed on the same 512 episodes, so the stored interval "-0.20 +- 0.24" is an interval over training seeds for ONE episode set and holds nothing of the episode set's own contribution, which two sets now show to be of the order of the gap itself. The change of the fit stands.
+  - What two episode sets cannot give: the size of the episode-set component. That takes the same analysis on several analysis seeds.
+  - Cost: 25.2 min per run on one CPU thread.
 
 ## C-r result, Tiger (read once 2026-11-21 10:01; `reports/2026-10-19_eval_protocol/ba_pomcp_tiger_readout.log`; campaign at 5609947, log beside it): OURS AHEAD OF EVERY BA-POMCP ARM
 

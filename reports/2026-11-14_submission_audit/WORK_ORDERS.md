@@ -272,6 +272,17 @@
   - **C-q.8 is registered (`2846a03`) and running:** the old fit on these same CPU episodes for the ten JEPA runs, returns kept (two processes, about 3 hours). It must reproduce C-q.4's bound reports exactly. Its reading is stated in advance in PROTOCOL.
 - **For the audit session:** do not move any ledger source before C-q.8 is read. Whatever it shows, the decoded-belief rows need a statement about the shared episode set; the planner rows do not (they replicate).
 
+**Addendum 2026-11-25 15:55: C-q.8 is read (log `reports/2026-11-15_interpretability/tiger_reanalysis_fit_control.log`; PROTOCOL, "C-q results"). The decoded-belief agent's larger loss comes with the episode set, not with the new probe fit. The fit change stands; a reported row needs a caveat or more analysis seeds.**
+- **The control:** the ten JEPA runs analysed with the OLD fit on C-q.7's CPU episodes. It reproduced C-q.4's bound reports exactly on every run.
+- **Result** (decoded-belief agent with the MLP probe minus the optimal agent, paired, Student-t 95% over ten seeds): old fit on the CPU episodes -1.20 [-1.83, -0.58]; new fit on the same episodes -0.96 [-1.24, -0.69]; old fit on the stored GPU episodes -0.20 [-0.44, 0.03]. New minus old on the same episodes: +0.24 [-0.31, 0.79]; they differ visibly on one seed only, where the old fit's probe sat on a rise.
+- **So:** (1) the new fit did not hurt the decoded-belief agent; on these episodes three of the ten old-fit probes on random histories were on a rise (0.012 to 0.021 against a typical 0.004). (2) The decoded-belief agent's gap depends on the episode set: about -0.2 on one set of 512 episodes and about -1.0 on another, with the same runs and the same fit.
+- **What this means for the paper's row "decoded-belief agent, MLP probe: -0.20 +- 0.24"** (README table; the audit session knows where else it is cited): its interval is over training seeds on ONE shared episode set. It does not cover the episode set, whose effect is as large as the gap. "Indistinguishable from the optimal agent" is not supported for that row on the second set (-0.96, all ten seeds negative). The learned planner's rows are not affected: its gap replicates on both sets (0.02 and 0.03).
+  - The same structure holds for every paired gap of the Tiger analysis: all seeds share the analysis episodes. The planner's gap is small on both sets; the decoded-belief agents' are not stable.
+- **Options for the audit session and the user:**
+  1. Report the decoded-belief rows on both episode sets, say that the interval is over training seeds for a fixed episode set, and claim no equivalence for them.
+  2. Estimate the episode-set component: the same CPU analysis (new fit) on several further analysis seeds, about 30 min per run on one thread, so about 5 CPU-hours per analysis seed for the ten JEPA runs. With four more seeds (20 CPU-hours, about 8 h with three processes) the row gets an interval over both training seeds and episode sets (the crossed design the Wumpus rows already use). I recommend this; it needs no GPU.
+- Nothing is changed in the ledger or the paper by me. The fit change (`8321456`) stands.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).

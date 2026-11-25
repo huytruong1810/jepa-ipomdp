@@ -1,0 +1,19 @@
+C-q.8 (post hoc): the decoded-belief agent under the selected-iterate fit and under the last-iterate fit, the ten JEPA runs on the same CPU episodes (analysis seed 12345, 512 episodes); with the old fit every run reproduced C-q.4's bound reports, and the optimal agent's and the learned planner's returns are equal under both fits
+
+  decoded_mlp - optimal (paired within the run)
+    selected-iterate fit                                       -0.964 [-1.242, -0.685]  per seed [-1.183, -0.448, -1.005, -0.558, -1.707, -0.623, -0.854, -1.316, -0.777, -1.166]
+    last-iterate fit                                           -1.204 [-1.827, -0.581]  per seed [-1.096, -0.448, -3.439, -0.618, -1.714, -0.623, -0.863, -1.293, -0.777, -1.166]
+    selected minus last                                        0.240 [-0.312, 0.792]  per seed [-0.087, 0.0, 2.434, 0.06, 0.007, 0.0, 0.01, -0.023, 0.0, 0.0]
+    stored reports (GPU episodes, last-iterate fit)            -0.204 [-0.440, 0.033]  per seed [0.19, -0.457, -0.24, 0.137, -0.786, 0.128, -0.446, -0.311, 0.116, -0.368]
+
+  decoded_linear - optimal (paired within the run)
+    selected-iterate fit                                       -7.458 [-9.297, -5.619]  per seed [-5.078, -9.217, -5.713, -12.743, -8.129, -6.793, -5.464, -10.248, -5.87, -5.323]
+    last-iterate fit                                           -7.458 [-9.297, -5.619]  per seed [-5.078, -9.217, -5.713, -12.743, -8.129, -6.793, -5.464, -10.248, -5.87, -5.323]
+    selected minus last                                        0.000 [0.000, 0.000]  per seed [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    stored reports (GPU episodes, last-iterate fit)            -4.704 [-6.630, -2.778]  per seed [-3.072, -6.631, -2.64, -9.865, -4.923, -5.355, -2.236, -7.748, -1.821, -2.748]
+
+  the MLP probe on random histories (the probe the decoded-belief agent acts on), mean L1
+    selected-iterate fit                                       0.0036 [0.0034, 0.0039]  per seed [0.0038, 0.0035, 0.0031, 0.0034, 0.0041, 0.0036, 0.0038, 0.004, 0.0033, 0.0038]
+    last-iterate fit                                           0.0074 [0.0029, 0.0118]  per seed [0.0122, 0.0035, 0.0208, 0.0145, 0.0041, 0.0036, 0.004, 0.004, 0.0033, 0.0038]
+
+  cost of the control: 25.2 min per run on one CPU thread
