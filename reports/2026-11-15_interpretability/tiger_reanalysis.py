@@ -42,6 +42,23 @@
 #          > reports/2026-11-15_interpretability/tiger_reanalysis.log
 #    `--episodes` and `--out` exist for a rehearsal at a small size; the faithfulness check runs only at the
 #    registered size, and `readout` reads only the registered directory.
+#
+# 5. C-q.8, the Control for the Decoded-Belief Agent (added 2026-11-25, after C-q.7 was read):
+#    - C-q.7 found the decoded-belief agent (MLP probe) 0.96 under the optimal agent on these CPU episodes, where the
+#      stored reports (GPU episodes, the last-iterate fit) have 0.20. Fit and episodes both differ, and C-q.4 kept no
+#      returns, so the cause cannot be read off. `play --fit last` runs the same analysis with the OLD fit on the
+#      same CPU episodes: it sets belief_probe.MLP_SELECTION_STEPS to 0, which leaves no candidate but the last
+#      iterate. Output: runs/interpretability/tiger_reanalysis_lastfit/. JEPA runs only.
+#    - Faithfulness, raising on failure: with the old fit BOTH bound reports (linear and MLP) must equal C-q.4's
+#      field for field. That also proves that the switch restores the old fit exactly.
+#    - `compare` (once, after its ten runs) prints, per seed and over the seeds, the decoded-belief agent's paired
+#      gap to the optimal agent under each fit and their difference (selected minus last, the same episodes), with
+#      the random-history probe's mean L1 under each fit. The optimal agent's and the learned planner's returns
+#      must be equal under both fits (they do not read the probe); the script raises if they are not.
+#        CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=1 nice -n 19 uv run python \
+#            reports/2026-11-15_interpretability/tiger_reanalysis.py play --fit last --sweep polyak --seeds 0,1,2,3,4
+#        CUDA_VISIBLE_DEVICES= uv run python reports/2026-11-15_interpretability/tiger_reanalysis.py compare \
+#            > reports/2026-11-15_interpretability/tiger_reanalysis_fit_control.log
 # ==============================================================================
 
 import argparse
@@ -61,13 +78,14 @@ from ipomdp.agents import PlanningAgent
 from ipomdp.domain import action_value_functions, build_tiger_pomdp, solve_infinite_horizon
 from ipomdp.experiments import AnalysisSettings
 from ipomdp.experiments.runs import load_trained_run
-from ipomdp.interpretability import analyze_beliefs
+from ipomdp.interpretability import analyze_beliefs, belief_probe
 from ipomdp.planning import BeliefTreeSearch
 from ipomdp.training.seeding import stream_seed
 
 CPU = torch.device("cpu")
 SWEEPS = {"polyak": Path("runs/sweeps/polyak"), "decoder": Path("runs/sweeps/decoder")}
 OUT = Path("runs/interpretability/tiger_reanalysis")
+OUT_LAST = Path("runs/interpretability/tiger_reanalysis_lastfit")   # section 5: the old fit on the same episodes
 CQ4 = Path("runs/interpretability/tiger_local_bounds")          # the old fit on the JEPA runs' CPU episodes
 SEEDS = tuple(range(10))
 SETTINGS = AnalysisSettings()                      # 512 episodes, tolerance 0.01, 3,000 probe steps, seed 12345
@@ -75,11 +93,17 @@ PROBES = ("linear/random", "linear/agent", "mlp/random", "mlp/agent")
 AGENTS = ("optimal", "learned_planner", "decoded_mlp", "decoded_linear")
 
 
-def play(sweep: str, seeds: list[int], episodes: int, out: Path) -> None:
+def play(sweep: str, seeds: list[int], episodes: int, out: Path | None, fit: str) -> None:
     torch.set_num_threads(1)
+    home = OUT if fit == "selected" else OUT_LAST
+    out = home if out is None else out
     registered = episodes == SETTINGS.episodes
-    if registered != (out == OUT):
-        raise ValueError(f"{OUT} holds the registered size ({SETTINGS.episodes} episodes) and nothing else.")
+    if registered != (out == home):
+        raise ValueError(f"{home} holds the registered size ({SETTINGS.episodes} episodes) and nothing else.")
+    if fit == "last":                                            # section 5
+        if sweep != "polyak":
+            raise ValueError("the control with the old fit is defined for the JEPA runs (C-q.4 is its reference).")
+        belief_probe.MLP_SELECTION_STEPS = 0                     # no candidate but the last iterate: the fit before 8321456
     commit = subprocess.run(["git", "log", "-1", "--format=%H"], check=True, capture_output=True, text=True).stdout.strip()
     todo = [seed for seed in seeds if not (out / sweep / f"seed{seed}.json").exists()]
     if not todo:
@@ -111,10 +135,13 @@ def play(sweep: str, seeds: list[int], episodes: int, out: Path) -> None:
             if analysis["bounds"]["linear/agent"] != cq4["linear/agent"]:
                 raise RuntimeError(f"polyak seed {seed}: the linear probe's bound report differs from the one C-q.4 "
                                    "stored; these are not C-q.4's episodes or not its analysis.")
+            if fit == "last" and analysis["bounds"]["mlp/agent"] != cq4["mlp/agent"]:
+                raise RuntimeError(f"polyak seed {seed}: with the old fit the MLP probe's bound report differs from "
+                                   "the one C-q.4 stored; the switch does not restore the old fit.")
             old_fit = cq4["mlp/agent"]
         for probe in analysis["probes"].values():                # megabytes of per-posterior rows that no readout uses
             probe["by_posterior"] = None
-        row = {"sweep": sweep, "seed": seed, "commit": commit, "episodes": episodes, "seconds": time.time() - start,
+        row = {"sweep": sweep, "seed": seed, "fit": fit, "commit": commit, "episodes": episodes, "seconds": time.time() - start,
                "analysis": analysis,
                "stored": {"returns": stored["returns"], "bounds": stored["bounds"],
                           "probes": {name: {k: v for k, v in report.items() if k != "by_posterior"}
@@ -124,8 +151,9 @@ def play(sweep: str, seeds: list[int], episodes: int, out: Path) -> None:
         tmp.write_text(json.dumps(row))
         os.replace(tmp, out / sweep / f"seed{seed}.json")
         # Timing only: the values are read once, by `readout`.
-        checked = "linear rows equal to C-q.4" if old_fit is not None else "no CPU reference to check against"
-        print(f"{sweep} seed {seed}: {checked}; analysed in {time.time() - start:.0f} s", flush=True)
+        checked = "no CPU reference to check against" if old_fit is None else (
+            "linear rows equal to C-q.4" if fit == "selected" else "linear and MLP rows equal to C-q.4")
+        print(f"{sweep} seed {seed} ({fit} fit): {checked}; analysed in {time.time() - start:.0f} s", flush=True)
 
 
 def _interval(values: list[float], digits: int) -> str:
@@ -178,22 +206,58 @@ def readout() -> None:
         print(f"  cost: {np.mean([row['seconds'] for row in rows]) / 60:.1f} min per run on one CPU thread")
 
 
+def compare() -> None:
+    """Section 5 (C-q.8): the decoded-belief agent under the two fits on the same episodes, JEPA runs."""
+    missing = [f"{home}/polyak/seed{seed}" for home in (OUT, OUT_LAST) for seed in SEEDS
+               if not (home / "polyak" / f"seed{seed}.json").exists()]
+    if missing:
+        raise SystemExit(f"not read: {missing} are not analysed yet")
+    new = [json.loads((OUT / "polyak" / f"seed{seed}.json").read_text()) for seed in SEEDS]
+    old = [json.loads((OUT_LAST / "polyak" / f"seed{seed}.json").read_text()) for seed in SEEDS]
+    for a, b in zip(new, old):
+        for agent in ("optimal", "learned_planner"):
+            if a["analysis"]["returns"][agent] != b["analysis"]["returns"][agent]:
+                raise RuntimeError(f"seed {a['seed']}: the {agent} agent's return differs between the two fits; the "
+                                   "two analyses did not play the same episodes.")
+    print("C-q.8 (post hoc): the decoded-belief agent under the selected-iterate fit and under the last-iterate fit, "
+          f"the ten JEPA runs on the same CPU episodes (analysis seed {SETTINGS.seed}, {SETTINGS.episodes} episodes); "
+          "with the old fit every run reproduced C-q.4's bound reports, and the optimal agent's and the learned "
+          "planner's returns are equal under both fits")
+    gap = lambda rows, agent: [row["analysis"]["returns"][agent]["mean"] - row["analysis"]["returns"]["optimal"]["mean"]  # noqa: E731
+                               for row in rows]
+    for agent in ("decoded_mlp", "decoded_linear"):
+        print(f"\n  {agent} - optimal (paired within the run)")
+        print(_line("selected-iterate fit", gap(new, agent), 3))
+        print(_line("last-iterate fit", gap(old, agent), 3))
+        print(_line("selected minus last", [x - y for x, y in zip(gap(new, agent), gap(old, agent))], 3))
+        print(_line("stored reports (GPU episodes, last-iterate fit)",
+                    [row["stored"]["returns"][agent]["mean"] - row["stored"]["returns"]["optimal"]["mean"] for row in new], 3))
+    print("\n  the MLP probe on random histories (the probe the decoded-belief agent acts on), mean L1")
+    print(_line("selected-iterate fit", [row["analysis"]["probes"]["mlp/random"]["mean_l1"] for row in new]))
+    print(_line("last-iterate fit", [row["analysis"]["probes"]["mlp/random"]["mean_l1"] for row in old]))
+    print(f"\n  cost of the control: {np.mean([row['seconds'] for row in old]) / 60:.1f} min per run on one CPU thread")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="C-q.7 (module header).")
+    parser = argparse.ArgumentParser(description="C-q.7 and C-q.8 (module header).")
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("play")
     p.add_argument("--sweep", required=True, choices=sorted(SWEEPS))
     p.add_argument("--seeds", required=True, type=lambda text: [int(k) for k in text.split(",")])
     p.add_argument("--episodes", type=int, default=SETTINGS.episodes)
-    p.add_argument("--out", type=Path, default=OUT)
+    p.add_argument("--out", type=Path, default=None)
+    p.add_argument("--fit", choices=("selected", "last"), default="selected")
     sub.add_parser("readout")
+    sub.add_parser("compare")
     args = parser.parse_args()
     if torch.cuda.is_available():
         raise RuntimeError("hide the GPU (CUDA_VISIBLE_DEVICES=): this analysis is registered on the CPU (section 2).")
     if args.command == "play":
-        play(args.sweep, args.seeds, args.episodes, args.out)
-    else:
+        play(args.sweep, args.seeds, args.episodes, args.out, args.fit)
+    elif args.command == "readout":
         readout()
+    else:
+        compare()
 
 
 if __name__ == "__main__":
