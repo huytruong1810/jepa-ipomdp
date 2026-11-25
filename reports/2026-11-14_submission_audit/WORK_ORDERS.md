@@ -247,6 +247,20 @@
 - **For the audit session, when C-q.7 is read:** which Tiger probe numbers the paper cites (`tiger.bounds.*`, the probe errors, the decoded-belief agent's rows): the stored GPU reports with the old fit, or the CPU re-analysis with the new one. If the latter, the ledger's sources for those ids move to `runs/interpretability/tiger_reanalysis/`, and the paper says that the analysis ran on the CPU. A third way, re-running `analyze.py` on the GPU for the twenty runs once the hold lifts (its GPU time is not measured; on the CPU a run takes about 42 min), would keep the stored episodes and change only the fit; it overwrites `analysis/report.json`, so the old reports would be copied aside first.
 - **E1:** its registration will name the new fit; nothing of E1 has run. The four development analyses of seed 100 are queued to be redone with it after C-q.7 (their last-iterate reports are kept beside the new ones).
 
+**Addendum 2026-11-25 08:20 (machine): an out-of-memory kill on Nov 24 at 21:41 was not jepa's; the level-2 decoder development run is analysed; C-q.7 has 7 of 20 runs.**
+- **The kill.** ipomcp's owner session wrote at 08:10 that the kernel had killed a 13.4 GB `python3` process on Nov 24 (the machine was at 62 MB available for a minute) and that it believed it to be a stage of jepa's Tiger re-analysis. It was not:
+  - the kernel's record is `global_oom, task_memcg=/, task=python3, pid=24829` at 21:41:06: a process in the root cgroup. jepa's stage runs in its own systemd unit (`jepa-tiger-re.service`) with a 2 GB cap;
+  - jepa's stage was not running: its guard had stopped it at 20:42:35, and it was started again at 21:41:09, three seconds after the kill, because the kill had freed the memory. Its guard stopped it once more at 21:42:31 (4.8 GB available);
+  - nothing of jepa died, and the result files are whole.
+  - Whose process it was is not known to me. Two unverified clues went to ipomcp's owner: the root cgroup means a process started from a shell outside any unit, and its process id follows closely on the self-improving-agent project's test processes of 21:13 to 21:22.
+  - ipomcp's new rules, which jepa's gates already meet: start a step only with its need plus 5,500 MB available; announce anything above 3 GB an hour ahead. Announced to it: the 1.2 GB re-analysis process, and four later analyses of 3.4 GB (each waits for 9.4 GB available).
+- **The level-2 decoder development run is analysed** (seed 100, CPU, the new probe fit; not an E1 result). Its analysis had been launched one minute before I stopped its waiter on Nov 24 and ran to the end (17:42).
+  - Return on the 512 analysis episodes: reference agent 14.08 +- 1.10; learned planner 12.17 +- 1.22; decoded-belief agent 12.62 +- 1.22 (MLP probe) and 7.22 +- 0.87 (linear; the level-2 JEPA run's linear decoded agent returned -12.0).
+  - j's node, share of the history's information recovered (trained / untrained): linear 97% / 66% on random histories and 95% / 58% on the agent's own; MLP 99% / 91% and 98% / 87%. The level-2 JEPA run recovered 66 to 93%.
+  - Bounds on L (MLP probe, agent's histories): mean L1 0.083; value error 0.158 <= 1.35 (local) <= 4.68 (global); policy form 52 and 187.
+  - So the pattern of level 1 holds at level 2 on this seed: the decoder latent carries j's node, and the fourth arm has something to show.
+- **C-q.7:** 7 of the 10 JEPA runs are analysed (each passed its equality check against C-q.4); the guard has stopped the play ten times, so the remaining 13 runs need another day. Nothing is read.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
