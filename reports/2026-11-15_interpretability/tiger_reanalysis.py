@@ -59,6 +59,25 @@
 #            reports/2026-11-15_interpretability/tiger_reanalysis.py play --fit last --sweep polyak --seeds 0,1,2,3,4
 #        CUDA_VISIBLE_DEVICES= uv run python reports/2026-11-15_interpretability/tiger_reanalysis.py compare \
 #            > reports/2026-11-15_interpretability/tiger_reanalysis_fit_control.log
+#
+# 6. C-q.9, the Episode Set as a Second Random Factor (added 2026-11-27, after C-q.8 was read):
+#    - Every run of a sweep is analysed on the same 512 episodes, so an interval over the training seeds holds
+#      nothing of the episode set. C-q.8 showed that this matters: the decoded-belief agent's paired gap to the
+#      optimal agent is about -0.2 on one episode set and about -1.0 on another, with the same runs and the same fit.
+#    - `play --analysis-seed S` runs the analysis of section 2 (the selected-iterate fit) on the ten JEPA runs with
+#      another analysis seed: other episodes for the probes' data sets and for the agents' returns. Output:
+#      runs/interpretability/tiger_reanalysis_seeds/<S>/polyak/. The registered seeds are ANALYSIS_SEEDS; with
+#      C-q.7's own seed 12345 the table has ten runs by five episode sets.
+#    - `seeds` (once, after the forty runs) prints for each quantity the ten-by-five table's margins and a crossed
+#      analysis: run and episode set as two random factors without replication. With mean squares MS_run, MS_set
+#      and MS_res, the variance of the grand mean is estimated by (MS_run + MS_set - MS_res) / (R S), its degrees
+#      of freedom by Satterthwaite's formula, and the components by (MS_run - MS_res) / S, (MS_set - MS_res) / R and
+#      MS_res. The interval over the training seeds for one episode set, which is what the stored reports give, is
+#      printed beside it for each of the five sets.
+#        CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=1 nice -n 19 uv run python \
+#            reports/2026-11-15_interpretability/tiger_reanalysis.py play --sweep polyak --analysis-seed 20261127 --seeds 0,1,2,3,4
+#        CUDA_VISIBLE_DEVICES= uv run python reports/2026-11-15_interpretability/tiger_reanalysis.py seeds \
+#            > reports/2026-11-15_interpretability/tiger_reanalysis_episode_sets.log
 # ==============================================================================
 
 import argparse
@@ -86,6 +105,8 @@ CPU = torch.device("cpu")
 SWEEPS = {"polyak": Path("runs/sweeps/polyak"), "decoder": Path("runs/sweeps/decoder")}
 OUT = Path("runs/interpretability/tiger_reanalysis")
 OUT_LAST = Path("runs/interpretability/tiger_reanalysis_lastfit")   # section 5: the old fit on the same episodes
+OUT_SEEDS = Path("runs/interpretability/tiger_reanalysis_seeds")    # section 6: other analysis seeds, one folder each
+ANALYSIS_SEEDS = (20261127, 20261128, 20261129, 20261130)           # section 6: registered before their first run
 CQ4 = Path("runs/interpretability/tiger_local_bounds")          # the old fit on the JEPA runs' CPU episodes
 SEEDS = tuple(range(10))
 SETTINGS = AnalysisSettings()                      # 512 episodes, tolerance 0.01, 3,000 probe steps, seed 12345
@@ -93,9 +114,14 @@ PROBES = ("linear/random", "linear/agent", "mlp/random", "mlp/agent")
 AGENTS = ("optimal", "learned_planner", "decoded_mlp", "decoded_linear")
 
 
-def play(sweep: str, seeds: list[int], episodes: int, out: Path | None, fit: str) -> None:
+def play(sweep: str, seeds: list[int], episodes: int, out: Path | None, fit: str, analysis_seed: int) -> None:
     torch.set_num_threads(1)
     home = OUT if fit == "selected" else OUT_LAST
+    if analysis_seed != SETTINGS.seed:                           # section 6
+        if fit != "selected" or sweep != "polyak" or analysis_seed not in ANALYSIS_SEEDS:
+            raise ValueError(f"other analysis seeds are registered for the JEPA runs with the selected-iterate fit, "
+                             f"and only {ANALYSIS_SEEDS}.")
+        home = OUT_SEEDS / str(analysis_seed)
     out = home if out is None else out
     registered = episodes == SETTINGS.episodes
     if registered != (out == home):
@@ -124,13 +150,13 @@ def play(sweep: str, seeds: list[int], episodes: int, out: Path | None, fit: str
         # As experiments/runs.py analyze_run builds the planner and calls the analysis.
         planner = PlanningAgent(
             model, BeliefTreeSearch(model, cfg.mcts.num_simulations, cfg.mcts.c_puct, cfg.mcts.dirichlet_alpha,
-                                    dirichlet_epsilon=0.0, seed=stream_seed(SETTINGS.seed, 7)),
-            episodes, temperature=0.0, seed=stream_seed(SETTINGS.seed, 8), device=CPU)
+                                    dirichlet_epsilon=0.0, seed=stream_seed(analysis_seed, 7)),
+            episodes, temperature=0.0, seed=stream_seed(analysis_seed, 8), device=CPU)
         analysis = asdict(analyze_beliefs(tiger, run.acting_filter, planner, solution.value_function, action_values,
                                           solution.error_bound, cfg.env.max_steps, episodes,
-                                          SETTINGS.mlp_probe_steps, SETTINGS.seed, CPU))
+                                          SETTINGS.mlp_probe_steps, analysis_seed, CPU))
         old_fit = None
-        if registered and sweep == "polyak":                     # section 2, faithfulness
+        if registered and sweep == "polyak" and analysis_seed == SETTINGS.seed:     # section 2, faithfulness
             cq4 = json.loads((CQ4 / f"seed{seed}.json").read_text())["bounds"]
             if analysis["bounds"]["linear/agent"] != cq4["linear/agent"]:
                 raise RuntimeError(f"polyak seed {seed}: the linear probe's bound report differs from the one C-q.4 "
@@ -141,7 +167,8 @@ def play(sweep: str, seeds: list[int], episodes: int, out: Path | None, fit: str
             old_fit = cq4["mlp/agent"]
         for probe in analysis["probes"].values():                # megabytes of per-posterior rows that no readout uses
             probe["by_posterior"] = None
-        row = {"sweep": sweep, "seed": seed, "fit": fit, "commit": commit, "episodes": episodes, "seconds": time.time() - start,
+        row = {"sweep": sweep, "seed": seed, "fit": fit, "analysis_seed": analysis_seed, "commit": commit, "episodes": episodes,
+               "seconds": time.time() - start,
                "analysis": analysis,
                "stored": {"returns": stored["returns"], "bounds": stored["bounds"],
                           "probes": {name: {k: v for k, v in report.items() if k != "by_posterior"}
@@ -153,7 +180,8 @@ def play(sweep: str, seeds: list[int], episodes: int, out: Path | None, fit: str
         # Timing only: the values are read once, by `readout`.
         checked = "no CPU reference to check against" if old_fit is None else (
             "linear rows equal to C-q.4" if fit == "selected" else "linear and MLP rows equal to C-q.4")
-        print(f"{sweep} seed {seed} ({fit} fit): {checked}; analysed in {time.time() - start:.0f} s", flush=True)
+        print(f"{sweep} seed {seed} ({fit} fit, analysis seed {analysis_seed}): {checked}; analysed in "
+              f"{time.time() - start:.0f} s", flush=True)
 
 
 def _interval(values: list[float], digits: int) -> str:
@@ -238,8 +266,71 @@ def compare() -> None:
     print(f"\n  cost of the control: {np.mean([row['seconds'] for row in old]) / 60:.1f} min per run on one CPU thread")
 
 
+def _crossed(table: np.ndarray) -> dict[str, float]:
+    """Section 6: runs (rows) by episode sets (columns) as two crossed random factors without replication."""
+    runs, sets = table.shape
+    grand, row_means, column_means = table.mean(), table.mean(axis=1), table.mean(axis=0)
+    ms_run = sets * ((row_means - grand) ** 2).sum() / (runs - 1)
+    ms_set = runs * ((column_means - grand) ** 2).sum() / (sets - 1)
+    residual = table - row_means[:, None] - column_means[None, :] + grand
+    df_res = (runs - 1) * (sets - 1)
+    ms_res = (residual ** 2).sum() / df_res
+    variance = (ms_run + ms_set - ms_res) / (runs * sets)        # of the grand mean; may be estimated at or below 0
+    out = {"mean": float(grand), "sd_run": math.sqrt(max((ms_run - ms_res) / sets, 0.0)),
+           "sd_set": math.sqrt(max((ms_set - ms_res) / runs, 0.0)), "sd_res": math.sqrt(ms_res),
+           "half": float("nan"), "df": float("nan")}
+    if variance > 0:
+        df = (ms_run + ms_set - ms_res) ** 2 / (ms_run ** 2 / (runs - 1) + ms_set ** 2 / (sets - 1) + ms_res ** 2 / df_res)
+        out["half"], out["df"] = float(stats.t.ppf(0.975, df) * math.sqrt(variance)), float(df)
+    return out
+
+
+def seeds_readout() -> None:
+    """Section 6 (C-q.9): ten JEPA runs by five episode sets."""
+    homes = {SETTINGS.seed: OUT, **{seed: OUT_SEEDS / str(seed) for seed in ANALYSIS_SEEDS}}
+    missing = [f"{home}/polyak/seed{run}" for home in homes.values() for run in SEEDS
+               if not (home / "polyak" / f"seed{run}.json").exists()]
+    if missing:
+        raise SystemExit(f"not read: {missing} are not analysed yet")
+    rows = {seed: [json.loads((home / "polyak" / f"seed{run}.json").read_text()) for run in SEEDS]
+            for seed, home in homes.items()}
+    sets = list(homes)
+    print(f"C-q.9 (post hoc): the ten JEPA runs of {SWEEPS['polyak']} analysed on five episode sets (analysis seeds {sets}; "
+          f"{SETTINGS.seed} is C-q.7's), CPU, one thread, {SETTINGS.episodes} episodes, the selected-iterate MLP probe")
+    print("per quantity: the interval over the ten training seeds within each episode set (Student-t 95%; what one report "
+          "gives), then the crossed analysis: grand mean with a 95% interval for runs and episode sets as two random "
+          "factors, and the standard deviations of the run effect, the episode-set effect and the residual")
+    returns = lambda row, agent: row["analysis"]["returns"][agent]["mean"]                                   # noqa: E731
+    quantities = [(f"{agent} - optimal (paired)", lambda row, agent=agent: returns(row, agent) - returns(row, "optimal"), 3)
+                  for agent in AGENTS[1:]]
+    quantities += [("optimal agent's return", lambda row: returns(row, "optimal"), 3)]
+    quantities += [(f"{probe} mean L1", lambda row, probe=probe: row["analysis"]["probes"][probe]["mean_l1"], 4)
+                   for probe in PROBES]
+    quantities += [(f"mlp/agent {key}", lambda row, key=key: row["analysis"]["bounds"]["mlp/agent"][key], 4)
+                   for key in ("value_error_mean", "value_error_bound_mean", "value_error_bound_local_mean", "regret_mean",
+                               "regret_bound_mean", "regret_bound_local_mean", "policy_loss_bound_mean",
+                               "policy_loss_bound_local_mean", "suboptimal_decision_rate")]
+    for label, value, digits in quantities:
+        table = np.array([[value(row) for row in rows[seed]] for seed in sets]).T          # (runs, episode sets)
+        print(f"\n  {label}")
+        for column, seed in enumerate(sets):
+            if np.ptp(table[:, column]) == 0:
+                print(f"    episode set {seed:<9} {table[0, column]:.{digits}f} (the same for every run)")
+            else:
+                print(f"    episode set {seed:<9} {_interval(table[:, column].tolist(), digits)}")
+        c = _crossed(table)
+        interval = (f"[{c['mean'] - c['half']:.{digits}f}, {c['mean'] + c['half']:.{digits}f}] (Satterthwaite df {c['df']:.1f})"
+                    if not math.isnan(c["half"]) else "[variance of the grand mean estimated at or below 0]")
+        print(f"    crossed: {c['mean']:.{digits}f} {interval}; sd run {c['sd_run']:.{digits}f}, episode set "
+              f"{c['sd_set']:.{digits}f}, residual {c['sd_res']:.{digits}f}")
+        print(f"    per run, mean over the five sets: {np.round(table.mean(axis=1), digits).tolist()}")
+    new = [row for seed in ANALYSIS_SEEDS for row in rows[seed]]
+    print(f"\ncost: {np.mean([row['seconds'] for row in new]) / 60:.1f} min per run on one CPU thread for the four new "
+          f"analysis seeds; commits {sorted({row['commit'][:7] for row in new})}")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="C-q.7 and C-q.8 (module header).")
+    parser = argparse.ArgumentParser(description="C-q.7, C-q.8 and C-q.9 (module header).")
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("play")
     p.add_argument("--sweep", required=True, choices=sorted(SWEEPS))
@@ -247,17 +338,21 @@ def main() -> None:
     p.add_argument("--episodes", type=int, default=SETTINGS.episodes)
     p.add_argument("--out", type=Path, default=None)
     p.add_argument("--fit", choices=("selected", "last"), default="selected")
+    p.add_argument("--analysis-seed", type=int, default=SETTINGS.seed)
     sub.add_parser("readout")
     sub.add_parser("compare")
+    sub.add_parser("seeds")
     args = parser.parse_args()
     if torch.cuda.is_available():
         raise RuntimeError("hide the GPU (CUDA_VISIBLE_DEVICES=): this analysis is registered on the CPU (section 2).")
     if args.command == "play":
-        play(args.sweep, args.seeds, args.episodes, args.out, args.fit)
+        play(args.sweep, args.seeds, args.episodes, args.out, args.fit, args.analysis_seed)
     elif args.command == "readout":
         readout()
-    else:
+    elif args.command == "compare":
         compare()
+    else:
+        seeds_readout()
 
 
 if __name__ == "__main__":
