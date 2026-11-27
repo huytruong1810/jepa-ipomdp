@@ -288,6 +288,13 @@
 - **Schedule, for the user:** the machine is free (ipomcp's queue has ended, the GPU holds 15 MiB), and jepa's hold (`runs/week/PAUSE`) is still in place. My estimate for W11, the smoke and E1's four arms is 4.5 to 7.6 days of queue. Lifted today, E1 reads out between 2026-12-02 and 2026-12-05 at the earliest; every further day moves that by a day.
 - The two remaining development analyses were redone with the new fit on 2026-11-25 (level 1 decoder, level 2 JEPA); see HANDOFF for the comparison with their last-iterate reports.
 
+**Addendum 2026-11-27 11:20: the user lifted the GPU hold; C-o (order W11) is registered and its stage is running.**
+- **The ruling (about 11:00): "Lift the hold".** `runs/week/PAUSE` removed at 11:14:30.
+- **C-o is registered (`9aabd06`)**, as drafted on 2026-11-22, with one note added on C-o.4: the Wumpus MLP probe keeps the last-iterate fit that analysed seeds 5-9 (changed for Tiger on 2026-11-24, not for Wumpus, so that the ten seeds share one instrument), and its per-seed values are printed. Checks at that commit: the readout (`reports/2026-10-19_eval_protocol/w11_readout.py`, moved there with the registration) gives "CHECK PASSED: 45 of 45 values of seeds 5-9 equal the ledger's" and refuses without the new seeds; fast suite 350 passed, 2 skipped; golden 51. The Wumpus analysis code is unchanged since seeds 5-9 were analysed except for an added report field (W7, `dbae0cb`).
+- **Stage `g0_w11` started at 11:14:43** (attempt 1, clean tree): the guard on seed 5 first, then the recipe on seeds 10-14, the baseline and EPR. About 45 GPU-hours, expected end about 2026-11-29 11:00. One read, after all parts.
+- **Next, staged only after the guard passes:** the Interactive Tiger smoke (four development seeds), then C-s's registration with its measurements, then E1's four arms. The deferred code batch (REVIEW lists A to C) waits until E1 has been read, so that all of E1 runs on one commit.
+- **Machine:** the self-improving-agent session acknowledged (no GPU window without asking jepa first). ipomcp's owner session announced single 13.5 GB rows from 12:05; it is not listed right now, so my request could not be delivered: jepa's queue gates each GPU step on 8,000 MB available, which a 13.5 GB row will often block between seeds. If a seed boundary waits long, jepa may write ipomcp's `STOP_BIG_ROWS` file, which ipomcp offered for that purpose, and tell its session.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
