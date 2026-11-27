@@ -283,6 +283,11 @@
   2. Estimate the episode-set component: the same CPU analysis (new fit) on several further analysis seeds, about 30 min per run on one thread, so about 5 CPU-hours per analysis seed for the ten JEPA runs. With four more seeds (20 CPU-hours, about 8 h with three processes) the row gets an interval over both training seeds and episode sets (the crossed design the Wumpus rows already use). I recommend this; it needs no GPU.
 - Nothing is changed in the ledger or the paper by me. The fit change (`8321456`) stands.
 
+**Addendum 2026-11-27 11:00: the user ordered the further analysis seeds; C-q.9 is registered (`0bd25fa`) and running. The GPU hold still stands and the date I gave for E1 has passed.**
+- **C-q.9:** the ten JEPA Tiger runs on analysis seeds 20261127 to 20261130 (CPU, the new probe fit), which with seed 12345 gives ten runs by five episode sets. The readout treats runs and episode sets as two crossed random factors; its interval covered 95.0 to 95.7% on synthetic tables where one set's interval over runs covered as little as 21%. Forty runs as eight processes; expected to end at about 14:30 today. One read.
+- **Schedule, for the user:** the machine is free (ipomcp's queue has ended, the GPU holds 15 MiB), and jepa's hold (`runs/week/PAUSE`) is still in place. My estimate for W11, the smoke and E1's four arms is 4.5 to 7.6 days of queue. Lifted today, E1 reads out between 2026-12-02 and 2026-12-05 at the earliest; every further day moves that by a day.
+- The two remaining development analyses were redone with the new fit on 2026-11-25 (level 1 decoder, level 2 JEPA); see HANDOFF for the comparison with their last-iterate reports.
+
 ## STATUS 2026-11-23 00:25 (the only jepa session) — E1's benchmark file is written; C-r I-Tiger is read; level 2 is ordered and under way
 
 **E1's benchmark file** (`runs/benchmarks/itiger_level1.pt`, written 2026-11-23 00:14:45).
